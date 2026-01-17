@@ -6,8 +6,8 @@ export module avalon.core:log;
 export namespace avalon {
 
 enum class LogLevel { Debug, Info, Warn, Error };
-AVALON_API void LogRaw(LogLevel level, std::string_view message);
-AVALON_API void InitializeLogger();
+AVALON_CORE_API void LogRaw(LogLevel level, std::string_view message);
+AVALON_CORE_API void InitializeLogger();
 
 template <typename... Args>
 inline void Info(std::format_string<Args...> fmt, Args &&...args) {

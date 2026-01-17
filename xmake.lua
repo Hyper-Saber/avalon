@@ -6,7 +6,7 @@ set_toolchains "clang"
 set_policy("build.c++.modules", true)
 add_rules("mode.debug", "mode.release")
 add_rules("plugin.compile_commands.autoupdate", { outputdir = "." })
-add_requires("vulkansdk", "directx-shader-compiler", { system = true })
+add_requires("vulkan","directx-shader-compiler", { system = true })
 add_requires("glfw", "glm", "spdlog")
 
 option "vulkan"
@@ -24,12 +24,13 @@ set_default(true)
 set_showmenu(true)
 set_description "Enable GLFW window backend"
 
-function add_avalon_api_rules()
+function add_avalon_api_rules(target_name)
+    local prefix = string.upper(target_name):gsub("%.", "_")
     if is_plat("windows") then
-        add_defines("AVALON_API=__declspec(dllexport)", {interface = false})
-        add_defines("AVALON_API=__declspec(dllimport)", {interface = true})
+        add_defines(prefix.."_API=__declspec(dllexport)", {interface = false})
+        add_defines(prefix.."_API=__declspec(dllimport)", {interface = true})
     else
-        add_defines("AVALON_API=__attribute__((visibility(\"default\")))", {public = true})
+        add_defines(prefix.."_API=__attribute__((visibility(\"default\")))", {public = true})
     end
 end
 
@@ -38,26 +39,16 @@ function add_rhi_backend(api)
     local prefix = (api == "vulkan") and "vk" or api
     add_files(format("%s/%s/%s_*.cppm", path, api, prefix), { public = true })
     add_files(format("%s/%s/%s_*.cpp", path, api, prefix))
-    add_defines("AVALON_ENABLE_" .. string.upper(api))
-
-    if api == "vulkan" then
-        if is_plat "linux" then
-            add_defines "VK_USE_PLATFORM_WAYLAND_KHR"
-            add_defines "VK_USE_PLATFORM_XCB_KHR"
-        elseif is_plat "windows" then
-            add_defines "VK_USE_PLATFORM_WIN32_KHR"
-        elseif is_plat "macosx" then
-            add_defines "VK_USE_PLATFORM_METAL_EXT"
-        end
-        add_packages "vulkansdk"
-    end
+    set_targetdir("$(builddir)/$(plat)/$(arch)/$(mode)/plugins")
+    add_packages(api)
 end
 
 function add_window_backend(name)
     local path = "src/avalon/window"
-    add_files(format("%s/%s_window.cppm", path, name), { public = true })
-    add_files(format("%s/%s_window.cpp", path, name))
+    add_files(format("%s/%s/%s_window.cppm", path, name, name), { public = true })
+    add_files(format("%s/%s/%s_window.cpp", path, name, name))
     add_defines("AVALON_ENABLE_WINDOW_" .. string.upper(name))
+    set_targetdir("$(buildir)/$(plat)/$(arch)/$(mode)/plugins")
     add_packages(name)
 end
 
@@ -65,55 +56,38 @@ target "avalon.core"
     set_kind "shared"
     set_policy("build.c++.modules", true)
     add_rules "c++.build.modules"
-    add_avalon_api_rules()
+    add_avalon_api_rules("avalon.core")
     add_files("src/avalon/core/*.cppm", {public = true})
     add_files("src/avalon/core/*.cpp")
+    add_files("src/avalon/rhi/rhi.cppm", {public = true})
+    add_files("src/avalon/window/window.cppm", {public = true})
+
+    add_includedirs("src", {public = true})
     add_packages("spdlog")
 
-target "avalon.window"
-    set_kind "static"
-    add_rules "c++.build.modules"
 
-    if is_plat("windows") then
-        add_defines("AVALON_API=__declspec(dllexport)", {interface = false})
-        add_defines("AVALON_API=__declspec(dllimport)", {interface = true})
-    else
-        add_defines("AVALON_API=__attribute__((visibility(\"default\")))", {public = true})
-    end
-
-    add_deps("avalon.core")
-
-    add_files("src/avalon/window/window.cppm", { public = true })
-    add_files("src/avalon/window/window.cpp")
-
-    if has_config "glfw" then
-        add_window_backend "glfw"
-    end
-
-target "avalon.rhi"
-    set_kind "static"
+target "avalon.rhi.vulkan"
+    set_kind "shared"
     set_policy("build.c++.modules", true)
     add_rules "c++.build.modules"
+    add_avalon_api_rules("avalon.rhi.vulkan")
+    add_deps("avalon.core")
 
-    if is_plat("windows") then
-        add_defines("AVALON_API=__declspec(dllexport)", {interface = false})
-        add_defines("AVALON_API=__declspec(dllimport)", {interface = true})
-    else
-        add_defines("AVALON_API=__attribute__((visibility(\"default\")))", {public = true})
+    if is_plat "linux" then
+    add_defines "VK_USE_PLATFORM_WAYLAND_KHR"
+    add_defines "VK_USE_PLATFORM_XCB_KHR"
+    elseif is_plat "windows" then
+    add_defines "VK_USE_PLATFORM_WIN32_KHR"
+    elseif is_plat "macosx" then add_defines "VK_USE_PLATFORM_METAL_EXT"
     end
 
-    add_deps("avalon.core", "avalon.window")
-    add_files("src/avalon/rhi/rhi.cppm", { public = true })
-    add_files("src/avalon/rhi/rhi.cpp")
+    add_rhi_backend("vulkan")
 
-    if has_config "vulkan" then
-        add_rhi_backend "vulkan"
-    end
-
-    if has_config "dx12" then
-        add_rhi_backend "dx12"
-    end
-    add_packages "glm"
+target "avalon.window.glfw"
+    set_kind "static"
+    add_rules "c++.build.modules"
+    add_avalon_api_rules("avalon.window.glfw")
+    add_deps("avalon.core")
 
 -- target("avalon.ecs")
 --     set_kind("static")
@@ -122,32 +96,24 @@ target "avalon.rhi"
 --     add_rules("c++.build.modules")
 --
 --     add_files("src/avalon/ecs/ecs.cppm", {public = true})
-target "avalon.shader_compiler"
-    set_kind "shared"
-    set_policy("build.c++.modules", true)
-    add_rules "c++.build.modules"
-
-    add_deps("avalon.core")
-    add_packages "directx-shader-compiler"
-
-    add_files("src/avalon/renderer/shader_compiler.cppm", { public = true })
-    add_files("src/avalon/renderer/shader_compiler.cpp")
+-- target "avalon.shader_compiler"
+--     set_kind "shared"
+--     set_policy("build.c++.modules", true)
+--     add_rules "c++.build.modules"
+--
+--     add_deps("avalon.core")
+--     add_packages "directx-shader-compiler"
+--
+--     add_files("src/avalon/renderer/shader_compiler.cppm", { public = true })
+--     add_files("src/avalon/renderer/shader_compiler.cpp")
 
 target "avalon.engine"
     set_kind "shared"
     set_policy("build.c++.modules", true)
     add_rules "c++.build.modules"
+    add_avalon_api_rules("avalon.engine")
 
-    if is_plat("windows") then
-        add_defines("AVALON_API=__declspec(dllexport)", {interface = false})
-        add_defines("AVALON_API=__declspec(dllimport)", {interface = true})
-    else
-        add_defines("AVALON_API=__attribute__((visibility(\"default\")))", {public = true})
-    end
-
-    add_headerfiles("src/avalon/engine/engine.cppm", {install = true})
-
-    add_deps("avalon.core", "avalon.rhi", "avalon.window")
+    add_deps("avalon.core")
     add_files("src/avalon/engine/engine.cppm", {public = true})
     add_files("src/avalon/engine/engine.cpp")
 

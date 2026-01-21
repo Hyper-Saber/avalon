@@ -44,35 +44,78 @@ III. 插件化生命周期 (Plugin Lifecycle)
 
 1. 具体架构图 (Architecture Tree)
 
-graph TD
-    %% Root: 用户接口层
-    Game["Game (App)"] --- Engine["avalon.engine (Facade)"]
+```mermaid
+%%{init: {'theme': 'dark', 'flowchart': {'htmlLabels': true, 'nodeSpacing': 50, 'rankSpacing': 80}}}%%
+graph LR
+    %% ============================================================
+    %% 1. 全局默认样式提取 (无单独字体设置，全靠 default 驱动)
+    %% ============================================================
+    classDef default font-size:16px,font-weight:bold,color:#FFFFFF,stroke:#000,stroke-width:2px;
 
-    %% 第一层：逻辑子系统 (Shared DLLs)
-    Engine --- Renderer["renderer (Logic)"]
-    Engine --- Resource["resource (Manager)"]
-    Engine --- Input["input (System)"]
-    Engine --- Scene["scene (Manager)"]
+    %% ============================================================
+    %% 2. 覆盖各层级背景色e
+    %% ============================================================
+    classDef user fill:#0D47A1;
+    classDef framework fill:#1B5E20;
+    classDef internal fill:#E65100;
+    classDef interface fill:#37474F;
+    classDef plugin fill:#4A148C,stroke-dasharray: 8 4,stroke-width:3px;
+    classDef core fill:#B71C1C;
 
-    %% 第二层：功能辅助 (Internal Modules)
-    Renderer --- ShaderCompiler["shader_compiler (Independent DLL)"]
-    Resource --- VFS["avalon.vfs (Virtual File System)"]
-    Scene --- ECS["avalon.ecs (Data Layout)"]
+    %% ============================================================
+    %% 3. 架构拓扑 (LR 布局)
+    %% ============================================================
 
-    %% 第三层：硬件接口定义 (Abstract Interfaces)
-    Renderer --- RHI_I["avalon.rhi (Interface)"]
-    Input --- Window_I["avalon.window (Interface)"]
+    subgraph Layer_A [Application Layer]
+        Game["GAME_APP"] --> Engine["AVALON_ENGINE"]
+        Engine --- PLoader["PLUGIN_LOADER"]
+    end
 
-    %% 第四层：运行时挂载的叶子 (Dynamic Plugins)
-    RHI_I -.-> VK["avalon_rhi_vulkan.so"]
-    RHI_I -.-> DX["avalon_rhi_dx12.dll"]
-    Window_I -.-> GLFW["avalon_window_glfw.so"]
+    subgraph Layer_B [Functional Subsystems]
+        Engine --> Renderer["RENDER_LOGIC"]
+        Engine --> Resource["RESOURCE_VFS"]
+        Engine --> Scene["SCENE_ECS"]
+    end
 
-    %% 第五层：全局根基 (The Soil)
-    VK & DX & GLFW & ShaderCompiler & VFS & ECS --- Core["avalon.core (Shared Foundation)"]
+    subgraph Layer_C_IF [HAL Interfaces]
+        Renderer --> RHI_I["AVALON_RHI_API"]
+        Engine --> Win_I["AVALON_WINDOW_API"]
+    end
 
-    %% 核心底层服务 (Static in Core)
-    Core --- Log["Log (spdlog)"]
-    Core --- Math["Math (GLM)"]
-    Core --- Mem["Memory (Allocators)"]
-    Core --- Task["Task (TaskGraph)"]
+    subgraph Layer_C_PL [Dynamic Plugins]
+        VK_P["VULKAN_BACKEND"]
+        DX_P["DX12_BACKEND"]
+        GLFW_P["GLFW_WINDOW"]
+        SComp["SHADER_COMPILER"]
+    end
+
+    %% 注入逻辑 (PluginLoader -> Plugins)
+    PLoader -.->|"INJECT"| VK_P
+    PLoader -.->|"INJECT"| DX_P
+    PLoader -.->|"INJECT"| GLFW_P
+    PLoader -.->|"INJECT"| SComp
+
+    %% 接口挂载 (Plugins -> Interfaces)
+    VK_P -.-> RHI_I
+    DX_P -.-> RHI_I
+    GLFW_P -.-> Win_I
+    
+    %% 逻辑关联
+    Renderer --- SComp
+
+    subgraph Layer_D [Foundation Layer]
+        Core["AVALON_CORE_SSOT"]
+    end
+
+    %% 全局连接到核心 (消除所有模块的依赖歧义)
+    Engine & Renderer & Resource & Scene & VK_P & DX_P & GLFW_P & SComp & PLoader --> Core
+
+    %% ============================================================
+    %% 4. 样式映射
+    %% ============================================================
+    class Game user;
+    class Engine,Renderer,Resource,Scene framework;
+    class PLoader internal;
+    class RHI_I,Win_I interface;
+    class VK_P,DX_P,GLFW_P,SComp plugin;
+    class Core core;

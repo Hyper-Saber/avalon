@@ -117,9 +117,18 @@ target "avalon.engine"
     add_files("src/avalon/engine/engine.cppm", {public = true})
     add_files("src/avalon/engine/engine.cpp")
 
+target "avalon.mock.plugin"
+    set_kind("shared")
+    add_files("src/avalon/tests/mocks/plugin_mock.cpp")
+    add_deps("avalon.core")
+    add_avalon_api_rules("avalon.mock.plugin")
+
+target "helloPlugin"
+    set_kind "binary"
+    add_deps "avalon.core"
+    add_files("samples/00_hello_plugin/main.cpp")
 
 target "helloTriangle"
     set_kind "binary"
-
     add_deps "avalon.engine"
     add_files "samples/01_hello_triangle/main.cpp"

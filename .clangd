@@ -1,0 +1,17 @@
+CompileFlags:
+  Add: [
+    "-std=c++23",
+    "-fmodules",
+    "-fno-implicit-modules",
+    "-fno-implicit-module-maps"
+  ]
+  Remove: [
+    "-fmodule-file=*",
+    "-fimplicit-modules",
+    "-fimplicit-module-maps"
+  ]
+  CompilationDatabase: "."
+
+Index:
+  Background: Build
+

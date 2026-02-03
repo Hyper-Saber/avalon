@@ -16,13 +16,13 @@ public:
 };
 
 template <typename T>
-concept IsPlugin = std::derived_from<T, IPlugin>;
+concept TPlugin = std::derived_from<T, IPlugin>;
 
 AVALON_CORE_API void *InternalLoadLibrary(std::string_view path);
 AVALON_CORE_API void *InternalGetSymbol(void *handle, std::string_view symbol);
 AVALON_CORE_API void InternalUnloadPlugin(void *handle);
 
-template <IsPlugin T> class PluginInstance {
+template <TPlugin T> class PluginInstance {
 public:
   struct Deleter {
     using DestroyFunc = void (*)(T *);
@@ -59,7 +59,7 @@ private:
   std::unique_ptr<T, Deleter> m_instance;
 };
 
-template <IsPlugin T>
+template <TPlugin T>
 inline auto LoadPlugin(std::string_view path,
                        std::string_view entry = "CreatePlugin",
                        std::string_view exit = "DestroyPlugin")

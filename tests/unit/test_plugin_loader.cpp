@@ -12,7 +12,7 @@ static constexpr std::string_view kNonExistentPath = "missing_plugin";
 static constexpr std::string_view kMockPluginName = "libavalon.mock.plugin";
 } // namespace test_config
 
-void test_load_non_existent_file() {
+void testLoadPlugin() {
   auto result =
       avalon::LoadPlugin<avalon::IPlugin>(test_config::kNonExistentPath);
 
@@ -38,7 +38,7 @@ int main() {
   std::cout << "--- Starting Modern Avalon Unit Tests (No Macros) ---"
             << std::endl;
 
-  test_load_non_existent_file();
+  testLoadPlugin();
   test_load_valid_mock_plugin();
 
   std::cout << "--- All Tests Completed ---" << std::endl;

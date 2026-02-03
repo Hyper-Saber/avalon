@@ -1,3 +1,4 @@
+
 function add_avalon_api_rules(target_name)
     local prefix = string.upper(target_name):gsub("%.", "_")
     if is_plat("windows") then
@@ -26,11 +27,8 @@ function add_window_backend(name)
     add_packages(name)
 end
 
-set_policy("build.c++.modules", true)
-add_rules "c++.build.modules"
-set_kind "shared"
-
 target "avalon.core"
+    set_kind "shared"
     add_avalon_api_rules("avalon.core")
     add_defines("AVALON_PLATFORM_DL_EXT=\""..(is_plat("windows") and ".dll" or ".so").."\"")
     add_files("core/*.cppm", {public = true})
@@ -38,11 +36,24 @@ target "avalon.core"
     add_files("rhi/rhi.cppm", {public = true})
     add_files("window/window.cppm", {public = true})
 
-    add_includedirs("src", {public = true})
+    add_includedirs("..", {public = true})
     add_packages("spdlog")
 
+target "avalon.shader_compiler"
+    set_kind "shared"
+    add_avalon_api_rules("avalon.shader_compiler")
+    add_files ("shader_compiler/*.cppm", {public = true})
+    add_files ("shader_compiler/*.cpp")
+    set_policy("build.c++.modules", true)
+    add_deps("avalon.core")
+    add_packages("directx-shader-compiler")
+    if is_plat("linux") then
+        add_includedirs("/usr/include/dxc")
+    end
 
 target "avalon.rhi.vulkan"
+    set_kind "shared"
+    add_rules "c++.build.modules"
     add_avalon_api_rules("avalon.rhi.vulkan")
     add_deps("avalon.core")
 
@@ -57,10 +68,14 @@ target "avalon.rhi.vulkan"
     add_rhi_backend("vulkan")
 
 target "avalon.window.glfw"
+    set_kind "shared"
+    add_rules "c++.build.modules"
     add_avalon_api_rules("avalon.window.glfw")
     add_deps("avalon.core")
 
 target "avalon.engine"
+    set_kind "shared"
+    add_rules "c++.build.modules"
     add_avalon_api_rules("avalon.engine")
 
     add_deps("avalon.core")

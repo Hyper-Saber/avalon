@@ -15,3 +15,21 @@ CompileFlags:
 Index:
   Background: Build
 
+---
+
+# If:
+#   PathMatch: .*\.hlsl
+#
+# CompileFlags:
+#   CompilationDatabase: ""
+#   Remove: ["-std=*", "-fmodules*", "-fno-fimplicit-modules*", "fno-fimplicit-module-maps*", "--target=*"]
+#   Add:
+#     - "-xhlsl"
+#     - "--target=spirv-unknown-vulkan-library"
+#     - "-std=hlsl2021"
+#     - "-DSPIRV"
+#     - "-fms-extensions"
+#     - "finclude-default-header"
+#     - "-Tvs_6_x"
+#     - "-Wno-unknown-attributes"
+#     - "-Wno-hlsl-unknown-semantic"

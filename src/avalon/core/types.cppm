@@ -1,6 +1,8 @@
 module;
 export module avalon.core:types;
 
+import :vfs;
+
 export namespace avalon::window {
 
 enum class WindowMode { Windowed, Fullscreen, Borderless };
@@ -18,6 +20,7 @@ enum class NativeWindowApi {
 };
 
 struct NativeWindowInfo {
+
   NativeWindowApi api;
 
   union {
@@ -49,3 +52,17 @@ struct RhiConfig {
   bool enableValidationLayer = true;
 };
 } // namespace avalon::rhi
+
+export namespace avalon {
+struct EngineContext {
+  rhi::RenderBackend rhi;
+  vfs::IVfs *pVfs;
+};
+
+struct EngineConfig {};
+
+AVALON_CORE_API auto GetContext() -> EngineContext & {
+  static EngineContext instance;
+  return instance;
+}
+} // namespace avalon

@@ -1,3 +1,5 @@
+module;
+#include <string_view>
 export module avalon.core:platform;
 
 export namespace avalon {
@@ -8,4 +10,6 @@ constexpr bool is_linux = false;
 constexpr bool kIsWindows = false;
 constexpr bool kIsLinux = true;
 #endif
+
+constexpr std::string_view kPluginExtension = AVALON_PLATFORM_DL_EXT;
 } // namespace avalon

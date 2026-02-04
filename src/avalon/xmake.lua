@@ -17,12 +17,12 @@ function add_rhi_backend(api)
     set_targetdir("$(builddir)/$(plat)/$(arch)/$(mode)/plugins")
     add_packages(api)
 end
-
+--
 function add_window_backend(name)
     local path = "window"
-    add_files(format("%s/%s/%s_window.cppm", path, name, name), { public = true })
+    -- add_files(format("%s/%s/%s_window.cppm", path, name, name), { public = true })
+    add_files("window/window.cppm", { public = true })
     add_files(format("%s/%s/%s_window.cpp", path, name, name))
-    add_defines("AVALON_ENABLE_WINDOW_" .. string.upper(name))
     set_targetdir("$(builddir)/$(plat)/$(arch)/$(mode)/plugins")
     add_packages(name)
 end
@@ -72,6 +72,12 @@ target "avalon.window.glfw"
     add_rules "c++.build.modules"
     add_avalon_api_rules("avalon.window.glfw")
     add_deps("avalon.core")
+    add_window_backend("glfw")
+    if is_plat("linux") then
+        add_defines "GLFW_EXPOSE_NATIVE_X11"
+        add_defines "GLFW_EXPOSE_NATIVE_WAYLAND"
+        add_syslinks("X11-xcb")
+    end
 
 target "avalon.engine"
     set_kind "shared"

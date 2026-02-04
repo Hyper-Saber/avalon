@@ -1,4 +1,5 @@
 module;
+#include <cstdint>
 export module avalon.core:types;
 
 import :vfs;
@@ -15,12 +16,11 @@ enum class WindowBackend {
 
 enum class NativeWindowApi {
   Wayland,
-  // Xcb,
-  // Win32,
+  Xcb,
+  Win32,
 };
 
 struct NativeWindowInfo {
-
   NativeWindowApi api;
 
   union {
@@ -28,14 +28,14 @@ struct NativeWindowInfo {
       void *display;
       void *surface;
     } wayland;
-    // struct {
-    //   void *connection;
-    //   uint32_t window;
-    // } xcb;
-    // struct {
-    //   void *hwnd;
-    //   void *hinstance;
-    // };
+    struct {
+      void *connection;
+      uint32_t window;
+    } xcb;
+    struct {
+      void *hwnd;
+      void *hinstance;
+    };
   };
 };
 } // namespace avalon::window

@@ -1,3 +1,4 @@
+
 target ("test.utils")
     set_kind("static")
     add_files("test_utils.cppm", {public = true})
@@ -21,3 +22,9 @@ target("test.shader_compiler")
     add_files("unit/shader_compiler/*.cpp")
     add_deps("avalon.core", "avalon.shader_compiler", "test.utils")
     set_rundir("$(projectdir)")
+
+target("test.glfw_window")
+    set_kind("binary")
+    set_group("Tests")
+    add_files("unit/test_glfw_window.cpp")
+    add_deps("avalon.core", "avalon.window.glfw", "test.utils")

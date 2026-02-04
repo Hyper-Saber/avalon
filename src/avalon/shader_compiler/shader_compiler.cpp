@@ -118,6 +118,8 @@ public:
       wArgs.push_back(L"-fspv-target-env=universal1.5");
     }
     wArgs.push_back(L"-fspv-reflect");
+    wArgs.push_back(L"-D");
+    wArgs.push_back(L"VK_LOCATION(n)=[[vk::location(n)]]");
 
     DxcBuffer sourceBuffer{source.data(), source.size(), DXC_CP_UTF8};
     DxcPtr<IDxcResult> pResult;
@@ -160,9 +162,10 @@ public:
     return std::unexpected(EStatusCode::InternalError);
   }
 };
+} // namespace avalon::shader_compiler
 
 extern "C" AVALON_SHADER_COMPILER_API avalon::IPlugin *CreatePlugin() {
-  return new ShaderCompiler();
+  return new avalon::shader_compiler::ShaderCompiler();
 }
 
 extern "C" AVALON_SHADER_COMPILER_API void
@@ -172,5 +175,3 @@ DestroyPlugin(avalon::IPlugin *plugin) {
     delete plugin;
   }
 }
-
-} // namespace avalon::shader_compiler

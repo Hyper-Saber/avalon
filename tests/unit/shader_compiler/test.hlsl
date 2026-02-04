@@ -1,11 +1,11 @@
 struct VSInput {
-[ [ vk : : location(0)] ] float3 position : POSITION;
-[ [ vk : : location(1)] ] float2 uv : TEXCOORD;
-} ;
+  VK_LOCATION(0) float3 position : POSITION;
+  VK_LOCATION(1) float2 uv : TEXCOORD;
+};
 
 struct VSOutput {
   float4 clipPos : SV_POSITION;
-} ;
+};
 
 VSOutput Main(VSInput input) {
   VSOutput output;

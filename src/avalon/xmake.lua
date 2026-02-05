@@ -12,6 +12,7 @@ end
 function add_rhi_backend(api)
     local path = "rhi"
     local prefix = (api == "vulkan") and "vk" or api
+    add_files("rhi/rhi.cppm", { public = true })
     add_files(format("%s/%s/%s_*.cppm", path, api, prefix), { public = true })
     add_files(format("%s/%s/%s_*.cpp", path, api, prefix))
     set_targetdir("$(builddir)/$(plat)/$(arch)/$(mode)/plugins")

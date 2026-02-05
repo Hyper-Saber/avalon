@@ -15,6 +15,7 @@ namespace avalon::window {
 
 class GlfwWindow final : public IWindow {
 public:
+  ~GlfwWindow() override { InternalCleanup(); }
   auto OnLoad() -> std::expected<void, EStatusCode> override {
     if (!glfwInit()) {
       avalon::Error("[GlfwWindow]: Failed to initialize GLFW!");
@@ -47,13 +48,6 @@ public:
     });
 
     return {};
-  }
-  void Cleanup() override {
-    if (m_window) {
-      glfwDestroyWindow(m_window);
-      m_window = nullptr;
-    }
-    glfwTerminate();
   }
 
   auto GetNativeInfo() -> NativeWindowInfo const override {
@@ -96,6 +90,14 @@ private:
   bool m_isResized = false;
   uint32_t m_width = 0;
   uint32_t m_height = 0;
+
+  void InternalCleanup() {
+    if (m_window) {
+      glfwDestroyWindow(m_window);
+      m_window = nullptr;
+    }
+    glfwTerminate();
+  }
 };
 } // namespace avalon::window
 
@@ -105,7 +107,6 @@ extern "C" AVALON_WINDOW_GLFW_API avalon::IPlugin *CreatePlugin() {
 
 extern "C" AVALON_WINDOW_GLFW_API void DestroyPlugin(avalon::IPlugin *plugin) {
   if (plugin) {
-    plugin->Cleanup();
     delete plugin;
   }
 }

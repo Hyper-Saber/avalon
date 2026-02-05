@@ -12,7 +12,6 @@ class IPlugin {
 public:
   virtual ~IPlugin() = default;
   virtual auto OnLoad() -> std::expected<void, EStatusCode> = 0;
-  virtual void Cleanup() = 0;
 };
 
 template <typename T>

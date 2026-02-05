@@ -9,7 +9,7 @@ using namespace test_config;
 
 namespace test_config {
 static constexpr std::string_view kNonExistentPath = "missing_plugin";
-static constexpr std::string_view kMockPluginName = "libavalon.mock.plugin";
+static constexpr std::string_view kMockPluginName = "libmock.plugin";
 } // namespace test_config
 
 void testLoadPlugin() {

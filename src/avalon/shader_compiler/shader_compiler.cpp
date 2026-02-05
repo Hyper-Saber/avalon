@@ -68,8 +68,6 @@ class ShaderCompiler final : public IShaderCompiler {
 public:
   auto OnLoad() -> std::expected<void, EStatusCode> override { return {}; }
 
-  void Cleanup() override {}
-
   auto CompileFromFile(const std::filesystem::path &path,
                        std::string_view entryPoint, EShaderStage stage,
                        EShaderFeatureLevel level)
@@ -171,7 +169,6 @@ extern "C" AVALON_SHADER_COMPILER_API avalon::IPlugin *CreatePlugin() {
 extern "C" AVALON_SHADER_COMPILER_API void
 DestroyPlugin(avalon::IPlugin *plugin) {
   if (plugin) {
-    plugin->Cleanup();
     delete plugin;
   }
 }

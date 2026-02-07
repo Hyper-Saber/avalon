@@ -47,6 +47,13 @@ enum class RenderBackend {
   // D3D12, Metal
 };
 
+enum class EFormat {
+  R32G32B32A32_Float4,
+  R32G32B32_Float3,
+  R32G32_Float2,
+  R32_Float,
+};
+
 struct RhiConfig {
   RenderBackend backend = RenderBackend::Auto;
   bool enableValidationLayer = true;

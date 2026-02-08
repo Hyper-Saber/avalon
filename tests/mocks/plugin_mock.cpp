@@ -11,7 +11,7 @@ public:
     std::cout << "[Mock Plugin] Cleanup called!" << std::endl;
   }
 
-  auto OnLoad() -> std::expected<void, EStatusCode> override {
+  auto OnLoad() -> EStatusCode override {
     std::cout << "[Mock Plugin] OnLoad called successfully!" << std::endl;
     return {};
   }

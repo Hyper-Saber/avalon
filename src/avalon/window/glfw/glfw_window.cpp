@@ -1,8 +1,6 @@
 module;
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
-#include <expected>
-#include <string>
 
 #ifdef __linux__
 #include <X11/Xlib-xcb.h>
@@ -16,23 +14,25 @@ namespace avalon::window {
 class GlfwWindow final : public IWindow {
 public:
   ~GlfwWindow() override { InternalCleanup(); }
-  auto OnLoad() -> std::expected<void, EStatusCode> override {
+
+  auto OnLoad() -> EStatusCode override {
     if (!glfwInit()) {
       avalon::Error("[GlfwWindow]: Failed to initialize GLFW!");
-      return std::unexpected(EStatusCode::PluginInitializeError);
+      return EStatusCode::PluginInitializeError;
     }
     return {};
   }
-  auto Initialize(const WindowProps &props)
-      -> std::expected<void, EStatusCode> override {
+
+  auto Initialize(const WindowProps &props) -> EStatusCode override {
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    m_window = glfwCreateWindow(props.width, props.height, props.title.c_str(),
-                                nullptr, nullptr);
+    m_window = glfwCreateWindow(props.width, props.height, props.title, nullptr,
+                                nullptr);
 
     if (!m_window) {
       avalon::Error("[GlfwWindow]: Failed to create GLFW window!");
-      return std::unexpected(EStatusCode::WindowError);
+      return EStatusCode::WindowError;
     }
+
     int width, height;
     glfwGetFramebufferSize(m_window, &width, &height);
     m_width = static_cast<uint32_t>(width);

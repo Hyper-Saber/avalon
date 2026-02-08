@@ -1,7 +1,5 @@
 module;
 #include <cstdint>
-#include <expected>
-#include <string>
 
 export module avalon.window;
 
@@ -10,7 +8,7 @@ import avalon.core;
 export namespace avalon::window {
 
 struct WindowProps {
-  std::string title = "Avalon Engine";
+  const char *title = "Avalon Engine";
   uint32_t width = 1280;
   uint32_t height = 720;
   bool resizable = true;
@@ -21,8 +19,7 @@ struct WindowProps {
 
 class IWindow : public IPlugin {
 public:
-  virtual auto Initialize(const WindowProps &props)
-      -> std::expected<void, EStatusCode> = 0;
+  virtual auto Initialize(const WindowProps &props) -> EStatusCode = 0;
   virtual auto GetNativeInfo() -> NativeWindowInfo const = 0;
   virtual bool IsMinimized() const = 0;
   virtual bool WasResized() const = 0;

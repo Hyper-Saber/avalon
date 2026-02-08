@@ -11,15 +11,15 @@ export namespace avalon {
 class IPlugin {
 public:
   virtual ~IPlugin() = default;
-  virtual auto OnLoad() -> std::expected<void, EStatusCode> = 0;
+  virtual auto OnLoad() -> EStatusCode = 0;
 };
-
-template <typename T>
-concept TPlugin = std::derived_from<T, IPlugin>;
 
 AVALON_CORE_API void *InternalLoadLibrary(std::string_view path);
 AVALON_CORE_API void *InternalGetSymbol(void *handle, std::string_view symbol);
 AVALON_CORE_API void InternalUnloadPlugin(void *handle);
+
+template <typename T>
+concept TPlugin = std::derived_from<T, IPlugin>;
 
 template <TPlugin T> class PluginInstance {
 public:
@@ -100,12 +100,12 @@ inline auto LoadPlugin(std::string_view path,
     return std::unexpected(EStatusCode::PluginInitializeError);
   }
 
-  auto init_res = raw_instance->OnLoad();
-  if (!init_res) {
+  auto res = raw_instance->OnLoad();
+  if (res != EStatusCode::Success) {
     avalon::Error("Plugin Loader: Failed to initialize! Path: {}", path);
     destroyFn(raw_instance);
     InternalUnloadPlugin(handle);
-    return std::unexpected(init_res.error());
+    return std::unexpected(res);
   }
 
   return PluginInstance<T>(raw_instance, handle, destroyFn);

@@ -3,12 +3,12 @@ module;
 #include <filesystem>
 #include <fstream>
 #include <string_view>
-#include <vector>
 module avalon.core:disk_device;
 
 import :vfs;
-import :memory;
 import :log;
+import :memory.blobs;
+import :containers;
 
 namespace avalon::vfs {
 constexpr std::string_view deviceName = "DiskDevice";
@@ -34,14 +34,14 @@ public:
     }
 
     auto fileSize = static_cast<size_t>(file.tellg());
-    std::vector<std::byte> buffer(fileSize);
+    Array<std::byte> buffer(fileSize);
 
     file.seekg(0, std::ios::beg);
     if (!file.read(reinterpret_cast<char *>(buffer.data()), fileSize)) {
       avalon::Error("[VFS]: read error at path: {}", path.generic_string());
       return std::unexpected(EVfsError::ReadError);
     }
-    return avalon::MakeBlob<avalon::VectorBlob>(std::move(buffer));
+    return CreateBlob(std::move(buffer));
   }
 
   bool IsPathExists(const std::filesystem::path &path) const override {

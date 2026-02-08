@@ -17,19 +17,19 @@ concept TRefCounted = requires(T t) {
   { t->Release() };
 };
 
-template <TRefCounted T> class TRef {
+template <TRefCounted T> class Ref {
 public:
-  TRef() : m_ptr(nullptr) {}
-  TRef(T *ptr) : m_ptr(ptr) {
+  Ref() : m_ptr(nullptr) {}
+  Ref(T *ptr) : m_ptr(ptr) {
     if (m_ptr)
       m_ptr->AddRef();
   }
-  TRef(const TRef &other) : TRef(other.m_ptr) {}
-  TRef(TRef &&other) noexcept : m_ptr(other.m_ptr) { other.m_ptr = nullptr; }
+  Ref(const Ref &other) : Ref(other.m_ptr) {}
+  Ref(Ref &&other) noexcept : m_ptr(other.m_ptr) { other.m_ptr = nullptr; }
 
-  ~TRef() { InternalRelease(); }
+  ~Ref() { InternalRelease(); }
 
-  TRef &operator=(T *ptr) {
+  Ref &operator=(T *ptr) {
     InternalRelease();
     if (m_ptr != ptr) {
       InternalRelease();
@@ -40,7 +40,7 @@ public:
     return *this;
   }
 
-  TRef &operator=(const TRef &other) { return *this = other.m_ptr; }
+  Ref &operator=(const Ref &other) { return *this = other.m_ptr; }
   T operator->() const { return m_ptr; }
   T *Get() const { return m_ptr; }
 

@@ -5,6 +5,7 @@ module;
 
 export module avalon.core:vfs;
 import :memory;
+import :memory.blobs;
 
 namespace avalon {
 class Engine;

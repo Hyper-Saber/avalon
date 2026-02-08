@@ -15,8 +15,7 @@ CompileFlags:
 Index:
   Background: Build
 
----
-
+# ---
 # If:
 #   PathMatch: .*\.hlsl
 #

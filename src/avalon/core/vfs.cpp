@@ -8,7 +8,7 @@ module;
 module avalon.core;
 import :vfs;
 import :memory;
-import :blobs;
+import :memory.blobs;
 import :disk_device;
 
 namespace avalon::vfs {

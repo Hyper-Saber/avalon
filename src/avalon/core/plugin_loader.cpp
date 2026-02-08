@@ -13,6 +13,7 @@ void *InternalGetSymbol(void *handle, std::string_view symbol) {
   return dlsym(handle, symbol.data());
 }
 void InternalUnloadPlugin(void *handle) {
+  Info("--- unloading Plugin Handle: {}", handle);
   if (handle)
     dlclose(handle);
 }

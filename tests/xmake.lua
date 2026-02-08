@@ -16,6 +16,12 @@ target("test.vfs")
     add_deps("avalon.core", "test.utils")
     set_rundir("$(projectdir)")
 
+target("test.memory")
+    set_kind("binary")
+    set_group("Tests")
+    add_files("unit/test_memory.cpp")
+    add_deps("avalon.core", "test.utils")
+
 target("test.shader_compiler")
     set_kind("binary")
     set_group("Tests")

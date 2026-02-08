@@ -6,6 +6,8 @@ export import :types;
 export import :plugin_loader;
 export import :vfs;
 export import :memory;
+export import :memory.blobs;
+export import :containers;
 export import :platform;
 export import :ref_counted;
 export import :non_copyable;

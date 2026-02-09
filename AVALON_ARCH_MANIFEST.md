@@ -1,6 +1,6 @@
 # Avalon Engine 架构图 (Architecture Manifest)
 
-**版本:** 0.1
+**版本:** 0.1.1
 **状态:** 正在开发 (Shared DLL 模式)
 
 1. 模块说明 (Module Definitions)
@@ -27,20 +27,6 @@ avalon_window_glfw.so (Dynamic Plugin): 包含 GLFW 调用的具体实现。
 
 D. 全局基石层 (Foundation Layer)
 avalon.core (Shared DLL): 全引擎唯一的物理核心。提供 spdlog 日志、GLM 数学库、自定义内存分配器以及多线程任务图。
-
-1. 设计原则 (Design Principles)
-I. 唯一核心原则 (Single Source of Truth)
-为了彻底消除菱形依赖，avalon.core 必须作为 Shared DLL 存在。所有其他模块（Renderer, RHI 插件等）在运行时必须链接到同一个内存地址的 Core，确保全局状态（如日志级别、内存计数）的唯一性。
-
-II. 后端不透明性 (Backend Opacity)
-用户项目（Game）和功能层（Renderer）永远不应该包含 <vulkan/vulkan.h>。所有的硬件操作必须通过虚接口进行。这保证了你可以在不重新编译引擎核心的情况下，通过替换 .so 文件来升级驱动后端。
-
-III. 插件化生命周期 (Plugin Lifecycle)
-插件的创建（Create）和销毁（Destroy）必须在 DLL 内部配对。
-
-原则： “谁申请，谁释放”。
-
-实现： 接口使用 virtual 析构函数，或者通过共享库导出的 DestroyInstance 函数来安全回收内存，防止跨 DLL 堆栈破坏。
 
 1. 具体架构图 (Architecture Tree)
 

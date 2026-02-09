@@ -3,7 +3,7 @@ module;
 
 export module avalon.core:memory.blobs;
 import :memory;
-import :containers;
+import :containers.array;
 
 export namespace avalon {
 
@@ -20,6 +20,10 @@ public:
 };
 
 using BlobPtr = std::unique_ptr<IBlob, void (*)(IBlob *)>;
+
+inline auto CreateEmptyBlobPtr() -> BlobPtr {
+  return BlobPtr(nullptr, [](IBlob *) {});
+}
 
 template <typename T>
 concept TBlobImpl = std::derived_from<T, IBlob>;

@@ -5,13 +5,12 @@ module;
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
-#include <vector>
 
 export module avalon.core:containers;
 import :memory.allocator;
 
 export namespace avalon {
-template <typename T> using Array = std::vector<T, Allocator<T>>;
+template <typename T, size_t N> using FixedArray = std::array<T, N>;
 
 using string = std::basic_string<char, std::char_traits<char>, Allocator<char>>;
 using wstring =
@@ -28,5 +27,6 @@ using Set = std::set<T, Compare, Allocator<T>>;
 template <typename T, typename Hash = std::hash<T>>
 using HashSet = std::unordered_set<T, Hash, Allocator<T>>;
 
-template <typename T, size_t N> using FixedArray = std::array<T, N>;
+//-------------------------------------------------------------------------------
+
 } // namespace avalon

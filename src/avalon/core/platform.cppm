@@ -1,4 +1,5 @@
 module;
+#include <filesystem>
 #include <string_view>
 export module avalon.core:platform;
 
@@ -12,4 +13,9 @@ constexpr bool kIsLinux = true;
 #endif
 
 constexpr std::string_view kPluginExtension = AVALON_PLATFORM_DL_EXT;
+
+inline auto ToPath(const char *cPath) -> std::filesystem::path {
+  return std::filesystem::path{
+      std::u8string_view(reinterpret_cast<const char8_t *>(cPath))};
+}
 } // namespace avalon

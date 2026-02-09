@@ -17,7 +17,7 @@ void test_memory_lifecycle_contract() {
     // 模拟资源加载
     const size_t dataSize = 1024;
     Array<std::byte> buffer;
-    buffer.resize(dataSize);
+    buffer.Resize(dataSize);
 
     // 契约 1：分配必须被追踪
     expect(mem::GetTotalUsage() >= baseUsage + dataSize,
@@ -28,7 +28,7 @@ void test_memory_lifecycle_contract() {
     auto blob = CreateBlob(std::move(buffer));
 
     // 契约 2：所有权转移（这是黑盒必须保证的语义）
-    expect(buffer.empty(),
+    expect(buffer.IsEmpty(),
            "Source container must be empty after handing over to Blob");
     expect(blob->GetSize() == dataSize, "Blob must report the same data size");
   }

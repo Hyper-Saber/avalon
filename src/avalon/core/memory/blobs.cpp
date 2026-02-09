@@ -12,8 +12,8 @@ public:
   explicit ArrayBlob(Array<std::byte> &&data) : m_data(std::move(data)) {}
   ~ArrayBlob() override = default;
 
-  auto GetData() const -> const void * override { return m_data.data(); }
-  auto GetSize() const -> size_t override { return m_data.size(); }
+  auto GetData() const -> const void * override { return m_data.GetData(); }
+  auto GetSize() const -> size_t override { return m_data.GetSize(); }
 
 private:
   Array<std::byte> m_data;

@@ -1,7 +1,5 @@
 module;
-#include <expected>
-#include <filesystem>
-#include <string_view>
+#include <bits/unique_ptr.h>
 
 export module avalon.core:vfs;
 import :memory;
@@ -23,27 +21,22 @@ enum class EVfsError {
 class IFileDevice {
 public:
   virtual ~IFileDevice() = default;
-  virtual auto ReadFile(const std::filesystem::path &path)
-      -> std::expected<avalon::BlobPtr, EVfsError> = 0;
-  virtual auto IsPathExists(const std::filesystem::path &path) const
-      -> bool = 0;
-  virtual auto GetDeviceName() const -> std::string_view = 0;
+  virtual auto ReadFile(const char *path, avalon::BlobPtr &outBlob)
+      -> EVfsError = 0;
+  virtual auto IsPathExists(const char *path) const -> bool = 0;
+  virtual auto GetDeviceName() const -> const char * = 0;
 };
 
 class IVfs {
 public:
   virtual ~IVfs() = default;
 
-  virtual void Mount(const std::string_view virtualRoot,
-                     const std::filesystem::path &physicalRoot,
+  virtual void Mount(const char *virtualRoot, const char *physicalRoot,
                      IFileDevice *device, int priority = 0) = 0;
-  virtual void Unmount(const std::string_view virtualRoot) = 0;
-
-  virtual auto ReadFile(const std::filesystem::path &path)
-      -> std::expected<avalon::BlobPtr, EVfsError> = 0;
-  virtual auto IsExists(const std::filesystem::path &path) const -> bool = 0;
+  virtual void Unmount(const char *virtualRoot) = 0;
+  virtual auto ReadFile(const char *path, BlobPtr &outBlob) -> EVfsError = 0;
+  virtual auto IsExists(const char *path) const -> bool = 0;
 };
-
 class VfsProvider {
 public:
   static AVALON_CORE_API auto CreateVfs() -> std::unique_ptr<IVfs>;

@@ -1,21 +1,18 @@
 module;
-#include <expected>
 #include <filesystem>
-#include <optional>
-#include <string_view>
-#include <vector>
 
 module avalon.core;
 import :vfs;
 import :memory;
 import :memory.blobs;
 import :disk_device;
+import :containers;
 
 namespace avalon::vfs {
 
 struct MountEntry {
-  std::string_view virtualRoot;
-  std::filesystem::path physicalRoot;
+  std::string virtualRoot;
+  std::filesystem::path physicalPath;
   IFileDevice *device;
   int priority;
 
@@ -26,42 +23,42 @@ struct MountEntry {
 
 class Vfs final : public IVfs {
 public:
-  void Mount(const std::string_view virtualRoot,
-             const std::filesystem::path &physicalRoot, IFileDevice *fileDevice,
-             int priority) override {
-    m_mounts.push_back({virtualRoot, physicalRoot, fileDevice, priority});
+  void Mount(const char *virtualRoot, const char *cPhysicalPath,
+             IFileDevice *fileDevice, int priority) override {
+    m_mounts.PushBack(
+        {virtualRoot, ToPath(cPhysicalPath), fileDevice, priority});
 
     std::sort(m_mounts.begin(), m_mounts.end(), std::greater<MountEntry>());
   }
 
-  void Unmount(const std::string_view virtualRoot) override {
-    std::erase_if(m_mounts, [&](const auto &entry) {
-      return entry.virtualRoot == virtualRoot;
-    });
+  void Unmount(const char *virtualRoot) override {
+    m_mounts.EraseIf(
+        [&](const auto &entry) { return entry.virtualRoot == virtualRoot; });
   }
 
-  auto ReadFile(const std::filesystem::path &path)
-      -> std::expected<avalon::BlobPtr, EVfsError> override {
+  auto ReadFile(const char *cPath, BlobPtr &outBlob) -> EVfsError override {
+    auto path = ToPath(cPath);
     if (auto resolved = ResolvePath(path)) {
       auto [device, targetPath] = *resolved;
-      if (device->IsPathExists(targetPath)) {
-        return device->ReadFile(targetPath);
+      auto cTargetPath = targetPath.c_str();
+      if (device->IsPathExists(cTargetPath)) {
+        return device->ReadFile(cTargetPath, outBlob);
       }
     }
 
-    return std::unexpected(EVfsError::NotFound);
+    return EVfsError::NotFound;
   }
 
-  auto IsExists(const std::filesystem::path &path) const -> bool override {
+  auto IsExists(const char *path) const -> bool override {
     if (auto resolved = ResolvePath(path)) {
       auto [device, targetPath] = *resolved;
-      return device->IsPathExists(targetPath);
+      return device->IsPathExists(targetPath.c_str());
     }
     return false;
   }
 
 private:
-  std::vector<MountEntry> m_mounts;
+  Array<MountEntry> m_mounts;
 
   auto ResolvePath(const std::filesystem::path &path) const
       -> std::optional<std::pair<IFileDevice *, std::filesystem::path>> {
@@ -76,7 +73,7 @@ private:
           relative.remove_prefix(1);
         }
 
-        auto targetPath = mount.physicalRoot / relative;
+        auto targetPath = mount.physicalPath / relative;
         return std::make_pair(mount.device, targetPath);
       }
     }

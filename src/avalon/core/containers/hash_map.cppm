@@ -77,7 +77,7 @@ public:
     return Iterator{m_entries + m_capacity, m_entries + m_capacity};
   }
 
-  void Insert(const K &key, const V &value) noexcept {
+  V &Insert(const K &key, const V &value) noexcept {
     if (static_cast<float>(m_size + 1) / m_capacity > kMaxLoadFactor) {
       Grow();
     }
@@ -92,9 +92,11 @@ public:
     } else {
       m_entries[index].GetValue() = value;
     }
+
+    return m_entries[index].GetValue();
   }
 
-  void Insert(const K &key, V &&value) noexcept {
+  V &Insert(const K &key, V &&value) noexcept {
     if (static_cast<float>(m_size + 1) / m_capacity > kMaxLoadFactor) {
       Grow();
     }
@@ -109,6 +111,7 @@ public:
     } else {
       m_entries[index].GetValue() = std::move(value);
     }
+    return m_entries[index].GetValue();
   }
 
   V *Get(const K &key) const noexcept {

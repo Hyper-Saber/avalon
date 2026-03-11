@@ -5,11 +5,11 @@ import avalon.ecs;
 import :mesh;
 export namespace avalon::graphics {
 
-struct MeshComponent : public ecs::IComponent {
+struct MeshComponent {
   MeshHandle meshHandle;
 };
 
-struct TransformComponent : public ecs::IComponent {
+struct TransformComponent {
   Matrix4x4 transform;
 };
 

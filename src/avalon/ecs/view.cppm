@@ -2,13 +2,12 @@ module;
 #include <tuple>
 export module avalon.ecs:view;
 
-import :component;
 import :types;
 
 export namespace avalon::ecs {
 class World;
 
-template <TComponent... Components> class View {
+template <typename... Components> class View {
 public:
   explicit View(World &world) : m_world(world) {}
 

@@ -9,19 +9,8 @@ function add_avalon_api_rules(target_name)
     end
 end
 
-function add_rhi_backend(api)
-    local path = "rhi"
-    local prefix = (api == "vulkan") and "vk" or api
-    add_files("rhi/rhi.cppm", { public = true })
-    add_files(format("%s/%s/%s_*.cppm", path, api, prefix), { public = true })
-    add_files(format("%s/%s/%s_*.cpp", path, api, prefix))
-    set_targetdir("$(builddir)/$(plat)/$(arch)/$(mode)/plugins")
-    add_packages(api)
-end
---
 function add_window_backend(name)
     local path = "window"
-    -- add_files(format("%s/%s/%s_window.cppm", path, name, name), { public = true })
     add_files("window/window.cppm", { public = true })
     add_files(format("%s/%s/%s_window.cpp", path, name, name))
     set_targetdir("$(builddir)/$(plat)/$(arch)/$(mode)/plugins")
@@ -32,32 +21,34 @@ target "avalon.core"
     set_kind "shared"
     add_avalon_api_rules("avalon.core")
     add_defines("AVALON_PLATFORM_DL_EXT=\""..(is_plat("windows") and ".dll" or ".so").."\"")
-    add_files("core/*.cppm", {public = true})
-    add_files("core/*.cpp")
-    add_files("rhi/rhi.cppm", {public = true})
-    add_files("window/window.cppm", {public = true})
+    add_headerfiles("core/debug/assert.hpp")
+    add_files("core/**.cppm", {public = true})
+    add_files("core/**.cpp")
 
     add_includedirs("..", {public = true})
+    add_includedirs("core", {public = true})
     add_packages("spdlog")
+    add_syslinks("stdc++exp")
 
-target "avalon.shader_compiler"
-    set_kind "shared"
-    add_avalon_api_rules("avalon.shader_compiler")
-    add_files ("shader_compiler/*.cppm", {public = true})
-    add_files ("shader_compiler/*.cpp")
-    set_policy("build.c++.modules", true)
+target "avalon.rhi"
+    set_kind "static"
+    add_files("rhi/*.cppm", {public = true})
     add_deps("avalon.core")
-    add_packages("directx-shader-compiler")
-    if is_plat("linux") then
-        add_includedirs("/usr/include/dxc")
-    end
+
+target "avalon.window"
+    set_kind "static"
+    add_files("window/window.cppm", {public = true})
+    add_deps("avalon.core")
 
 target "avalon.rhi.vulkan"
     set_kind "shared"
     add_rules "c++.build.modules"
     add_avalon_api_rules("avalon.rhi.vulkan")
-    add_deps("avalon.core")
-
+    add_deps("avalon.core", "avalon.rhi")
+    add_files("rhi/vulkan/*.cppm", { public = true })
+    add_files("rhi/vulkan/*.cpp")
+    set_targetdir("$(builddir)/$(plat)/$(arch)/$(mode)/plugins")
+    add_packages("vulkan")
     if is_plat "linux" then
     add_defines "VK_USE_PLATFORM_WAYLAND_KHR"
     add_defines "VK_USE_PLATFORM_XCB_KHR"
@@ -66,11 +57,8 @@ target "avalon.rhi.vulkan"
     elseif is_plat "macosx" then add_defines "VK_USE_PLATFORM_METAL_EXT"
     end
 
-    add_rhi_backend("vulkan")
-
 target "avalon.window.glfw"
     set_kind "shared"
-    add_rules "c++.build.modules"
     add_avalon_api_rules("avalon.window.glfw")
     add_deps("avalon.core")
     add_window_backend("glfw")
@@ -80,11 +68,32 @@ target "avalon.window.glfw"
         add_syslinks("X11-xcb")
     end
 
+target "avalon.ecs"
+    set_kind "shared"
+    set_targetdir("$(builddir)/$(plat)/$(arch)/$(mode)/plugins")
+    add_avalon_api_rules("avalon.ecs")
+    add_deps("avalon.core", "avalon.rhi")
+    add_files("ecs/*.cppm", {public = true})
+    add_files("ecs/*.cpp")
+
+target "avalon.shader"
+    set_kind "shared"
+    add_avalon_api_rules("avalon.shader")
+    add_deps("avalon.core", "avalon.rhi")
+    add_files("graphics/shader/*.cppm", {public = true})
+    add_packages("spirv-reflect", "directx-shader-compiler", {public = true})
+    add_includedirs("/usr/include/dxc/", {public = true})
+
+target "avalon.graphics"
+    set_kind "shared"
+    add_avalon_api_rules("avalon.graphics")
+    add_files ("graphics/**.cppm|shader/**", {public = true})
+    add_deps("avalon.core", "avalon.rhi", "avalon.shader", "avalon.ecs")
+    add_packages("glm")
+
 target "avalon.engine"
     set_kind "shared"
-    add_rules "c++.build.modules"
     add_avalon_api_rules("avalon.engine")
-
-    add_deps("avalon.core")
-    add_files("engine/engine.cppm", {public = true})
-    add_files("engine/engine.cpp")
+    add_deps("avalon.core", "avalon.window", "avalon.rhi", "avalon.shader", "avalon.graphics", "avalon.ecs", "avalon.rhi.vulkan", "avalon.window.glfw")
+    add_files("engine/*.cppm", {public = true})
+    add_files("engine/*.cpp")

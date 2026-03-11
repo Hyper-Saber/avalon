@@ -1,8 +1,7 @@
 module;
 #include <cstdint>
-export module avalon.core:types;
 
-import :vfs;
+export module avalon.core:types;
 
 export namespace avalon::window {
 
@@ -47,29 +46,8 @@ enum class RenderBackend {
   // D3D12, Metal
 };
 
-enum class EFormat {
-  R32G32B32A32_Float4,
-  R32G32B32_Float3,
-  R32G32_Float2,
-  R32_Float,
-};
-
 struct RhiConfig {
   RenderBackend backend = RenderBackend::Auto;
   bool enableValidationLayer = true;
 };
 } // namespace avalon::rhi
-
-export namespace avalon {
-struct EngineContext {
-  rhi::RenderBackend rhi;
-  vfs::IVfs *pVfs;
-};
-
-struct EngineConfig {};
-
-AVALON_CORE_API auto GetContext() -> EngineContext & {
-  static EngineContext instance;
-  return instance;
-}
-} // namespace avalon

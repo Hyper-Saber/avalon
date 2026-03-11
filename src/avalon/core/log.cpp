@@ -1,8 +1,11 @@
 module;
+#include <debug/assert.hpp>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
 module avalon.core;
+
+import :debug;
 
 namespace avalon {
 
@@ -28,6 +31,7 @@ void LogRaw(LogLevel level, std::string_view message) {
     break;
   case LogLevel::Error:
     spdlog::error(message);
+      debug::TraceBack(3);
     break;
   }
 }

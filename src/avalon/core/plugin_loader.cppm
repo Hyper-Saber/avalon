@@ -1,10 +1,11 @@
 module;
 #include <expected>
 #include <memory>
-#include <string_view>
 export module avalon.core:plugin_loader;
 import :status;
 import :log;
+import :string_view;
+import :path;
 
 export namespace avalon {
 
@@ -14,8 +15,8 @@ public:
   virtual auto OnLoad() -> EStatusCode = 0;
 };
 
-AVALON_CORE_API void *InternalLoadLibrary(std::string_view path);
-AVALON_CORE_API void *InternalGetSymbol(void *handle, std::string_view symbol);
+AVALON_CORE_API void *InternalLoadLibrary(StringView path);
+AVALON_CORE_API void *InternalGetSymbol(void *handle, StringView symbol);
 AVALON_CORE_API void InternalUnloadPlugin(void *handle);
 
 template <typename T>
@@ -39,10 +40,14 @@ public:
     }
   };
 
+  PluginInstance<T>() = default;
+
   PluginInstance(T *instance, void *handle,
                  typename Deleter::DestroyFunc destroyFn)
       : m_instance(instance,
                    Deleter{.handle = handle, .destroyFn = destroyFn}) {}
+
+  ~PluginInstance() { Reset(); }
 
   PluginInstance(const PluginInstance &) = delete;
   PluginInstance &operator=(const PluginInstance &) = delete;
@@ -51,20 +56,24 @@ public:
 
   T *operator->() { return m_instance.get(); }
   const T *operator->() const { return m_instance.get(); }
-  T *get() { return m_instance.get(); }
-  const T *get() const { return m_instance.get(); }
+  T *Get() { return m_instance.get(); }
+  const T *Get() const { return m_instance.get(); }
+
+  void Reset() {
+    m_instance.reset();
+    m_instance = nullptr;
+  }
 
 private:
   std::unique_ptr<T, Deleter> m_instance;
 };
 
 template <TPlugin T>
-inline auto LoadPlugin(std::string_view path,
-                       std::string_view entry = "CreatePlugin",
-                       std::string_view exit = "DestroyPlugin")
+inline auto LoadPlugin(Path path, StringView entry = "CreatePlugin",
+                       StringView exit = "DestroyPlugin")
     -> std::expected<PluginInstance<T>, EStatusCode> {
 
-  void *handle = InternalLoadLibrary(path);
+  void *handle = InternalLoadLibrary(path.GetView());
   if (!handle) {
     avalon::Error("Plugin Loader: Plugin not found! Path: {}.", path);
     return std::unexpected(EStatusCode::FileNotFound);

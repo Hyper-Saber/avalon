@@ -5,8 +5,8 @@ module;
 
 export module test.utils;
 
-export namespace test_config {
-void expect(
+export namespace test {
+void Assert(
     bool condition, std::string_view message,
     const std::source_location location = std::source_location::current()) {
   if (!condition) {
@@ -19,4 +19,4 @@ void expect(
     std::cout << "PASSED: " << message << std::endl;
   }
 }
-} // namespace test_config
+} // namespace test

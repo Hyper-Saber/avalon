@@ -10,25 +10,25 @@ AVALON_CORE_API void LogRaw(LogLevel level, std::string_view message);
 AVALON_CORE_API void InitializeLogger();
 
 template <typename... Args>
-inline void Info(std::format_string<Args...> fmt, Args &&...args) {
+void Info(std::format_string<Args...> fmt, Args &&...args) {
   LogRaw(LogLevel::Info,
          std::vformat(fmt.get(), std::make_format_args(args...)));
 }
 
 template <typename... Args>
-inline void Warn(std::format_string<Args...> fmt, Args &&...args) {
+void Warn(std::format_string<Args...> fmt, Args &&...args) {
   LogRaw(LogLevel::Warn,
          std::vformat(fmt.get(), std::make_format_args(args...)));
 }
 
 template <typename... Args>
-inline void Error(std::format_string<Args...> fmt, Args &&...args) {
+void Error(std::format_string<Args...> fmt, Args &&...args) {
   LogRaw(LogLevel::Error,
          std::vformat(fmt.get(), std::make_format_args(args...)));
 }
 
 template <typename... Args>
-inline void Debug(std::format_string<Args...> fmt, Args &&...args) {
+void Debug(std::format_string<Args...> fmt, Args &&...args) {
 #ifndef NDEBUG
   LogRaw(LogLevel::Debug,
          std::vformat(fmt.get(), std::make_format_args(args...)));

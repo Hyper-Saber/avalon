@@ -22,7 +22,7 @@ public:
   virtual auto Initialize(const WindowProps &props) -> EStatusCode = 0;
   virtual auto GetNativeInfo() -> NativeWindowInfo const = 0;
   virtual bool IsMinimized() const = 0;
-  virtual bool WasResized() const = 0;
+  virtual bool IsResized() const = 0;
   virtual void ResetResizeFlag() = 0;
   virtual void PollEvents() = 0;
   virtual bool ShouldClose() const = 0;

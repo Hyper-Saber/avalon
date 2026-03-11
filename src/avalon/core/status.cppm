@@ -1,3 +1,4 @@
+module;
 export module avalon.core:status;
 
 export namespace avalon {
@@ -13,7 +14,6 @@ enum class EStatusCode {
   RhiUpdateFailed,
   InvalidParameter,
   NotSupported,
-  NotFound,
   InternalError,
 };
 }

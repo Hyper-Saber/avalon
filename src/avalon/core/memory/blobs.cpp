@@ -1,63 +1,70 @@
 module;
-#include <bits/move.h>
 #include <cstddef>
+#include <cstring>
+#include <utility>
 
 module avalon.core;
-import :memory.blobs;
+
+using namespace avalon::mem;
 
 namespace avalon {
 
-class ArrayBlob final : public IBlob {
+class DataBlob final : public BlobBase<DataBlob> {
 public:
-  explicit ArrayBlob(Array<std::byte> &&data) : m_data(std::move(data)) {}
-  ~ArrayBlob() override = default;
+  explicit DataBlob(Array<std::byte> &&data) : m_data(std::move(data)) {}
+  ~DataBlob() override = default;
 
-  auto GetData() const -> const void * override { return m_data.GetData(); }
-  auto GetSize() const -> size_t override { return m_data.GetSize(); }
+  auto GetData() const noexcept -> const void * override {
+    return m_data.GetData();
+  }
+  auto GetSize() const noexcept -> size_t override { return m_data.GetSize(); }
+  auto GetHash() const noexcept -> HashType override {
+    if (m_cachedHash == 0) {
+      m_cachedHash = Hash::Compute(m_data.GetData(), m_data.GetSize());
+    }
+    return m_cachedHash;
+  }
 
 private:
   Array<std::byte> m_data;
+  mutable HashType m_cachedHash = 0;
 };
 
-class ViewBlob final : public IBlob {
+class ViewBlob final : public BlobBase<ViewBlob> {
 public:
   ViewBlob(const void *data, size_t size) : m_ptr(data), m_size(size) {}
   ~ViewBlob() override = default;
 
-  auto GetData() const -> const void * override { return m_ptr; }
-  auto GetSize() const -> size_t override { return m_size; }
+  auto GetData() const noexcept -> const void * override { return m_ptr; }
+  auto GetSize() const noexcept -> size_t override { return m_size; }
+  auto GetHash() const noexcept -> HashType override {
+    if (m_cachedHash == 0) {
+      m_cachedHash = Hash::Compute(m_ptr, m_size);
+    }
+    return m_cachedHash;
+  }
 
 private:
   const void *m_ptr;
   size_t m_size;
-};
-
-class StaticBlob final : public IBlob {
-public:
-  StaticBlob(const void *src, size_t size) : m_size(size) {
-    m_ptr = mem::InternalAlloc(size);
-    if (src && m_ptr)
-      mem::InternalMemcpy(m_ptr, src, size);
-  }
-  ~StaticBlob() override { mem::InternalFree(m_ptr, m_size); }
-
-  auto GetData() const -> const void * override { return m_ptr; }
-  auto GetSize() const -> size_t override { return m_size; }
-
-private:
-  void *m_ptr{nullptr};
-  size_t m_size = 0;
+  mutable HashType m_cachedHash = 0;
 };
 
 auto CreateBlob(Array<std::byte> &&data) -> BlobPtr {
-  return MakeBlob<ArrayBlob>(std::move(data));
+  return MakeBlob<DataBlob>(std::move(data));
 }
 
 auto CreateBlob(const void *data, size_t size) -> BlobPtr {
-  return MakeBlob<StaticBlob>(data, size);
+  Array<std::byte> array;
+  array.PushBackRaw(data, size);
+  return MakeBlob<DataBlob>(std::move(array));
 }
 
-auto CreateViewBlob(const void *data, size_t size) -> BlobPtr {
-  return MakeBlob<ViewBlob>(data, size);
+auto CreateEmptyBlob(size_t size) -> BlobPtr {
+  return MakeBlob<DataBlob>(Array<std::byte>(size));
+}
+
+auto CreateViewBlob(const void *data, size_t size) -> SharedBlobPtr {
+  return MakeSharedBlob<ViewBlob>(data, size);
 }
 } // namespace avalon

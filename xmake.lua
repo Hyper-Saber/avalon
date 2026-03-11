@@ -10,9 +10,13 @@ add_rules("mode.debug", "mode.release")
 add_rules("plugin.compile_commands.autoupdate", { outputdir = "." })
 add_requires("vulkan","directx-shader-compiler", { system = true })
 add_requires("glfw", {configs = {wayland = true, x11 = true}})
-add_requires("glm", "spdlog")
+add_requires("glm", "spdlog", "spirv-reflect")
 set_config("mode", "debug")
-set_runtimes(is_mode("debug") and "MDd" or "MD")
+set_exceptions("none")
+
+if is_mode("debug") then
+    add_defines("AVALON_DEBUG")
+end
 
 option("enable_tests")
     set_default(true)
@@ -24,4 +28,3 @@ end
 
 includes("src/avalon")
 includes("tests/mocks")
-

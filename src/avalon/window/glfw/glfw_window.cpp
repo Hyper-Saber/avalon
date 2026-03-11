@@ -72,7 +72,7 @@ public:
     return info;
   }
 
-  bool WasResized() const override { return m_isResized; };
+  bool IsResized() const override { return m_isResized; };
   bool IsMinimized() const override { return m_width == 0 || m_height == 0; }
   void ResetResizeFlag() override { m_isResized = false; }
   void PollEvents() override { glfwPollEvents(); }

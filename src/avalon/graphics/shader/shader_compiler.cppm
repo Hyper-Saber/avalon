@@ -6,306 +6,13 @@ export module avalon.shader:shader_compiler;
 import avalon.core;
 import :shader_blob_builder;
 import :serialization;
+import :utils;
 
 using namespace avalon::rhi;
 
-namespace avalon::graphics {
-
-struct StageDesc {
-  String entryPointName;
-  EShaderStage shaderStage;
-};
-
-struct ShaderCompileDesc {
-  BlobPtr sourceCode;
-  Path filePath;
-  Array<StageDesc> shaderStages;
-  rhi::EShaderFeatureLevel level = rhi::EShaderFeatureLevel::Level_6_0;
-};
-
-template <typename T> class DxcPtr {
-public:
-  DxcPtr() : m_ptr(nullptr) {}
-  DxcPtr(T *p) : m_ptr(p) {}
-  ~DxcPtr() {
-    if (m_ptr)
-      m_ptr->Release();
-  }
-
-  DxcPtr(const DxcPtr &) = delete;
-  DxcPtr &operator=(const DxcPtr &) = delete;
-
-  DxcPtr(DxcPtr &&other) noexcept : m_ptr(other.m_ptr) {
-    other.m_ptr = nullptr;
-  }
-  DxcPtr &operator=(DxcPtr &&other) noexcept {
-    if (this != &other) {
-      if (m_ptr)
-        m_ptr->Release();
-      m_ptr = other.m_ptr;
-      other.m_ptr = nullptr;
-    }
-    return *this;
-  }
-
-  T *Get() const { return m_ptr; }
-  T **GetAddressOf() {
-    if (m_ptr) {
-      m_ptr->Release();
-      m_ptr = nullptr;
-    }
-    return &m_ptr;
-  }
-  T *operator->() const { return m_ptr; }
-  explicit operator bool() const { return m_ptr != nullptr; }
-
-private:
-  T *m_ptr;
-};
-
-auto Utf8ToUtf16(const char *utf8Str) -> Array<char16_t> {
-  Array<char16_t> result;
-  if (!utf8Str)
-    return result;
-
-  const uint8_t *p = reinterpret_cast<const uint8_t *>(utf8Str);
-
-  while (*p) {
-    uint32_t cp = 0; // Unicode Code Point
-
-    // 手动解码 UTF-8
-    if ((*p & 0x80) == 0) { // 1-byte (ASCII)
-      cp = *p++;
-    } else if ((*p & 0xE0) == 0xC0) { // 2-bytes
-      cp = (*p++ & 0x1F) << 6;
-      cp |= (*p++ & 0x3F);
-    } else if ((*p & 0xF0) == 0xE0) { // 3-bytes
-      cp = (*p++ & 0x0F) << 12;
-      cp |= (*p++ & 0x3F) << 6;
-      cp |= (*p++ & 0x3F);
-    } else if ((*p & 0xF8) == 0xF0) { // 4-bytes
-      cp = (*p++ & 0x07) << 18;
-      cp |= (*p++ & 0x3F) << 12;
-      cp |= (*p++ & 0x3F) << 6;
-      cp |= (*p++ & 0x3F);
-    } else {
-      p++; // 非法序列，跳过
-      continue;
-    }
-
-    // 编码为 UTF-16 (char16_t)
-    if (cp <= 0xFFFF) {
-      result.PushBack(static_cast<char16_t>(cp));
-    } else {
-      // 处理 Surrogate Pairs (超出 16 位范围的字符，如 Emoji)
-      cp -= 0x10000;
-      result.PushBack(static_cast<char16_t>((cp >> 10) + 0xD800));
-      result.PushBack(static_cast<char16_t>((cp & 0x3FF) + 0xDC00));
-    }
-  }
-
-  result.PushBack(u'\0'); // 确保以 null 结尾，DXC 接口需要
-  return result;
-}
-
-auto Utf8ToWstring(const char *utf8Str) -> std::wstring {
-  if (!utf8Str)
-    return L"";
-
-  size_t len = std::mbstowcs(nullptr, utf8Str, 0);
-  if (len == (size_t)-1)
-    return L"";
-  std::wstring result(len, L'\0');
-  std::mbstowcs(&result[0], utf8Str, len);
-  return result;
-}
-
-static auto GetTargetProfile(EShaderStage stage, EShaderFeatureLevel level)
-    -> std::wstring {
-  std::wstring version = L"6_0";
-  if (level == EShaderFeatureLevel::Level_6_3)
-    version = L"6_3";
-  else if (level == EShaderFeatureLevel::Level_6_6)
-    version = L"6_6";
-
-  switch (stage) {
-  case EShaderStage::Vertex:
-    return L"vs_" + version;
-  case EShaderStage::Fragment:
-    return L"ps_" + version;
-  case EShaderStage::Compute:
-    return L"cs_" + version;
-  default:
-    return L"lib_" + version;
-  }
-}
-
-EFormat ToEFormat(const SpvReflectFormat format) {
-  switch (format) {
-  case SPV_REFLECT_FORMAT_UNDEFINED:
-    return EFormat::Undefined;
-  case SPV_REFLECT_FORMAT_R16_UINT:
-    return EFormat::R16_Uint;
-  case SPV_REFLECT_FORMAT_R16_SINT:
-    return EFormat::R16_Int;
-  case SPV_REFLECT_FORMAT_R16_SFLOAT:
-    return EFormat::R16_Float;
-  case SPV_REFLECT_FORMAT_R16G16_UINT:
-    return EFormat::R16G16_Uint2;
-  case SPV_REFLECT_FORMAT_R16G16_SINT:
-    return EFormat::R16G16_Int2;
-  case SPV_REFLECT_FORMAT_R16G16_SFLOAT:
-    return EFormat::R16G16_Float2;
-  case SPV_REFLECT_FORMAT_R16G16B16_UINT:
-    return EFormat::R16G16B16_Uint3;
-  case SPV_REFLECT_FORMAT_R16G16B16_SINT:
-    return EFormat::R16G16B16_Int3;
-  case SPV_REFLECT_FORMAT_R16G16B16_SFLOAT:
-    return EFormat::R16G16B16_Float3;
-  case SPV_REFLECT_FORMAT_R16G16B16A16_UINT:
-    return EFormat::R16G16B16A16_Uint4;
-  case SPV_REFLECT_FORMAT_R16G16B16A16_SINT:
-    return EFormat::R16G16B16A16_Int4;
-  case SPV_REFLECT_FORMAT_R16G16B16A16_SFLOAT:
-    return EFormat::R16G16B16A16_Float4;
-  case SPV_REFLECT_FORMAT_R32_UINT:
-    return EFormat::R32_Uint;
-  case SPV_REFLECT_FORMAT_R32_SINT:
-    return EFormat::R32_Int;
-  case SPV_REFLECT_FORMAT_R32_SFLOAT:
-    return EFormat::R32_Float;
-  case SPV_REFLECT_FORMAT_R32G32_UINT:
-    return EFormat::R32G32_Uint2;
-  case SPV_REFLECT_FORMAT_R32G32_SINT:
-    return EFormat::R32G32_Int2;
-  case SPV_REFLECT_FORMAT_R32G32_SFLOAT:
-    return EFormat::R32G32_Float2;
-  case SPV_REFLECT_FORMAT_R32G32B32_UINT:
-    return EFormat::R32G32B32_Uint3;
-  case SPV_REFLECT_FORMAT_R32G32B32_SINT:
-    return EFormat::R32G32B32_Int3;
-  case SPV_REFLECT_FORMAT_R32G32B32_SFLOAT:
-    return EFormat::R32G32B32_Float3;
-  case SPV_REFLECT_FORMAT_R32G32B32A32_UINT:
-    return EFormat::R32G32B32A32_Uint4;
-  case SPV_REFLECT_FORMAT_R32G32B32A32_SINT:
-    return EFormat::R32G32B32A32_Int4;
-  case SPV_REFLECT_FORMAT_R32G32B32A32_SFLOAT:
-    return EFormat::R32G32B32A32_Float4;
-  case SPV_REFLECT_FORMAT_R64_UINT:
-    return EFormat::R64_Uint;
-  case SPV_REFLECT_FORMAT_R64_SINT:
-    return EFormat::R64_Int;
-  case SPV_REFLECT_FORMAT_R64_SFLOAT:
-    return EFormat::R64_Float;
-  case SPV_REFLECT_FORMAT_R64G64_UINT:
-    return EFormat::R64G64_Uint2;
-  case SPV_REFLECT_FORMAT_R64G64_SINT:
-    return EFormat::R64G64_Int2;
-  case SPV_REFLECT_FORMAT_R64G64_SFLOAT:
-    return EFormat::R64G64_Float2;
-  case SPV_REFLECT_FORMAT_R64G64B64_UINT:
-    return EFormat::R64G64B64_Uint3;
-  case SPV_REFLECT_FORMAT_R64G64B64_SINT:
-    return EFormat::R64G64B64_Int3;
-  case SPV_REFLECT_FORMAT_R64G64B64_SFLOAT:
-    return EFormat::R64G64B64_Float3;
-  case SPV_REFLECT_FORMAT_R64G64B64A64_UINT:
-    return EFormat::R64G64B64A64_Uint4;
-  case SPV_REFLECT_FORMAT_R64G64B64A64_SINT:
-    return EFormat::R64G64B64A64_Int4;
-  case SPV_REFLECT_FORMAT_R64G64B64A64_SFLOAT:
-    return EFormat::R64G64B64A64_Float4;
-  }
-}
-
-EFormat SpvTypeToEFormat(const SpvReflectTypeDescription *type) {
-  if (!type)
-    return EFormat::Undefined;
-  const auto &numeric = type->traits.numeric;
-  const uint32_t componentCount = numeric.vector.component_count;
-  const uint32_t width = numeric.scalar.width;
-
-  if (type->type_flags & SPV_REFLECT_TYPE_FLAG_FLOAT) {
-    if (width == 16) {
-      switch (componentCount) {
-      case 1:
-        return EFormat::R16_Float;
-      case 2:
-        return EFormat::R16G16_Float2;
-      case 3:
-        return EFormat::R16G16B16_Float3;
-      case 4:
-        return EFormat::R16G16B16A16_Float4;
-      };
-    } else if (width == 32)
-      switch (componentCount) {
-      case 1:
-        return EFormat::R32_Float;
-      case 2:
-        return EFormat::R32G32_Float2;
-      case 3:
-        return EFormat::R32G32B32_Float3;
-      case 4:
-        return EFormat::R32G32B32A32_Float4;
-      }
-    else if (width == 64) {
-      switch (componentCount) {
-      case 1:
-        return EFormat::R64_Float;
-      case 2:
-        return EFormat::R64G64_Float2;
-      case 3:
-        return EFormat::R64G64B64_Float3;
-      case 4:
-        return EFormat::R64G64B64A64_Float4;
-      }
-    }
-  } else if (type->type_flags & SPV_REFLECT_TYPE_FLAG_INT) {
-    bool is_signed = type->traits.numeric.scalar.signedness != 0;
-    if (width == 16) {
-      switch (componentCount) {
-      case 1:
-        return is_signed ? EFormat::R16_Int : EFormat::R16_Uint;
-      case 2:
-        return is_signed ? EFormat::R16G16_Int2 : EFormat::R16G16_Uint2;
-      case 3:
-        return is_signed ? EFormat::R16G16B16_Int3 : EFormat::R16G16B16_Uint3;
-      case 4:
-        return is_signed ? EFormat::R16G16B16A16_Int4
-                         : EFormat::R16G16B16A16_Uint4;
-      };
-    } else if (width == 32) {
-      switch (componentCount) {
-      case 1:
-        return is_signed ? EFormat::R32_Int : EFormat::R32_Uint;
-      case 2:
-        return is_signed ? EFormat::R32G32_Int2 : EFormat::R32G32_Uint2;
-      case 3:
-        return is_signed ? EFormat::R32G32B32_Int3 : EFormat::R32G32B32_Uint3;
-      case 4:
-        return is_signed ? EFormat::R32G32B32A32_Int4
-                         : EFormat::R32G32B32A32_Uint4;
-      }
-    } else if (width == 64) {
-      switch (componentCount) {
-      case 1:
-        return is_signed ? EFormat::R64_Int : EFormat::R64_Uint;
-      case 2:
-        return is_signed ? EFormat::R64G64_Int2 : EFormat::R64G64_Uint2;
-      case 3:
-        return is_signed ? EFormat::R64G64B64_Int3 : EFormat::R64G64B64_Uint3;
-      case 4:
-        return is_signed ? EFormat::R64G64B64A64_Int4
-                         : EFormat::R64G64B64A64_Uint4;
-      }
-    }
-  } else if (type->type_flags & SPV_REFLECT_TYPE_FLAG_MATRIX) {
-    return EFormat::Undefined;
-  }
-
-  return EFormat::Undefined;
-}
+namespace {
+using namespace avalon;
+using namespace avalon::graphics;
 
 void ExtractVertexInputs(SpvReflectShaderModule *pModule,
                          ReflectionData &outReflectionData) {
@@ -317,11 +24,10 @@ void ExtractVertexInputs(SpvReflectShaderModule *pModule,
   for (auto *pVariable : inputVars) {
     if (pVariable->decoration_flags & SPV_REFLECT_DECORATION_BUILT_IN)
       continue;
-    ShaderInputAttribute attr{
-        .nameHash = StringId(pVariable->name),
-        .location = pVariable->location,
-        .format = ToEFormat(pVariable->format),
-    };
+    ShaderInputAttribute attr{.nameHash = StringId(pVariable->name),
+                              .location = pVariable->location,
+                              .format = ToEFormat(pVariable->format),
+                              .semantic = ToESemantic(pVariable->semantic)};
 
     outReflectionData.inputAttributes.PushBack(attr);
   }
@@ -454,6 +160,84 @@ void ExtractPushConstantRanges(SpvReflectShaderModule *module,
   }
 }
 
+auto ReflectShader(EShaderStage stage, const void *data, size_t size)
+    -> ReflectionData {
+  ReflectionData reflectionData;
+
+  SpvReflectShaderModule module;
+  SpvReflectResult result = spvReflectCreateShaderModule(size, data, &module);
+  if (result != SPV_REFLECT_RESULT_SUCCESS) {
+    avalon::Error("[shader_compiler]: failed to reflect shader.");
+    return reflectionData;
+  }
+
+  if (stage == EShaderStage::Vertex)
+    ExtractVertexInputs(&module, reflectionData);
+
+  ExtractDescriptorBindings(&module, reflectionData, stage);
+
+  ExtractPushConstantRanges(&module, reflectionData, stage);
+
+  spvReflectDestroyShaderModule(&module);
+  return reflectionData;
+}
+
+} // namespace
+
+namespace avalon::graphics {
+
+struct StageDesc {
+  String entryPointName;
+  EShaderStage shaderStage;
+};
+
+struct ShaderCompileDesc {
+  BlobPtr sourceCode;
+  Path filePath;
+  Array<StageDesc> shaderStages;
+  rhi::EShaderFeatureLevel level = rhi::EShaderFeatureLevel::Level_6_0;
+};
+
+template <typename T> class DxcPtr {
+public:
+  DxcPtr() : m_ptr(nullptr) {}
+  DxcPtr(T *p) : m_ptr(p) {}
+  ~DxcPtr() {
+    if (m_ptr)
+      m_ptr->Release();
+  }
+
+  DxcPtr(const DxcPtr &) = delete;
+  DxcPtr &operator=(const DxcPtr &) = delete;
+
+  DxcPtr(DxcPtr &&other) noexcept : m_ptr(other.m_ptr) {
+    other.m_ptr = nullptr;
+  }
+  DxcPtr &operator=(DxcPtr &&other) noexcept {
+    if (this != &other) {
+      if (m_ptr)
+        m_ptr->Release();
+      m_ptr = other.m_ptr;
+      other.m_ptr = nullptr;
+    }
+    return *this;
+  }
+
+  T *Get() const { return m_ptr; }
+  T **GetAddressOf() {
+    if (m_ptr) {
+      m_ptr->Release();
+      m_ptr = nullptr;
+    }
+    return &m_ptr;
+  }
+  T *operator->() const { return m_ptr; }
+  explicit operator bool() const { return m_ptr != nullptr; }
+
+private:
+  T *m_ptr;
+};
+
 class ShaderCompiler : public mem::AutoDestroyable<ShaderCompiler> {
 public:
   bool Initialize() {
@@ -499,7 +283,7 @@ public:
         wArgs.push_back(ref.c_str());
       };
 
-      if constexpr (avalon::kIsLinux) {
+      if constexpr (platform::kIsLinux) {
         AddArg(L"-spirv");
         AddArg(L"-fspv-target-env=universal1.5");
       }
@@ -571,26 +355,6 @@ public:
   }
 
 private:
-  auto ReflectShader(EShaderStage stage, const void *data, size_t size)
-      -> ReflectionData {
-    ReflectionData reflectionData;
-
-    SpvReflectShaderModule module;
-    SpvReflectResult result = spvReflectCreateShaderModule(size, data, &module);
-    if (result != SPV_REFLECT_RESULT_SUCCESS) {
-      avalon::Error("[shader_compiler]: failed to reflect shader.");
-      return reflectionData;
-    }
-
-    ExtractVertexInputs(&module, reflectionData);
-
-    ExtractDescriptorBindings(&module, reflectionData, stage);
-
-    ExtractPushConstantRanges(&module, reflectionData, stage);
-
-    spvReflectDestroyShaderModule(&module);
-    return reflectionData;
-  }
   DxcPtr<IDxcUtils> m_utils;
   DxcPtr<IDxcCompiler3> m_compiler;
 };

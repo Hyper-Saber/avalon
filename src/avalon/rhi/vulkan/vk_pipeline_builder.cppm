@@ -67,22 +67,78 @@ public:
     m_rasterizationInfo.lineWidth = info.lineWidth;
     m_depthStencilStateInfo.depthTestEnable =
         info.isDepthTestEnable ? VK_TRUE : VK_FALSE;
+    m_depthStencilStateInfo.depthTestEnable = VK_FALSE;
     m_depthStencilStateInfo.depthWriteEnable =
         info.isDepthWriteEnable ? VK_TRUE : VK_FALSE;
     m_depthStencilStateInfo.depthCompareOp =
         ToVkDepthCompareOp(info.depthCompareOp);
 
-    SetVertexInput(info.vertexBindings, info.vertexInputAttributes);
+    return *this;
+  }
+
+  PipelineBuilder &SetVertexInput(Span<const VertexBinding> bindings,
+                                  Span<const VertexInputAttribute> attributes) {
+    m_bindingDescriptions.Clear();
+    m_attributeDescriptions.Clear();
+
+    for (const auto &binding : bindings) {
+      m_bindingDescriptions.PushBack({
+          .binding = binding.binding,
+          .stride = binding.stride,
+          .inputRate = binding.isInstanceData ? VK_VERTEX_INPUT_RATE_INSTANCE
+                                              : VK_VERTEX_INPUT_RATE_VERTEX,
+      });
+      if constexpr (debug::kIsDebug) {
+        Debug("[Vulkan]: Vertex input binding description: \n"
+              "---------------------------------------------\n"
+              "binding: {}\n stride: {}\n inputRate: {}\n"
+              "---------------------------------------------",
+              binding.binding, binding.stride, binding.isInstanceData);
+      }
+    }
+
+    for (const auto &attr : attributes) {
+      VkVertexInputAttributeDescription attrDesc{
+          .location = attr.location,
+          .binding = attr.binding,
+          .format = ToVkFormat(attr.format),
+          .offset = attr.offset,
+      };
+
+      m_attributeDescriptions.PushBack(attrDesc);
+
+      if constexpr (debug::kIsDebug) {
+        Debug("[Vulkan]: Vertex Input attribute description: \n"
+              "---------------------------------------------\n"
+              " location : {}\n binding : {}\n format: {}\n offset: {}\n"
+              "---------------------------------------------",
+              attrDesc.location, attrDesc.binding, ToView(attr.format),
+              attrDesc.offset);
+      }
+    }
+
+    m_vertexInputInfo = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+        .vertexBindingDescriptionCount =
+            static_cast<uint32_t>(m_bindingDescriptions.GetSize()),
+        .pVertexBindingDescriptions = m_bindingDescriptions.GetData(),
+        .vertexAttributeDescriptionCount =
+            static_cast<uint32_t>(m_attributeDescriptions.GetSize()),
+        .pVertexAttributeDescriptions = m_attributeDescriptions.GetData(),
+    };
+
     return *this;
   }
 
   PipelineBuilder &AddShaderStage(EShaderStage stage, const String &entryName,
                                   VkShaderModule module) {
+    m_entryPointNames.PushBack(entryName);
+
     VkPipelineShaderStageCreateInfo stageCreateInfo{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
         .stage = ToVkShaderStageBits(stage),
         .module = module,
-        .pName = entryName.GetData(),
+        .pName = m_entryPointNames.GetBack().GetData(),
     };
 
     m_shaderStageCreateInfos.PushBack(stageCreateInfo);
@@ -145,44 +201,11 @@ private:
   Array<VkVertexInputBindingDescription> m_bindingDescriptions;
   Array<VkVertexInputAttributeDescription> m_attributeDescriptions;
   VkPipelineColorBlendAttachmentState m_colorBlendAttachmentState{};
+
+  Array<String> m_entryPointNames;
+
   VkRenderPass m_renderPass{VK_NULL_HANDLE};
   uint32_t m_subpass = 0;
-
-  void SetVertexInput(Span<const VertexBinding> bindings,
-                      Span<const VertexInputAttribute> attributes) {
-    m_bindingDescriptions.Clear();
-    m_attributeDescriptions.Clear();
-
-    for (const auto &binding : bindings) {
-      m_bindingDescriptions.PushBack({
-          .binding = binding.binding,
-          .stride = binding.stride,
-          .inputRate = binding.isInstanceData ? VK_VERTEX_INPUT_RATE_INSTANCE
-                                              : VK_VERTEX_INPUT_RATE_VERTEX,
-      });
-    }
-
-    for (const auto &attr : attributes) {
-      VkVertexInputAttributeDescription attrDesc{
-          .location = attr.location,
-          .binding = attr.binding,
-          .format = ToVkFormat(attr.format),
-          .offset = attr.offset,
-      };
-
-      m_attributeDescriptions.PushBack(attrDesc);
-    }
-
-    m_vertexInputInfo = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-        .vertexBindingDescriptionCount =
-            static_cast<uint32_t>(m_bindingDescriptions.GetSize()),
-        .pVertexBindingDescriptions = m_bindingDescriptions.GetData(),
-        .vertexAttributeDescriptionCount =
-            static_cast<uint32_t>(m_attributeDescriptions.GetSize()),
-        .pVertexAttributeDescriptions = m_attributeDescriptions.GetData(),
-    };
-  }
 
   void InternalClear(VkDevice device) { m_shaderStageCreateInfos.Clear(); }
 };

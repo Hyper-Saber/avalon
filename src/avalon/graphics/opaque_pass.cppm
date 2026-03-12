@@ -15,9 +15,7 @@ public:
              rhi::Extent2D extent)
       : m_pipeline(pipeline), m_rendePass(renderPass), m_extent(extent) {}
 
-  void OnResize(const rhi::Extent2D &extent) override {
-    m_extent = extent;
-  }
+  void OnResize(const rhi::Extent2D &extent) override { m_extent = extent; }
 
   void Execute(RenderContext &context, const RenderPacket &packet) override {
     RenderPassBeginInfo info;

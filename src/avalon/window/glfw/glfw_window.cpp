@@ -54,7 +54,7 @@ public:
     NativeWindowInfo info{};
 
     auto platform = glfwGetPlatform();
-    if constexpr (avalon::kIsLinux) {
+    if constexpr (platform::kIsLinux) {
       if (platform == GLFW_PLATFORM_WAYLAND) {
         info.api = NativeWindowApi::Wayland;
         info.wayland.display = glfwGetWaylandDisplay();

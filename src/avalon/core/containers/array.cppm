@@ -179,7 +179,7 @@ public:
       }
     }
     m_size = writeIndex;
-    return m_size - oldSize;
+    return oldSize - m_size;
   }
 
   Iterator begin() noexcept { return m_data; }

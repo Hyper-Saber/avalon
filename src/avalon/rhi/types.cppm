@@ -20,39 +20,39 @@ enum class EFormat {
   R16_Uint,
   R16_Int,
   R16_Float,
-  R16G16_Uint2,
-  R16G16_Int2,
-  R16G16_Float2,
-  R16G16B16_Uint3,
-  R16G16B16_Int3,
-  R16G16B16_Float3,
-  R16G16B16A16_Uint4,
-  R16G16B16A16_Int4,
-  R16G16B16A16_Float4,
+  R16G16_Uint,
+  R16G16_Int,
+  R16G16_Float,
+  R16G16B16_Uint,
+  R16G16B16_Int,
+  R16G16B16_Float,
+  R16G16B16A16_Uint,
+  R16G16B16A16_Int,
+  R16G16B16A16_Float,
   R32_Uint,
   R32_Int,
   R32_Float,
-  R32G32_Uint2,
-  R32G32_Int2,
-  R32G32_Float2,
-  R32G32B32_Uint3,
-  R32G32B32_Int3,
-  R32G32B32_Float3,
-  R32G32B32A32_Uint4,
-  R32G32B32A32_Int4,
-  R32G32B32A32_Float4,
+  R32G32_Uint,
+  R32G32_Int,
+  R32G32_Float,
+  R32G32B32_Uint,
+  R32G32B32_Int,
+  R32G32B32_Float,
+  R32G32B32A32_Uint,
+  R32G32B32A32_Int,
+  R32G32B32A32_Float,
   R64_Uint,
   R64_Int,
   R64_Float,
-  R64G64_Uint2,
-  R64G64_Int2,
-  R64G64_Float2,
-  R64G64B64_Uint3,
-  R64G64B64_Int3,
-  R64G64B64_Float3,
-  R64G64B64A64_Uint4,
-  R64G64B64A64_Int4,
-  R64G64B64A64_Float4,
+  R64G64_Uint,
+  R64G64_Int,
+  R64G64_Float,
+  R64G64B64_Uint,
+  R64G64B64_Int,
+  R64G64B64_Float,
+  R64G64B64A64_Uint,
+  R64G64B64A64_Int,
+  R64G64B64A64_Float,
 
   R8G8B8_UNORM,
   R8G8B8A8_UNORM,
@@ -66,6 +66,14 @@ enum class EFormat {
 
 enum class EImageFormat {
 
+};
+
+enum class EVertexSemantic {
+  Unknown,
+  Position,
+  TexCoord,
+  Color,
+  Normal,
 };
 
 enum class EShaderStage : uint32_t {
@@ -128,7 +136,12 @@ enum class EDescriptorType : uint32_t {
 
 enum class EAttachmentLoadOp { Load, Clear, DontCare };
 enum class EAttachmentStoreOp { Store, DontCare };
-enum class EMemoryProperty : uint8_t { DeviceLocal, HostVisible };
+enum class EMemoryProperty : uint8_t {
+  None = 0,
+  DeviceLocal = 1 << 0,
+  HostVisible = 1 << 1,
+  HostCoherent = 1 << 2,
+};
 
 enum class EResourceLayout {
   Undefined,
@@ -149,6 +162,8 @@ enum class ETextureUsage : uint32_t {
   TransferSrc = 1 << 4,
 };
 
+enum class EQueueType { Graphics, Transfer, Compute, Present };
+
 enum class ERenderTarget : uint32_t {
   SwapchainBackBuffer = 0,
 };
@@ -160,6 +175,7 @@ enum class ERenderCapability : uint32_t {
 
 template <> struct EnableBitmaskOperators<EBufferUsage> : std::true_type {};
 template <> struct EnableBitmaskOperators<EShaderStage> : std::true_type {};
+template <> struct EnableBitmaskOperators<EMemoryProperty> : std::true_type {};
 
 struct QueueRequirement {
   bool isRequireGraphics = false;
@@ -255,7 +271,7 @@ struct TextureCreateInfo {
   uint32_t layers = 1;
   uint32_t mipLevels = 1;
 
-  EFormat format = EFormat::R16G16B16A16_Uint4;
+  EFormat format = EFormat::R16G16B16A16_Uint;
 };
 
 struct VertexBinding {
@@ -281,6 +297,7 @@ struct VertexInputAttribute {
   uint32_t location;
   uint32_t binding;
   rhi::EFormat format;
+  EVertexSemantic semantic;
   uint32_t offset;
 
   HashType GetHash() const noexcept {
@@ -373,7 +390,7 @@ struct PipelineCreateInfo {
   Span<const ShaderStageInfo> stageInfos;
   EPrimitiveTopology topology = EPrimitiveTopology::TriangleList;
   EPolygonMode polygonMode = EPolygonMode::Fill;
-  ECullMode cullMode = ECullMode::Back;
+  ECullMode cullMode = ECullMode::None;
   bool isDepthTestEnable = true;
   bool isDepthWriteEnable = true;
   EDepthCompareOp depthCompareOp = EDepthCompareOp::Less;
@@ -428,6 +445,12 @@ struct RenderPassBeginInfo {
   Array<ClearValue> clearValues;
 };
 
+struct BufferCopy {
+  uint64_t srcOffset = 0;
+  uint64_t dstOffset = 0;
+  uint64_t size = 0;
+};
+
 enum class ERhiResult {
   Success,
   Unknown,
@@ -442,30 +465,4 @@ enum class ERhiResult {
   FormatNotSupported,
 };
 
-constexpr StringView ToStaticString(ERhiResult e) {
-  switch (e) {
-  case ERhiResult::Success:
-    return "Success";
-  case ERhiResult::Unknown:
-    return "Unknown";
-  case ERhiResult::InitializationFailed:
-    return "InitializationFailed";
-  case ERhiResult::SurfaceLost:
-    return "SurfaceLost";
-  case ERhiResult::DeviceLost:
-    return "DeviceLost";
-  case ERhiResult::OutOfMemory:
-    return "OutOfMemory";
-  case ERhiResult::BackendSpecificError:
-    return "BackendSpecificError";
-  case ERhiResult::SwapchainOutOfDate:
-    return "SwapchainOutOfDate";
-  case ERhiResult::FailedToRecordCommand:
-    return "FailedToRecordCommand";
-  case ERhiResult::FailedToSubmitQueue:
-    return "FailedToSubmitQueue";
-  case ERhiResult::FormatNotSupported:
-    return "FormatNotSupported";
-  }
-}
 } // namespace avalon::rhi

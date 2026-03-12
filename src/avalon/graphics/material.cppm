@@ -8,8 +8,10 @@ import avalon.shader;
 import avalon.core;
 import avalon.rhi;
 import :utils;
+import :mesh;
 
 export namespace avalon::graphics {
+
 class AVALON_GRAPHICS_API Material final : public RefCounted<Material> {
 public:
   explicit Material(Handle<Shader> handle) : m_shaderHandle(handle) {
@@ -49,6 +51,10 @@ public:
     };
 
     return info;
+  }
+
+  auto GetVertexLayout() const -> const VertexLayout & {
+    return m_vertexLayout;
   }
 
 private:
@@ -110,6 +116,7 @@ private:
           .location = attr.location,
           .binding = 0,
           .format = attr.format,
+          .semantic = attr.semantic,
           .offset = currentOffset,
       });
       auto size = rhi::GetFormatSize(attr.format);
@@ -122,6 +129,44 @@ private:
         .stride = currentOffset,
         .isInstanceData = false,
     });
+
+    m_vertexLayout.attributes = {m_vertexAttributes.GetData(),
+                                 m_vertexAttributes.GetSize()};
+    m_vertexLayout.stride = ComputeStride();
+  }
+
+  uint32_t ComputeStride() {
+    uint32_t stride = 0;
+    auto attributes = m_vertexAttributes;
+    for (const auto &attr : attributes) {
+      stride += GetFormatSize(attr.format);
+    }
+
+    if constexpr (debug::kIsDebug) {
+      uint32_t actualStride = 0;
+      for (const auto &attr : attributes) {
+        switch (attr.semantic) {
+        case EVertexSemantic::Position:
+          actualStride += sizeof(Vec3);
+          break;
+        case EVertexSemantic::TexCoord:
+          actualStride += sizeof(Vec2);
+          break;
+        case EVertexSemantic::Color:
+          actualStride += sizeof(Vec4);
+          break;
+        case EVertexSemantic::Normal:
+          actualStride += sizeof(Vec3);
+          break;
+        default:
+          break;
+        }
+      }
+
+      AVALON_ASSERT(actualStride == stride);
+    }
+
+    return stride;
   }
 
   Handle<Shader> m_shaderHandle;
@@ -129,5 +174,6 @@ private:
   Array<PropertyMapping> m_propertyLayout;
   Array<rhi::VertexInputAttribute> m_vertexAttributes;
   Array<rhi::VertexBinding> m_vertexBindings;
+  VertexLayout m_vertexLayout;
 };
 } // namespace avalon::graphics

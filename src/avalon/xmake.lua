@@ -89,7 +89,6 @@ target "avalon.graphics"
     add_avalon_api_rules("avalon.graphics")
     add_files ("graphics/**.cppm|shader/**", {public = true})
     add_deps("avalon.core", "avalon.rhi", "avalon.shader", "avalon.ecs")
-    add_packages("glm")
 
 target "avalon.engine"
     set_kind "shared"

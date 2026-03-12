@@ -103,9 +103,11 @@ private:
       -> Handle<PipelineResource> {
     auto renderPass =
         m_resourceProvider.GetRenderPass(info.renderPassHandle).renderPass;
+
     auto builder = PipelineBuilder();
-    builder.SetRenderPass(renderPass);
-    builder.LoadStates(info);
+    builder.SetRenderPass(renderPass)
+        .SetVertexInput(info.vertexBindings, info.vertexInputAttributes);
+
     for (const auto &stageInfo : info.stageInfos) {
       auto module = m_shaderModuleCache->GetOrCreateShaderModule(stageInfo);
       builder.AddShaderStage(stageInfo.stage, stageInfo.entryName, module);

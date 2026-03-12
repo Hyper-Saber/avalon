@@ -24,9 +24,10 @@ public:
   Entity CreateEntity() { return ++m_entityConuter; }
 
   template <typename T, typename... Args>
-  T &AddComponent(Entity entity, Args &&...args) {
+  World *AddComponent(Entity entity, Args &&...args) {
     auto &pool = GetPool<T>();
-    return pool.Upsert(entity, T(std::forward<Args>(args)...));
+    pool.Upsert(entity, T(std::forward<Args>(args)...));
+    return this;
   }
 
   template <typename T> T *GetComponent(Entity entity) {
@@ -121,8 +122,7 @@ auto View<Components...>::begin() -> Iterator {
   return ++it;
 }
 
-template <typename... Components>
-auto View<Components...>::end() -> Iterator {
+template <typename... Components> auto View<Components...>::end() -> Iterator {
   return Iterator{m_world, m_world.GetMaxEntity() + 1};
 }
 

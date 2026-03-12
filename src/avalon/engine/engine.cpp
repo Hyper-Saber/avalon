@@ -46,7 +46,7 @@ auto Engine::Initialize(const EngineConfig &config)
                       device.Get());
 
   auto rhiLoadRes =
-      LoadPlugin<rhi::IRhi>({kVkRhiPluginPath + kPluginExtension});
+      LoadPlugin<rhi::IRhi>({kVkRhiPluginPath + platform::kPluginExtension});
 
   if (!rhiLoadRes) {
     return std::unexpected(EStatusCode::PluginInitializeError);
@@ -56,8 +56,8 @@ auto Engine::Initialize(const EngineConfig &config)
   uint32_t width = config.windowProps.width, height = config.windowProps.height;
   rhi::ERhiResult result;
   if (config.renderDeviceRequirement.queueRequirement.isRequirePresent) {
-    auto windowLoadRes =
-        LoadPlugin<window::IWindow>({kWindowPluginPath + kPluginExtension});
+    auto windowLoadRes = LoadPlugin<window::IWindow>(
+        {kWindowPluginPath + platform::kPluginExtension});
 
     if (!windowLoadRes) {
       return std::unexpected(EStatusCode::PluginInitializeError);
@@ -122,6 +122,8 @@ auto Engine::Initialize(const EngineConfig &config)
       MakeUnique<graphics::OpaquePass>(m_pipeline, m_renderPass, extent));
 
   m_world = MakeUnique<ecs::World>();
+
+  CreateTriangleEntity(material);
 
   return {};
 }
@@ -197,6 +199,35 @@ bool Engine::TryHandleRhiError(rhi::ERhiResult error) {
     return false;
   }
   return true;
+}
+
+void Engine::CreateTriangleEntity(const graphics::Material &material) {
+  graphics::MeshData data{
+      .positions{
+          {0.0f, -0.5f, 0.0f},
+          {0.5f, 0.5f, 0.0f},
+          {-0.5f, 0.5f, 0.0f},
+      },
+      .indices{0, 1, 2},
+      .colors{
+          {1, 0, 0, 1},
+          {0, 1, 0, 1},
+          {0, 0, 1, 1},
+      },
+      .texCoords{
+          {0.5f, 1.f},
+          {0.f, 0.f},
+          {1.f, 0.f},
+      },
+  };
+
+  m_mesh =
+      graphics::GetMeshManager().CreateMesh(data, material.GetVertexLayout());
+
+  auto entity = m_world->CreateEntity();
+  Transform transform;
+  m_world->AddComponent<graphics::MeshComponent>(entity, m_mesh)
+      ->AddComponent<graphics::TransformComponent>(entity, transform);
 }
 
 } // namespace avalon

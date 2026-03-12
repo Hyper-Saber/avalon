@@ -69,6 +69,7 @@ struct ShaderInputAttribute {
   StringId nameHash;
   uint32_t location;
   rhi::EFormat format;
+  rhi::EVertexSemantic semantic;
 };
 
 struct ShaderReflectionHeader {
@@ -95,7 +96,7 @@ static_assert(sizeof(ShaderPushConstant) == 12,
               "ShaderPushConstants size mismatch!");
 static_assert(sizeof(ShaderDescriptorBinding) == 44,
               "ShaderResourceBinding size mismatch!");
-static_assert(sizeof(ShaderInputAttribute) == 16,
+static_assert(sizeof(ShaderInputAttribute) == 20,
               "ShaderInputAttribute size mismatch!");
 static_assert(sizeof(ShaderReflectionHeader) == 40,
               "ShaderReflectionHeader size mismatch!");

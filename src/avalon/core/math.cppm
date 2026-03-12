@@ -1,10 +1,14 @@
 module;
 #include <cmath>
 #include <cstdint>
+#include <debug/assert.hpp>
 export module avalon.core:math;
+
+import :debug;
 
 export namespace avalon {
 constexpr float kPi = 3.1415926535897932384626433832795f;
+constexpr float kEpsilon = 0.000001f;
 
 inline constexpr float ToRadians(float degrees) {
   return degrees * (kPi / 180.f);
@@ -13,6 +17,10 @@ inline constexpr float ToRadians(float degrees) {
 inline constexpr float ToDegrees(float radians) {
   return radians * (180.f / kPi);
 }
+
+struct Vec2 {
+  float x = 0, y = 0;
+};
 
 struct Vec3 {
   float x = 0, y = 0, z = 0;
@@ -32,6 +40,24 @@ struct Vec3 {
   static Vec3 One() { return {1.0f, 1.0f, 1.0f}; }
 };
 
+inline float LengthSquared(const Vec3 &v) {
+  return v.x * v.x + v.y * v.y + v.z * v.z;
+}
+
+inline float Length(const Vec3 &v) { return std::sqrt(LengthSquared(v)); }
+
+inline Vec3 Normalize(const Vec3 &v) {
+  float lenSq = LengthSquared(v);
+
+  if (lenSq > kEpsilon) {
+    float invLen = 1.0f / std::sqrt(lenSq);
+    return {v.x * invLen, v.y * invLen, v.z * invLen};
+  }
+
+  AVALON_ASSERT_MSG(true, "Attempting to normalize a zero-length vector!");
+
+  return {0.0f, 0.0f, 0.0f};
+}
 struct Vec4 {
   float x = 0, y = 0, z = 0, w = 1;
 

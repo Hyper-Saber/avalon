@@ -8,6 +8,7 @@ import avalon.window;
 import avalon.rhi;
 import avalon.graphics;
 import avalon.ecs;
+import avalon.shader;
 export import :utils;
 
 export namespace avalon {
@@ -35,6 +36,8 @@ private:
   auto ExecuteFrame() -> rhi::ERhiResult;
   bool TryHandleRhiError(rhi::ERhiResult error);
 
+  void CreateTriangleEntity(const graphics::Material &material);
+
 private:
   EngineConfig m_config;
   PluginInstance<window::IWindow> m_window;
@@ -43,5 +46,6 @@ private:
   UniquePtr<ecs::World> m_world;
   rhi::PipelineHandle m_pipeline;
   rhi::RenderPassHandle m_renderPass;
+  graphics::MeshHandle m_mesh;
 };
 } // namespace avalon

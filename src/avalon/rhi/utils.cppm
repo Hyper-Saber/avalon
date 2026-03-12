@@ -17,23 +17,23 @@ constexpr uint32_t GetFormatSize(EFormat format) {
     return 2;
   case EFormat::R16_Float:
     return 2;
-  case EFormat::R16G16_Uint2:
+  case EFormat::R16G16_Uint:
     return 4;
-  case EFormat::R16G16_Int2:
+  case EFormat::R16G16_Int:
     return 4;
-  case EFormat::R16G16_Float2:
+  case EFormat::R16G16_Float:
     return 4;
-  case EFormat::R16G16B16_Uint3:
+  case EFormat::R16G16B16_Uint:
     return 6;
-  case EFormat::R16G16B16_Int3:
+  case EFormat::R16G16B16_Int:
     return 6;
-  case EFormat::R16G16B16_Float3:
+  case EFormat::R16G16B16_Float:
     return 6;
-  case EFormat::R16G16B16A16_Uint4:
+  case EFormat::R16G16B16A16_Uint:
     return 8;
-  case EFormat::R16G16B16A16_Int4:
+  case EFormat::R16G16B16A16_Int:
     return 8;
-  case EFormat::R16G16B16A16_Float4:
+  case EFormat::R16G16B16A16_Float:
     return 8;
   case EFormat::R32_Uint:
     return 4;
@@ -41,23 +41,23 @@ constexpr uint32_t GetFormatSize(EFormat format) {
     return 4;
   case EFormat::R32_Float:
     return 4;
-  case EFormat::R32G32_Uint2:
+  case EFormat::R32G32_Uint:
     return 8;
-  case EFormat::R32G32_Int2:
+  case EFormat::R32G32_Int:
     return 8;
-  case EFormat::R32G32_Float2:
+  case EFormat::R32G32_Float:
     return 8;
-  case EFormat::R32G32B32_Uint3:
+  case EFormat::R32G32B32_Uint:
     return 12;
-  case EFormat::R32G32B32_Int3:
+  case EFormat::R32G32B32_Int:
     return 12;
-  case EFormat::R32G32B32_Float3:
+  case EFormat::R32G32B32_Float:
     return 12;
-  case EFormat::R32G32B32A32_Uint4:
+  case EFormat::R32G32B32A32_Uint:
     return 16;
-  case EFormat::R32G32B32A32_Int4:
+  case EFormat::R32G32B32A32_Int:
     return 16;
-  case EFormat::R32G32B32A32_Float4:
+  case EFormat::R32G32B32A32_Float:
     return 16;
   case EFormat::R64_Uint:
     return 8;
@@ -65,23 +65,23 @@ constexpr uint32_t GetFormatSize(EFormat format) {
     return 8;
   case EFormat::R64_Float:
     return 8;
-  case EFormat::R64G64_Uint2:
+  case EFormat::R64G64_Uint:
     return 16;
-  case EFormat::R64G64_Int2:
+  case EFormat::R64G64_Int:
     return 16;
-  case EFormat::R64G64_Float2:
+  case EFormat::R64G64_Float:
     return 16;
-  case EFormat::R64G64B64_Uint3:
+  case EFormat::R64G64B64_Uint:
     return 24;
-  case EFormat::R64G64B64_Int3:
+  case EFormat::R64G64B64_Int:
     return 24;
-  case EFormat::R64G64B64_Float3:
+  case EFormat::R64G64B64_Float:
     return 24;
-  case EFormat::R64G64B64A64_Uint4:
+  case EFormat::R64G64B64A64_Uint:
     return 32;
-  case EFormat::R64G64B64A64_Int4:
+  case EFormat::R64G64B64A64_Int:
     return 32;
-  case EFormat::R64G64B64A64_Float4:
+  case EFormat::R64G64B64A64_Float:
     return 32;
   default:
     break;
@@ -89,4 +89,139 @@ constexpr uint32_t GetFormatSize(EFormat format) {
 
   return kInvalidFormatSize;
 }
+
+constexpr StringView ToView(EFormat format) {
+  using enum EFormat;
+  switch (format) {
+  case Undefined:
+    return "Undefined";
+
+  // 16-bit
+  case R16_Uint:
+    return "R16_Uint";
+  case R16_Int:
+    return "R16_Int";
+  case R16_Float:
+    return "R16_Float";
+  case R16G16_Uint:
+    return "R16G16_Uint";
+  case R16G16_Int:
+    return "R16G16_Int";
+  case R16G16_Float:
+    return "R16G16_Float";
+  case R16G16B16_Uint:
+    return "R16G16B16_Uint";
+  case R16G16B16_Int:
+    return "R16G16B16_Int";
+  case R16G16B16_Float:
+    return "R16G16B16_Float";
+  case R16G16B16A16_Uint:
+    return "R16G16B16A16_Uint";
+  case R16G16B16A16_Int:
+    return "R16G16B16A16_Int";
+  case R16G16B16A16_Float:
+    return "R16G16B16A16_Float";
+
+  // 32-bit
+  case R32_Uint:
+    return "R32_Uint";
+  case R32_Int:
+    return "R32_Int";
+  case R32_Float:
+    return "R32_Float";
+  case R32G32_Uint:
+    return "R32G32_Uint";
+  case R32G32_Int:
+    return "R32G32_Int";
+  case R32G32_Float:
+    return "R32G32_Float";
+  case R32G32B32_Uint:
+    return "R32G32B32_Uint";
+  case R32G32B32_Int:
+    return "R32G32B32_Int";
+  case R32G32B32_Float:
+    return "R32G32B32_Float";
+  case R32G32B32A32_Uint:
+    return "R32G32B32A32_Uint";
+  case R32G32B32A32_Int:
+    return "R32G32B32A32_Int";
+  case R32G32B32A32_Float:
+    return "R32G32B32A32_Float";
+
+  // 64-bit
+  case R64_Uint:
+    return "R64_Uint";
+  case R64_Int:
+    return "R64_Int";
+  case R64_Float:
+    return "R64_Float";
+  case R64G64_Uint:
+    return "R64G64_Uint";
+  case R64G64_Int:
+    return "R64G64_Int";
+  case R64G64_Float:
+    return "R64G64_Float";
+  case R64G64B64_Uint:
+    return "R64G64B64_Uint";
+  case R64G64B64_Int:
+    return "R64G64B64_Int";
+  case R64G64B64_Float:
+    return "R64G64B64_Float";
+  case R64G64B64A64_Uint:
+    return "R64G64B64A64_Uint";
+  case R64G64B64A64_Int:
+    return "R64G64B64A64_Int";
+  case R64G64B64A64_Float:
+    return "R64G64B64A64_Float";
+
+  // Packed / Normalized / Special
+  case R8G8B8_UNORM:
+    return "R8G8B8_UNORM";
+  case R8G8B8A8_UNORM:
+    return "R8G8B8A8_UNORM";
+  case R8G8B8_SRGB:
+    return "R8G8B8_SRGB";
+  case R8G8B8A8_SRGB:
+    return "R8G8B8A8_SRGB";
+  case B8G8R8A8_SRGB:
+    return "B8G8R8A8_SRGB";
+  case R16G16B16A16_SFLOAT:
+    return "R16G16B16A16_SFLOAT";
+  case D32_SFLOAT:
+    return "D32_SFLOAT";
+  case D32_SFLOAT_S8_UINT:
+    return "D32_SFLOAT_S8_UINT";
+
+  default:
+    return "UnknownFormat";
+  }
+}
+
+constexpr StringView ToView(ERhiResult e) {
+  switch (e) {
+  case ERhiResult::Success:
+    return "Success";
+  case ERhiResult::Unknown:
+    return "Unknown";
+  case ERhiResult::InitializationFailed:
+    return "InitializationFailed";
+  case ERhiResult::SurfaceLost:
+    return "SurfaceLost";
+  case ERhiResult::DeviceLost:
+    return "DeviceLost";
+  case ERhiResult::OutOfMemory:
+    return "OutOfMemory";
+  case ERhiResult::BackendSpecificError:
+    return "BackendSpecificError";
+  case ERhiResult::SwapchainOutOfDate:
+    return "SwapchainOutOfDate";
+  case ERhiResult::FailedToRecordCommand:
+    return "FailedToRecordCommand";
+  case ERhiResult::FailedToSubmitQueue:
+    return "FailedToSubmitQueue";
+  case ERhiResult::FormatNotSupported:
+    return "FormatNotSupported";
+  }
+}
+
 } // namespace avalon::rhi

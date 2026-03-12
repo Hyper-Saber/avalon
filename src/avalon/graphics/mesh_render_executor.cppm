@@ -41,8 +41,8 @@ public:
         lastIBO = currentIBO;
       }
 
-      cmd.PushConstants(rhi::EShaderStage::Vertex, 0, sizeof(Matrix4x4),
-                        &packet.transforms[i]);
+      // cmd.PushConstants(rhi::EShaderStage::Vertex, 0, sizeof(Matrix4x4),
+      //                   &packet.transforms[i]);
 
       cmd.DrawIndexed(mesh->GetIndexCount(), 1, 0, 0, 0);
     }

@@ -13,7 +13,7 @@ namespace avalon::graphics {
 
 struct RenderPacket {
   Array<MeshHandle> meshHandles;
-  Array<Matrix4x4> transforms;
+  Array<Transform> transforms;
   Array<uint64_t> sortKeys;
 
   void Clear() {
@@ -33,7 +33,7 @@ public:
 
     for (auto [entity, meshComp, transComp] : view) {
       outPacket.meshHandles.PushBack(meshComp.meshHandle);
-      outPacket.transforms.PushBack(transComp.transform);
+      outPacket.transforms.PushBack(transComp.local);
       auto sortKey = static_cast<uint64_t>(meshComp.meshHandle.id) << 32;
       outPacket.sortKeys.PushBack(sortKey);
     }

@@ -21,6 +21,7 @@ export import :status;
 export import :string;
 export import :string_view;
 export import :string_id;
+export import :transform;
 export import :types;
 export import :utils;
 export import :unique_ptr;

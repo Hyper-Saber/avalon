@@ -15,6 +15,7 @@ void TestHelloTriangle() {
               .queueRequirement =
                   {
                       .isRequireGraphics = true,
+                      .isRequireTransfer = true,
                       .isRequirePresent = true,
                   },
               .requiredCapabilities =

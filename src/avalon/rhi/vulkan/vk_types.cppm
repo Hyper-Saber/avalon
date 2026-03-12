@@ -126,10 +126,7 @@ public:
   virtual auto GetPhysicalDevice() -> VkPhysicalDevice = 0;
   virtual auto GetDevice() -> VkDevice = 0;
   virtual auto GetQueueFamilyIndices() -> const QueueFamilyIndices & = 0;
-  virtual auto GetPresentQueue() -> VkQueue = 0;
-  virtual auto GetGraphicsQueue() -> VkQueue = 0;
-  virtual auto GetComputeQueue() -> VkQueue = 0;
-  virtual auto GetTransferQueue() -> VkQueue = 0;
+  virtual auto GetQueue(EQueueType) -> VkQueue = 0;
   virtual auto QuerySwapchainSupportDetails(VkPhysicalDevice device)
       -> SwapchainSupportDetails = 0;
 };

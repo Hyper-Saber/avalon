@@ -98,6 +98,8 @@ public:
   void BindVertexBuffer(uint32_t firstBinding, uint32_t bindingCount,
                         const BufferHandle *pBuffers,
                         const uint64_t *pOffsets) override {
+    VkDeviceSize defaultOffsets[16] = {0};
+    const VkDeviceSize *pActualOffsets = pOffsets ? pOffsets : defaultOffsets;
 
     AVALON_ASSERT_MSG(bindingCount <= 16,
                       "Binding count is too high, max is 16");
@@ -110,7 +112,8 @@ public:
       buffers[i] = m_resourceProvider.GetBuffer(pBuffers[i]).buffer;
     }
 
-    vkCmdBindVertexBuffers(m_cmd, firstBinding, actualCount, buffers, pOffsets);
+    vkCmdBindVertexBuffers(m_cmd, firstBinding, actualCount, buffers,
+                           pActualOffsets);
   }
 
   void BindIndexBuffer(BufferHandle handle, uint64_t offset,
@@ -136,6 +139,20 @@ public:
                     uint64_t size) override {
     VkBuffer buffer = m_resourceProvider.GetBuffer(handle).buffer;
     vkCmdUpdateBuffer(m_cmd, buffer, offset, size, pData);
+  }
+
+  void CopyBuffer(BufferHandle src, BufferHandle dst,
+                  const BufferCopy &region) override {
+    auto srcBuffer = m_resourceProvider.GetBuffer(src).buffer;
+    auto dstBuffer = m_resourceProvider.GetBuffer(dst).buffer;
+
+    VkBufferCopy vkRegin{
+        .srcOffset = region.srcOffset,
+        .dstOffset = region.dstOffset,
+        .size = region.size,
+    };
+
+    vkCmdCopyBuffer(m_cmd, srcBuffer, dstBuffer, 1, &vkRegin);
   }
 
   void Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,

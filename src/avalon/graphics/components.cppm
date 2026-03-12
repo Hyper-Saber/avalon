@@ -10,7 +10,7 @@ struct MeshComponent {
 };
 
 struct TransformComponent {
-  Matrix4x4 transform;
+  Transform local;
 };
 
 } // namespace avalon::graphics

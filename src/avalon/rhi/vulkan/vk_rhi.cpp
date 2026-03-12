@@ -1,6 +1,7 @@
 module;
 #include <debug/assert.hpp>
 #include <expected>
+#include <functional>
 #include <optional>
 #include <vulkan/vulkan.h>
 
@@ -17,28 +18,32 @@ namespace avalon::rhi {
 VkRhi::VkRhi() = default;
 
 VkRhi::~VkRhi() {
-  vkDeviceWaitIdle(m_context->GetDevice());
+  vkDeviceWaitIdle(m_deviceContext->GetDevice());
   for (auto &syncObject : m_frameSyncObjects) {
     if (syncObject.renderFinishedSemaphore != VK_NULL_HANDLE)
-      vkDestroySemaphore(m_context->GetDevice(),
+      vkDestroySemaphore(m_deviceContext->GetDevice(),
                          syncObject.renderFinishedSemaphore, nullptr);
     if (syncObject.imageAvailableSemaphore != VK_NULL_HANDLE)
-      vkDestroySemaphore(m_context->GetDevice(),
+      vkDestroySemaphore(m_deviceContext->GetDevice(),
                          syncObject.imageAvailableSemaphore, nullptr);
     if (syncObject.m_inflightFence != VK_NULL_HANDLE)
-      vkDestroyFence(m_context->GetDevice(), syncObject.m_inflightFence,
+      vkDestroyFence(m_deviceContext->GetDevice(), syncObject.m_inflightFence,
                      nullptr);
   }
 
-  for (auto &pool : m_commandPools) {
+  for (auto &pool : m_frameCommandPools) {
     if (pool != VK_NULL_HANDLE)
-      vkDestroyCommandPool(m_context->GetDevice(), pool, nullptr);
+      vkDestroyCommandPool(m_deviceContext->GetDevice(), pool, nullptr);
   }
+
+  if (m_immTransferPool != VK_NULL_HANDLE)
+    vkDestroyCommandPool(m_deviceContext->GetDevice(), m_immTransferPool,
+                         nullptr);
 
   m_pipelineManager.Reset();
   m_resourcePool.Reset();
   m_swapchainContext.Reset();
-  m_context.Reset();
+  m_deviceContext.Reset();
 }
 
 auto VkRhi::OnLoad() -> EStatusCode { return EStatusCode::Success; };
@@ -46,14 +51,14 @@ auto VkRhi::OnLoad() -> EStatusCode { return EStatusCode::Success; };
 auto VkRhi::Initialize(const DeviceRequirement &requirement,
                        const window::NativeWindowInfo &windowInfo,
                        uint32_t width, uint32_t height) -> ERhiResult {
-  m_context = MakeUnique<DeviceContext>();
+  m_deviceContext = MakeUnique<DeviceContext>();
   auto config = TranslateRequirements(requirement);
-  auto result = m_context->Initialize(config, windowInfo)
+  auto result = m_deviceContext->Initialize(config, windowInfo)
                     .and_then([&] -> std::expected<void, ERhiResult> {
                       if (!config.queueRequirement.isRequirePresent)
                         return {};
                       m_swapchainContext =
-                          MakeUnique<SwapchainContext>(*m_context.Get());
+                          MakeUnique<SwapchainContext>(*m_deviceContext.Get());
                       return m_swapchainContext->Initialize(width, height);
                     })
                     .and_then([&]() { return CreateCommandPools(); })
@@ -61,10 +66,10 @@ auto VkRhi::Initialize(const DeviceRequirement &requirement,
   if (!result.has_value())
     return result.error();
 
-  m_resourcePool = MakeUnique<ResourcePool>(m_context->GetDevice(),
-                                            m_context->GetPhysicalDevice());
+  m_resourcePool = MakeUnique<ResourcePool>(
+      m_deviceContext->GetDevice(), m_deviceContext->GetPhysicalDevice());
   m_pipelineManager =
-      MakeUnique<PipelineManager>(m_context->GetDevice(), *this);
+      MakeUnique<PipelineManager>(m_deviceContext->GetDevice(), *this);
   return {};
 }
 
@@ -84,6 +89,10 @@ auto VkRhi::GetSwapchainImageFormat() -> EFormat {
   default:
     return EFormat::Undefined;
   }
+}
+
+void VkRhi::SetSwapchainRenderPass(RenderPassHandle handle) {
+  CreateSwapchianFrameBuffers(handle);
 }
 
 auto VkRhi::GetRenderPass(RenderPassHandle handle)
@@ -109,7 +118,7 @@ auto VkRhi::GetBuffer(BufferHandle handle) -> const BufferResource & {
 
 auto VkRhi::RecreateSwapchain(RenderPassHandle handle, uint32_t width,
                               uint32_t height) -> ERhiResult {
-  vkDeviceWaitIdle(m_context->GetDevice());
+  vkDeviceWaitIdle(m_deviceContext->GetDevice());
   CleanupSwapchainFrameBuffers();
   auto result = m_swapchainContext->RecreateSwapchain(width, height);
   if (!result) {
@@ -145,14 +154,14 @@ auto VkRhi::CreateRenderPass(const RenderPassCreateInfo &info)
 auto VkRhi::CreateCommandBuffer() -> ICommandBuffer * {
   VkCommandBufferAllocateInfo info{
       .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-      .commandPool = m_commandPools[m_currentFrame],
+      .commandPool = m_frameCommandPools[m_currentFrame],
       .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
       .commandBufferCount = 1,
   };
 
   VkCommandBuffer vkCmdBuffer;
-  auto result =
-      vkAllocateCommandBuffers(m_context->GetDevice(), &info, &vkCmdBuffer);
+  auto result = vkAllocateCommandBuffers(m_deviceContext->GetDevice(), &info,
+                                         &vkCmdBuffer);
 
   if (result != VK_SUCCESS) {
     Error("[Vulkan]: Failed to allocate command buffer! Error code: {}.",
@@ -160,13 +169,75 @@ auto VkRhi::CreateCommandBuffer() -> ICommandBuffer * {
     return nullptr;
   }
   auto cmdBuffer = MakeUnique<CommandBuffer>(vkCmdBuffer, *this);
-  m_commandBuffers.PushBack(std::move(cmdBuffer));
+  m_frameCommandBuffers.PushBack(std::move(cmdBuffer));
 
-  return m_commandBuffers.GetBack().Get();
+  return m_frameCommandBuffers.GetBack().Get();
 }
 
-void VkRhi::SetSwapchainRenderPass(RenderPassHandle handle) {
-  CreateSwapchianFrameBuffers(handle);
+void VkRhi::ExcuteOnce(EQueueType queueType,
+                       const std::function<void(ICommandBuffer *)> &action) {
+
+  auto pool = m_immTransferPool;
+  auto device = m_deviceContext->GetDevice();
+  vkResetCommandPool(device, pool, 0);
+
+  VkCommandBufferAllocateInfo allocInfo{
+      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+      .commandPool = pool,
+      .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+      .commandBufferCount = 1,
+  };
+
+  VkCommandBuffer vkCmd;
+
+  auto result = vkAllocateCommandBuffers(device, &allocInfo, &vkCmd);
+  if (result != VK_SUCCESS) {
+    Error("[Vulkan]: Failed to allocate command buffer! Error code: {}.",
+          ToView(result));
+    return;
+  }
+
+  auto cmd = MakeUnique<CommandBuffer>(vkCmd, *this);
+
+  cmd->Begin();
+  action(cmd.Get());
+  cmd->End();
+
+  VkSubmitInfo submitInfo{
+      .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+      .commandBufferCount = 1,
+      .pCommandBuffers = &vkCmd,
+  };
+
+  VkQueue queue = m_deviceContext->GetQueue(queueType);
+
+  vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
+  vkQueueWaitIdle(queue);
+}
+
+void *VkRhi::MapMemory(BufferHandle handle) {
+  auto bufferResource = m_resourcePool->ResolveBuffer({handle.id});
+  if (!bufferResource)
+    return nullptr;
+
+  void *mappedData = nullptr;
+
+  auto result =
+      vkMapMemory(m_deviceContext->GetDevice(), bufferResource->memory, 0,
+                  bufferResource->size, 0, &mappedData);
+
+  if (result != VK_SUCCESS) {
+    Error("[Vulkan]: Failed to map memory! Error code: {}.", ToView(result));
+    return nullptr;
+  }
+
+  return mappedData;
+}
+void VkRhi::UnmapMemory(BufferHandle handle) {
+  auto bufferResource = m_resourcePool->ResolveBuffer({handle.id});
+  if (bufferResource) {
+    vkUnmapMemory(m_deviceContext->GetDevice(), bufferResource->memory);
+  }
 }
 
 void VkRhi::Submit(ICommandBuffer *cmd) {
@@ -187,19 +258,19 @@ void VkRhi::Submit(ICommandBuffer *cmd) {
           &m_frameSyncObjects[m_currentImageIndex].renderFinishedSemaphore,
   };
 
-  vkQueueSubmit(m_context->GetGraphicsQueue(), 1, &info,
+  vkQueueSubmit(m_deviceContext->GetQueue(EQueueType::Graphics), 1, &info,
                 m_frameSyncObjects[m_currentFrame].m_inflightFence);
 }
 
 auto VkRhi::BeginFrame() -> ERhiResult {
   AVALON_ASSERT(m_maxFrameInFlight == m_swapchainContext->GetImageCount());
   auto res = vkWaitForFences(
-      m_context->GetDevice(), 1,
+      m_deviceContext->GetDevice(), 1,
       &m_frameSyncObjects[m_currentFrame].m_inflightFence, VK_TRUE, UINT64_MAX);
 
   auto result = vkAcquireNextImageKHR(
-      m_context->GetDevice(), m_swapchainContext->GetSwapchain(), UINT64_MAX,
-      m_frameSyncObjects[m_currentFrame].imageAvailableSemaphore,
+      m_deviceContext->GetDevice(), m_swapchainContext->GetSwapchain(),
+      UINT64_MAX, m_frameSyncObjects[m_currentFrame].imageAvailableSemaphore,
       VK_NULL_HANDLE, &m_currentImageIndex);
 
   if (result == VK_ERROR_OUT_OF_DATE_KHR) {
@@ -210,10 +281,11 @@ auto VkRhi::BeginFrame() -> ERhiResult {
     return HandleVkError(result);
   }
 
-  vkResetFences(m_context->GetDevice(), 1,
+  vkResetFences(m_deviceContext->GetDevice(), 1,
                 &m_frameSyncObjects[m_currentFrame].m_inflightFence);
-  m_commandBuffers.Clear();
-  vkResetCommandPool(m_context->GetDevice(), m_commandPools[m_currentFrame], 0);
+  m_frameCommandBuffers.Clear();
+  vkResetCommandPool(m_deviceContext->GetDevice(),
+                     m_frameCommandPools[m_currentFrame], 0);
 
   return {};
 }
@@ -230,7 +302,8 @@ auto VkRhi::EndFrame() -> ERhiResult {
       .pImageIndices = &m_currentImageIndex,
   };
 
-  auto result = vkQueuePresentKHR(m_context->GetPresentQueue(), &presentInfo);
+  auto result = vkQueuePresentKHR(
+      m_deviceContext->GetQueue(EQueueType::Present), &presentInfo);
 
   auto ret = ERhiResult::Success;
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
@@ -246,22 +319,45 @@ auto VkRhi::EndFrame() -> ERhiResult {
 auto VkRhi::CreateCommandPools() -> std::expected<void, ERhiResult> {
   if (m_maxFrameInFlight == 0)
     m_maxFrameInFlight = m_swapchainContext->GetImageCount();
-  m_commandPools.Resize(m_maxFrameInFlight);
-  auto indices = m_context->GetQueueFamilyIndices();
-  VkCommandPoolCreateInfo createInfo{
+  m_frameCommandPools.Resize(m_maxFrameInFlight);
+
+  auto indices = m_deviceContext->GetQueueFamilyIndices();
+
+  VkCommandPoolCreateInfo graphicsPoolInfo{
       .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
       .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
       .queueFamilyIndex = indices.graphicsFamily.value(),
   };
 
-  for (auto &pool : m_commandPools) {
-    auto result = vkCreateCommandPool(m_context->GetDevice(), &createInfo,
-                                      nullptr, &pool);
+  for (auto &pool : m_frameCommandPools) {
+    auto result = vkCreateCommandPool(m_deviceContext->GetDevice(),
+                                      &graphicsPoolInfo, nullptr, &pool);
     if (result != VK_SUCCESS) {
       avalon::Error("Vulkan: Failed to create command pool! Error code: {}.",
                     ToView(result));
       return std::unexpected(HandleVkError(result));
     }
+  }
+
+  auto queueFamilyIndex = indices.transferFamily.has_value()
+                              ? indices.transferFamily.value()
+                              : indices.graphicsFamily.value();
+
+  VkCommandPoolCreateInfo transferPoolInfo{
+      .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+      .flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT |
+               VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+      .queueFamilyIndex = queueFamilyIndex,
+  };
+
+  auto result =
+      vkCreateCommandPool(m_deviceContext->GetDevice(), &transferPoolInfo,
+                          nullptr, &m_immTransferPool);
+
+  if (result != VK_SUCCESS) {
+    avalon::Error("Vulkan: Failed to create command pool! Error code: {}.",
+                  ToView(result));
+    return std::unexpected(HandleVkError(result));
   }
 
   return {};
@@ -296,22 +392,23 @@ auto VkRhi::CreateSyncObjects() -> std::expected<void, ERhiResult> {
   m_frameSyncObjects.Resize(m_maxFrameInFlight);
   for (auto &sync : m_frameSyncObjects) {
     auto result =
-        vkCreateSemaphore(m_context->GetDevice(), &semaphoreCreateInfo, nullptr,
-                          &sync.imageAvailableSemaphore);
+        vkCreateSemaphore(m_deviceContext->GetDevice(), &semaphoreCreateInfo,
+                          nullptr, &sync.imageAvailableSemaphore);
     if (result != VK_SUCCESS) {
       avalon::Error("Vulkan: Failed to create sync objects!");
       return std::unexpected(HandleVkError(result));
     }
 
-    result = vkCreateSemaphore(m_context->GetDevice(), &semaphoreCreateInfo,
-                               nullptr, &sync.renderFinishedSemaphore);
+    result =
+        vkCreateSemaphore(m_deviceContext->GetDevice(), &semaphoreCreateInfo,
+                          nullptr, &sync.renderFinishedSemaphore);
     if (result != VK_SUCCESS) {
       avalon::Error("Vulkan: Failed to create sync objects!");
       return std::unexpected(HandleVkError(result));
     }
 
-    result = vkCreateFence(m_context->GetDevice(), &fenceCreateInfo, nullptr,
-                           &sync.m_inflightFence);
+    result = vkCreateFence(m_deviceContext->GetDevice(), &fenceCreateInfo,
+                           nullptr, &sync.m_inflightFence);
     if (result != VK_SUCCESS) {
       avalon::Error("Vulkan: Failed to create sync objects!");
       return std::unexpected(HandleVkError(result));

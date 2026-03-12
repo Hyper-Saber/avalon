@@ -1,4 +1,5 @@
 module;
+#include <debug/assert.hpp>
 #include <expected>
 #include <optional>
 #include <set>
@@ -22,14 +23,14 @@ debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
               void *pUserData) {
 
   if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-    avalon::Error("[Vulkan]: {}", pCallbackData->pMessage);
+    avalon::Error("[VKVL]: {}", pCallbackData->pMessage);
   } else if (messageSeverity &
              VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-    avalon::Warn("[Vulkan]: {}", pCallbackData->pMessage);
+    avalon::Warn("[VKVL]: {}", pCallbackData->pMessage);
   } else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
-    avalon::Info("[Vulkan]: {}", pCallbackData->pMessage);
+    avalon::Info("[VKVL]: {}", pCallbackData->pMessage);
   } else {
-    avalon::Debug("[Vulkan]: {}", pCallbackData->pMessage);
+    avalon::Debug("[VKVL]: {}", pCallbackData->pMessage);
   }
   return VK_FALSE;
 }
@@ -79,14 +80,15 @@ public:
   auto Initialize(const DeviceConfig &config,
                   const window::NativeWindowInfo &windowInfo)
       -> std::expected<void, ERhiResult> {
-    return CreateInstance(config.queueRequirement.isRequirePresent)
+    m_config = config;
+    return CreateInstance()
 #ifndef NDEBUG
         .and_then([&] { return CreateDebugMessenger(); })
 #endif // !NDEBUG
         .and_then([&] { return CreateSurface(windowInfo); })
         .and_then([&] { return DiscoverDevices(); })
-        .and_then([&] { return PickPhysicalDevice(config); })
-        .and_then([&] { return CreateLogicalDevice(config); });
+        .and_then([&] { return PickPhysicalDevice(); })
+        .and_then([&] { return CreateLogicalDevice(); });
   }
 
   auto GetInstance() noexcept -> VkInstance override { return m_instance; }
@@ -96,13 +98,20 @@ public:
   }
   auto GetSurface() noexcept -> VkSurfaceKHR override { return m_surface; }
 
-  auto GetPresentQueue() noexcept -> VkQueue override { return m_presentQueue; }
-  auto GetGraphicsQueue() noexcept -> VkQueue override {
-    return m_graphicsQueue;
-  }
-  auto GetComputeQueue() noexcept -> VkQueue override { return m_computeQueue; }
-  auto GetTransferQueue() noexcept -> VkQueue override {
-    return m_transferQueue;
+  auto GetQueue(EQueueType queueType) -> VkQueue override {
+    switch (queueType) {
+    case EQueueType::Graphics:
+      return m_graphicsQueue;
+    case EQueueType::Transfer:
+      AVALON_ASSERT(m_config.queueRequirement.isRequireTransfer);
+      return m_transferQueue;
+    case EQueueType::Compute:
+      AVALON_ASSERT(m_config.queueRequirement.isRequireCompute);
+      return m_computeQueue;
+    case EQueueType::Present:
+      AVALON_ASSERT(m_config.queueRequirement.isRequirePresent);
+      return m_presentQueue;
+    }
   }
 
   auto GetQueueFamilyIndices() noexcept -> const QueueFamilyIndices & override {
@@ -134,8 +143,8 @@ public:
   }
 
 private:
-  auto CreateInstance(bool isRequirePresent)
-      -> std::expected<void, ERhiResult> {
+  auto CreateInstance() -> std::expected<void, ERhiResult> {
+    bool isRequirePresent = m_config.queueRequirement.isRequirePresent;
     VkApplicationInfo appInfo{
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
         .pApplicationName = "avalon",
@@ -192,7 +201,6 @@ private:
     auto func = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
         vkGetInstanceProcAddr(m_instance, "vkCreateDebugUtilsMessengerEXT"));
     if (!func) {
-    avalon:
       Warn("[Vulkan]: Failed to load vkCreateDebugUtilsMessengerEXT (Extension "
            "missing or not enabled!)");
       return {};
@@ -212,7 +220,7 @@ private:
       -> std::expected<void, ERhiResult> {
 
     VkResult result = VK_ERROR_INITIALIZATION_FAILED;
-    if constexpr (kIsLinux) {
+    if constexpr (platform::kIsLinux) {
       if (windowInfo.api == window::NativeWindowApi::Wayland) {
         VkWaylandSurfaceCreateInfoKHR createInfo{
             .sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR,
@@ -233,7 +241,7 @@ private:
         result =
             vkCreateXcbSurfaceKHR(m_instance, &createInfo, nullptr, &m_surface);
       }
-    } else if constexpr (kIsWindows) {
+    } else if constexpr (platform::kIsWindows) {
     }
 
     if (result != VK_SUCCESS) {
@@ -253,11 +261,10 @@ private:
     return {};
   }
 
-  auto PickPhysicalDevice(const DeviceConfig &config)
-      -> std::expected<void, ERhiResult> {
+  auto PickPhysicalDevice() -> std::expected<void, ERhiResult> {
 
     for (auto device : m_availablePhysicalDevices) {
-      if (IsDeviceSuitable(device, config)) {
+      if (IsDeviceSuitable(device)) {
         m_physicalDevice = device;
         return {};
       }
@@ -266,25 +273,34 @@ private:
     return std::unexpected(ERhiResult::DeviceLost);
   }
 
-  bool IsDeviceSuitable(VkPhysicalDevice device, const DeviceConfig &config) {
+  bool IsDeviceSuitable(VkPhysicalDevice device) {
     VkPhysicalDeviceProperties deviceProperties;
     vkGetPhysicalDeviceProperties(device, &deviceProperties);
 
-    m_queueFamilyIndices = FindQueueFamilies(device, config.queueRequirement);
-    bool extensionsSupported = CheckDeviceExtensionSupport(device, config);
+    m_queueFamilyIndices = FindQueueFamilies(device, m_config.queueRequirement);
+    bool extensionsSupported = CheckDeviceExtensionSupport(device, m_config);
 
-    return m_queueFamilyIndices.IsComplete(config.queueRequirement) &&
+    return m_queueFamilyIndices.IsComplete(m_config.queueRequirement) &&
            deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
   }
 
-  auto CreateLogicalDevice(const DeviceConfig &config)
-      -> std::expected<void, ERhiResult> {
+  auto CreateLogicalDevice() -> std::expected<void, ERhiResult> {
 
     float queueamilyPriority = 1.0f;
     Array<VkDeviceQueueCreateInfo> queueCreateInfos;
     std::set<uint32_t> uniqueQueueFamilies = {
         m_queueFamilyIndices.graphicsFamily.value(),
-        m_queueFamilyIndices.presentFamily.value()};
+    };
+
+    if (m_config.queueRequirement.isRequirePresent) {
+      uniqueQueueFamilies.insert(m_queueFamilyIndices.presentFamily.value());
+    }
+    if (m_config.queueRequirement.isRequireTransfer) {
+      uniqueQueueFamilies.insert(m_queueFamilyIndices.transferFamily.value());
+    }
+    if (m_config.queueRequirement.isRequireCompute) {
+      uniqueQueueFamilies.insert(m_queueFamilyIndices.computeFamily.value());
+    }
 
     for (auto queueFamily : uniqueQueueFamilies) {
       VkDeviceQueueCreateInfo createInfo{
@@ -304,9 +320,9 @@ private:
         .enabledLayerCount = 0,
         .ppEnabledLayerNames = nullptr,
         .enabledExtensionCount =
-            static_cast<uint32_t>(config.extensions.GetSize()),
-        .ppEnabledExtensionNames = config.extensions.GetData(),
-        .pEnabledFeatures = &config.features,
+            static_cast<uint32_t>(m_config.extensions.GetSize()),
+        .ppEnabledExtensionNames = m_config.extensions.GetData(),
+        .pEnabledFeatures = &m_config.features,
     };
 
     auto result =
@@ -318,8 +334,22 @@ private:
 
     vkGetDeviceQueue(m_device, m_queueFamilyIndices.graphicsFamily.value(), 0,
                      &m_graphicsQueue);
-    vkGetDeviceQueue(m_device, m_queueFamilyIndices.presentFamily.value(), 0,
-                     &m_presentQueue);
+    if (m_config.queueRequirement.isRequirePresent)
+      vkGetDeviceQueue(m_device, m_queueFamilyIndices.presentFamily.value(), 0,
+                       &m_presentQueue);
+    if (m_config.queueRequirement.isRequireTransfer) {
+      if (m_queueFamilyIndices.transferFamily.has_value())
+        vkGetDeviceQueue(m_device, m_queueFamilyIndices.transferFamily.value(),
+                         0, &m_transferQueue);
+      else {
+        Debug("[Vulkan]: Transfer queue not found. Using graphics queue "
+              "instead.");
+        m_transferQueue = m_graphicsQueue;
+      }
+    }
+    if (m_config.queueRequirement.isRequireCompute)
+      vkGetDeviceQueue(m_device, m_queueFamilyIndices.computeFamily.value(), 0,
+                       &m_computeQueue);
 
     avalon::Debug("[Vulkan]: Logical device created.");
     return {};
@@ -344,9 +374,14 @@ private:
           property.queueFlags & VK_QUEUE_COMPUTE_BIT) {
         indices.computeFamily = i;
       }
-      if (requirement.isRequireTransfer &&
-          property.queueFlags & VK_QUEUE_TRANSFER_BIT) {
-        indices.transferFamily = i;
+      if (requirement.isRequireTransfer) {
+        if ((property.queueFlags & VK_QUEUE_TRANSFER_BIT) &&
+            !(property.queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
+          indices.transferFamily = i;
+        } else if (!indices.transferFamily.has_value() &&
+                   (property.queueFlags & VK_QUEUE_TRANSFER_BIT)) {
+          indices.transferFamily = i;
+        }
       }
       if (requirement.isRequirePresent) {
         VkBool32 isSupported;
@@ -396,6 +431,8 @@ private:
   }
 
 private:
+  DeviceConfig m_config;
+
   VkInstance m_instance{VK_NULL_HANDLE};
   VkDebugUtilsMessengerEXT m_debugMessenger{VK_NULL_HANDLE};
   VkSurfaceKHR m_surface{VK_NULL_HANDLE};

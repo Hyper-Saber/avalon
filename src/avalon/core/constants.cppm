@@ -3,7 +3,7 @@ export module avalon.core:constants;
 
 import :string_view;
 
-export namespace avalon {
+export namespace avalon::platform {
 #ifdef _WIN32
 constexpr bool kIsWindows = true;
 constexpr bool kIsLinux = false;
@@ -14,10 +14,12 @@ constexpr bool kIsLinux = true;
 
 constexpr StringView kPluginExtension = AVALON_PLATFORM_DL_EXT;
 
+} // namespace avalon::platform
+
+export namespace avalon::debug {
 #ifndef NDEBUG
 constexpr bool kIsDebug = true;
 #else
 constexpr bool kIsDebug = false;
 #endif
-
-} // namespace avalon
+} // namespace avalon::debug

@@ -1,5 +1,6 @@
 module;
 #include <cstdint>
+#include <debug/assert.hpp>
 export module avalon.graphics:mesh;
 
 import avalon.core;
@@ -7,17 +8,11 @@ import avalon.rhi;
 
 using namespace avalon::rhi;
 
-namespace avalon::graphics {
-
-struct VertexAttribute {
-  uint32_t location;
-  rhi::EFormat format;
-  uint32_t offset;
-};
+export namespace avalon::graphics {
 
 struct VertexLayout {
   uint32_t stride;
-  Array<VertexAttribute> attributes;
+  Span<const VertexInputAttribute> attributes;
 };
 
 struct MeshData {
@@ -28,10 +23,11 @@ struct MeshData {
     uint32_t indexCount;
   };
 
-  Array<float> positions;
-  Array<float> normals;
-  Array<float> texCoords;
+  Array<Vec3> positions;
   Array<uint32_t> indices;
+  Array<Vec4> colors;
+  Array<Vec3> normals;
+  Array<Vec2> texCoords;
   Array<SubMesh> subMeshs;
 
   struct AABB {
@@ -39,22 +35,18 @@ struct MeshData {
     float max[3];
   } bounds;
 
-  bool IsValid() const noexcept {
-    return !positions.IsEmpty() && !indices.IsEmpty();
-  }
 };
 
 class AVALON_GRAPHICS_API Mesh final : public mem::AutoDestroyable<Mesh> {
 public:
   Mesh(BufferHandle vbo, BufferHandle ibo, uint32_t indexCount,
-       EFormat indexFormat, const VertexLayout &layout)
+       EFormat indexFormat)
       : m_vertexBuffer(vbo), m_indexBuffer(ibo), m_indexCount(indexCount),
-        m_indexFormat(indexFormat), m_layout(layout) {}
+        m_indexFormat(indexFormat) {}
 
   BufferHandle GetVBO() const noexcept { return m_vertexBuffer; }
   BufferHandle GetIBO() const noexcept { return m_indexBuffer; }
   EFormat GetIndexFormat() const noexcept { return m_indexFormat; }
-  auto GetLayout() const -> const VertexLayout & { return m_layout; }
   uint32_t GetIndexCount() const noexcept { return m_indexCount; }
 
 private:
@@ -62,7 +54,6 @@ private:
   BufferHandle m_indexBuffer;
   uint32_t m_indexCount;
   EFormat m_indexFormat = EFormat::R32_Uint;
-  VertexLayout m_layout;
 };
 
 using MeshHandle = Handle<Mesh>;

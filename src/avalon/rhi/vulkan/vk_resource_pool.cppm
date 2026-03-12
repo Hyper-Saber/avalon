@@ -1,4 +1,5 @@
 module;
+#include <debug/assert.hpp>
 #include <vulkan/vulkan.h>
 export module avalon.rhi.vulkan:resource_pool;
 
@@ -20,7 +21,7 @@ public:
     VkBufferCreateInfo createInfo{
         .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
         .size = static_cast<VkDeviceSize>(info.size),
-        .usage = ToVkBufferUsage(info.usage),
+        .usage = ToVkBufferUsageFlags(info.usage),
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
     };
 
@@ -32,13 +33,16 @@ public:
 
     VkMemoryRequirements memRequirements;
     vkGetBufferMemoryRequirements(m_device, buffer, &memRequirements);
+
+    auto memoryTypeIndex =
+        FindMemoryType(memRequirements.memoryTypeBits,
+                       ToVkMemoryPropertyFlags(info.memoryProperty));
+
+    AVALON_ASSERT(memoryTypeIndex != kInvalidMemoryTypeIndex);
     VkMemoryAllocateInfo allocInfo{
         .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
         .allocationSize = memRequirements.size,
-        .memoryTypeIndex =
-            FindMemoryType(memRequirements.memoryTypeBits,
-                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
+        .memoryTypeIndex = memoryTypeIndex,
     };
 
     VkDeviceMemory bufferMemory;
@@ -46,6 +50,13 @@ public:
         VK_SUCCESS) {
       vkDestroyBuffer(m_device, buffer, nullptr);
       avalon::Error("Vulkan: Failed to allocate buffer memory!");
+      return {};
+    }
+
+    if (vkBindBufferMemory(m_device, buffer, bufferMemory, 0) != VK_SUCCESS) {
+      vkDestroyBuffer(m_device, buffer, nullptr);
+      vkFreeMemory(m_device, bufferMemory, nullptr);
+      avalon::Error("[Vulkan]: Failed to bind buffer memory!");
       return {};
     }
 
@@ -109,13 +120,21 @@ public:
     return m_frameBufferPool.Resolve(handle);
   }
 
-  void ReleaseBuffer(Handle<BufferResource> handle) {}
-  void ReleaseTexture(Handle<TextureResource> handle) {}
-  void ReleaseRenderPass(Handle<RenderPassResource> handle) {}
-  void ReleaseFrameBuffer(Handle<FrameBufferResource> handle) {}
+  void ReleaseBuffer(Handle<BufferResource> handle) {
+    m_bufferPool.Destroy(handle);
+  }
+  void ReleaseTexture(Handle<TextureResource> handle) {
+    m_texturePool.Destroy(handle);
+  }
+
+  void ReleaseFrameBuffer(Handle<FrameBufferResource> handle) {
+    m_frameBufferPool.Destroy(handle);
+  }
 
 private:
-  auto CreateFrameBuffer(VkRenderPass pass, const Array<VkImageView> views,
+  constexpr static uint32_t kInvalidMemoryTypeIndex = 0xFFFFFFFF;
+
+  auto CreateFrameBuffer(VkRenderPass pass, const Array<VkImageView> &views,
                          uint32_t width, uint32_t height, uint32_t layers)
       -> Handle<FrameBufferResource> {
 
@@ -154,7 +173,7 @@ private:
       }
     }
     avalon::Error("Vulkan: Failed to find suitable memory type!");
-    return 0;
+    return kInvalidMemoryTypeIndex;
   }
 
 private:

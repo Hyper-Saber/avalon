@@ -140,12 +140,12 @@ private:
     uint32_t attrCount = m_reflection.pHeader->inputAttrCount;
     m_vertexAttributes.Reserve(attrCount);
 
-    uint32_t currentOffset = 0;
     for (uint32_t i = 0; i < attrCount; i++) {
       const auto &attr = m_reflection.pAttributes[i];
       m_vertexAttributes.PushBack({
           .location = attr.location,
           .format = attr.format,
+          .semantic = attr.semantic,
       });
     }
   }

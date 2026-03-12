@@ -13,4 +13,5 @@ inline auto GetShaderManager() -> ShaderManager & {
 inline auto GetMeshManager() -> MeshManager & {
   return GetContext().GetService<MeshManager>(EEngineService::MeshManager);
 }
+
 } // namespace avalon::graphics

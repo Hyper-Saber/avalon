@@ -38,23 +38,23 @@ auto ToVkFormat(EFormat format) -> VkFormat {
     return VkFormat::VK_FORMAT_R16_SINT;
   case EFormat::R16_Float:
     return VkFormat::VK_FORMAT_R16_SFLOAT;
-  case EFormat::R16G16_Uint2:
+  case EFormat::R16G16_Uint:
     return VkFormat::VK_FORMAT_R16G16_UINT;
-  case EFormat::R16G16_Int2:
+  case EFormat::R16G16_Int:
     return VkFormat::VK_FORMAT_R16G16_SINT;
-  case EFormat::R16G16_Float2:
+  case EFormat::R16G16_Float:
     return VkFormat::VK_FORMAT_R16G16_SFLOAT;
-  case EFormat::R16G16B16_Uint3:
+  case EFormat::R16G16B16_Uint:
     return VkFormat::VK_FORMAT_R16G16B16_UINT;
-  case EFormat::R16G16B16_Int3:
+  case EFormat::R16G16B16_Int:
     return VkFormat::VK_FORMAT_R16G16B16_SINT;
-  case EFormat::R16G16B16_Float3:
+  case EFormat::R16G16B16_Float:
     return VkFormat::VK_FORMAT_R16G16B16_SFLOAT;
-  case EFormat::R16G16B16A16_Uint4:
+  case EFormat::R16G16B16A16_Uint:
     return VkFormat::VK_FORMAT_R16G16B16A16_UINT;
-  case EFormat::R16G16B16A16_Int4:
+  case EFormat::R16G16B16A16_Int:
     return VkFormat::VK_FORMAT_R16G16B16A16_SINT;
-  case EFormat::R16G16B16A16_Float4:
+  case EFormat::R16G16B16A16_Float:
     return VkFormat::VK_FORMAT_R16G16B16A16_SFLOAT;
   case EFormat::R32_Uint:
     return VkFormat::VK_FORMAT_R32_UINT;
@@ -62,23 +62,23 @@ auto ToVkFormat(EFormat format) -> VkFormat {
     return VkFormat::VK_FORMAT_R32_SINT;
   case EFormat::R32_Float:
     return VkFormat::VK_FORMAT_R32_SFLOAT;
-  case EFormat::R32G32_Uint2:
+  case EFormat::R32G32_Uint:
     return VkFormat::VK_FORMAT_R32G32_UINT;
-  case EFormat::R32G32_Int2:
+  case EFormat::R32G32_Int:
     return VkFormat::VK_FORMAT_R32G32_SINT;
-  case EFormat::R32G32_Float2:
+  case EFormat::R32G32_Float:
     return VkFormat::VK_FORMAT_R32G32_SFLOAT;
-  case EFormat::R32G32B32_Uint3:
+  case EFormat::R32G32B32_Uint:
     return VkFormat::VK_FORMAT_R32G32B32_UINT;
-  case EFormat::R32G32B32_Int3:
+  case EFormat::R32G32B32_Int:
     return VkFormat::VK_FORMAT_R32G32B32_SINT;
-  case EFormat::R32G32B32_Float3:
+  case EFormat::R32G32B32_Float:
     return VkFormat::VK_FORMAT_R32G32B32_SFLOAT;
-  case EFormat::R32G32B32A32_Uint4:
+  case EFormat::R32G32B32A32_Uint:
     return VkFormat::VK_FORMAT_R32G32B32A32_UINT;
-  case EFormat::R32G32B32A32_Int4:
+  case EFormat::R32G32B32A32_Int:
     return VkFormat::VK_FORMAT_R32G32B32A32_SINT;
-  case EFormat::R32G32B32A32_Float4:
+  case EFormat::R32G32B32A32_Float:
     return VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT;
   case EFormat::R64_Uint:
     return VkFormat::VK_FORMAT_R64_UINT;
@@ -86,23 +86,23 @@ auto ToVkFormat(EFormat format) -> VkFormat {
     return VkFormat::VK_FORMAT_R64_SINT;
   case EFormat::R64_Float:
     return VkFormat::VK_FORMAT_R64_SFLOAT;
-  case EFormat::R64G64_Uint2:
+  case EFormat::R64G64_Uint:
     return VkFormat::VK_FORMAT_R64G64_UINT;
-  case EFormat::R64G64_Int2:
+  case EFormat::R64G64_Int:
     return VkFormat::VK_FORMAT_R64G64_SINT;
-  case EFormat::R64G64_Float2:
+  case EFormat::R64G64_Float:
     return VkFormat::VK_FORMAT_R64G64_SFLOAT;
-  case EFormat::R64G64B64_Uint3:
+  case EFormat::R64G64B64_Uint:
     return VkFormat::VK_FORMAT_R64G64B64_UINT;
-  case EFormat::R64G64B64_Int3:
+  case EFormat::R64G64B64_Int:
     return VkFormat::VK_FORMAT_R64G64B64_SINT;
-  case EFormat::R64G64B64_Float3:
+  case EFormat::R64G64B64_Float:
     return VkFormat::VK_FORMAT_R64G64B64_SFLOAT;
-  case EFormat::R64G64B64A64_Uint4:
+  case EFormat::R64G64B64A64_Uint:
     return VkFormat::VK_FORMAT_R64G64B64A64_UINT;
-  case EFormat::R64G64B64A64_Int4:
+  case EFormat::R64G64B64A64_Int:
     return VkFormat::VK_FORMAT_R64G64B64A64_SINT;
-  case EFormat::R64G64B64A64_Float4:
+  case EFormat::R64G64B64A64_Float:
     return VkFormat::VK_FORMAT_R64G64B64A64_SFLOAT;
   case EFormat::R8G8B8_UNORM:
     return VkFormat::VK_FORMAT_R8G8B8_UNORM;
@@ -202,7 +202,7 @@ auto ToVkDepthCompareOp(EDepthCompareOp compareOp) -> VkCompareOp {
   }
 }
 
-auto ToVkBufferUsage(EBufferUsage usage) -> VkBufferUsageFlagBits {
+auto ToVkBufferUsageBits(EBufferUsage usage) -> VkBufferUsageFlagBits {
   switch (usage) {
   case EBufferUsage::Vertex:
     return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
@@ -221,6 +221,54 @@ auto ToVkBufferUsage(EBufferUsage usage) -> VkBufferUsageFlagBits {
   case EBufferUsage::None:
     return VK_BUFFER_USAGE_FLAG_BITS_MAX_ENUM;
   }
+}
+
+auto ToVkBufferUsageFlags(EBufferUsage usage) -> VkBufferUsageFlags {
+  AVALON_ASSERT(usage != EBufferUsage::None);
+  VkBufferUsageFlags vkUsages = 0;
+  if ((usage & EBufferUsage::TransferDst) != EBufferUsage::None) {
+    vkUsages |= VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+  }
+  if ((usage & EBufferUsage::TransferSrc) != EBufferUsage::None) {
+    vkUsages |= VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+  }
+  if ((usage & EBufferUsage::Storage) != EBufferUsage::None) {
+    vkUsages |= VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+  }
+  if ((usage & EBufferUsage::Index) != EBufferUsage::None) {
+    vkUsages |= VkBufferUsageFlagBits::VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+  }
+  if ((usage & EBufferUsage::Uniform) != EBufferUsage::None) {
+    vkUsages |= VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+  }
+  if ((usage & EBufferUsage::Vertex) != EBufferUsage::None) {
+    vkUsages |= VkBufferUsageFlagBits::VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+  }
+  if ((usage & EBufferUsage::Indirect) != EBufferUsage::None) {
+    vkUsages |= VkBufferUsageFlagBits::VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+  }
+
+  AVALON_ASSERT(vkUsages != 0);
+  return vkUsages;
+}
+
+auto ToVkMemoryPropertyFlags(EMemoryProperty property)
+    -> VkMemoryPropertyFlags {
+  AVALON_ASSERT(property != EMemoryProperty::None);
+
+  VkMemoryPropertyFlags vkFlags = 0;
+  if ((property & EMemoryProperty::DeviceLocal) != EMemoryProperty::None) {
+    vkFlags |= VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+  }
+  if ((property & EMemoryProperty::HostVisible) != EMemoryProperty::None) {
+    vkFlags |= VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+  }
+  if ((property & EMemoryProperty::HostCoherent) != EMemoryProperty::None) {
+    vkFlags |= VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+  }
+
+  AVALON_ASSERT(vkFlags != 0);
+  return vkFlags;
 }
 
 auto ToVkDescriptorType(EDescriptorType type) -> VkDescriptorType {

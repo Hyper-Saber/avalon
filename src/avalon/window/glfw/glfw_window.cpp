@@ -23,6 +23,11 @@ public:
     return {};
   }
 
+  void SetTitle(StringView title) override {
+    glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
+    glfwSetWindowTitle(m_window, title.GetData());
+  }
+
   auto Initialize(const WindowProps &props) -> EStatusCode override {
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     m_window = glfwCreateWindow(props.width, props.height, props.title, nullptr,

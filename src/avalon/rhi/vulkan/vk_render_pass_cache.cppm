@@ -40,6 +40,14 @@ public:
           .attachment = i,
           .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
       });
+
+      Debug("[Vulkan]: Color Attachment {}: "
+            "\n---------------------------------------\nformat: {}\nloadOp: "
+            "{}\nstoreOp: {}\ninitialLayout: {}\nfinalLayout: "
+            "{}\n---------------------------------------",
+            i, ToView(src.format), ToView(src.loadOp), ToView(src.storeOp),
+            ToView(src.initialLayout), ToView(src.finalLayout));
+      Debug("[Vulkan]: Has depth: {}", createInfo.hasDepth);
     }
 
     if (createInfo.hasDepth) {
@@ -72,12 +80,26 @@ public:
             createInfo.hasDepth ? &depthReference : nullptr,
     };
 
+    VkSubpassDependency dependency{
+        .srcSubpass = VK_SUBPASS_EXTERNAL,
+        .dstSubpass = 0,
+        .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+                        VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+        .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+                        VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+        .srcAccessMask = 0,
+        .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+                         VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+    };
+
     VkRenderPassCreateInfo vkPassCreateInfo{
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
         .attachmentCount = static_cast<uint32_t>(vkAttachments.GetSize()),
         .pAttachments = vkAttachments.GetData(),
         .subpassCount = 1,
         .pSubpasses = &subpassDesc,
+        .dependencyCount = 1,
+        .pDependencies = &dependency,
     };
 
     VkRenderPass pass{VK_NULL_HANDLE};

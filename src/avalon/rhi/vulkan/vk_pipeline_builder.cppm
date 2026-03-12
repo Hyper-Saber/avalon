@@ -67,7 +67,6 @@ public:
     m_rasterizationInfo.lineWidth = info.lineWidth;
     m_depthStencilStateInfo.depthTestEnable =
         info.isDepthTestEnable ? VK_TRUE : VK_FALSE;
-    m_depthStencilStateInfo.depthTestEnable = VK_FALSE;
     m_depthStencilStateInfo.depthWriteEnable =
         info.isDepthWriteEnable ? VK_TRUE : VK_FALSE;
     m_depthStencilStateInfo.depthCompareOp =

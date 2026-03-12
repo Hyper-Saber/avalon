@@ -391,8 +391,8 @@ struct PipelineCreateInfo {
   EPrimitiveTopology topology = EPrimitiveTopology::TriangleList;
   EPolygonMode polygonMode = EPolygonMode::Fill;
   ECullMode cullMode = ECullMode::None;
-  bool isDepthTestEnable = true;
-  bool isDepthWriteEnable = true;
+  bool isDepthTestEnable = false;
+  bool isDepthWriteEnable = false;
   EDepthCompareOp depthCompareOp = EDepthCompareOp::Less;
 
   float lineWidth = 1.0f;
@@ -432,9 +432,25 @@ struct DepthStencil {
 };
 
 struct ClearValue {
-  Color color;
-  DepthStencil depthStencil;
+  union {
+    Color color;
+    DepthStencil depthStencil;
+  };
   bool isDepth = false;
+
+  static ClearValue Color(float r, float g, float b, float a = 1.0f) {
+    ClearValue v;
+    v.color = {r, g, b, a};
+    v.isDepth = false;
+    return v;
+  }
+
+  static ClearValue DepthStencil(float d = 1.0f, uint32_t s = 0) {
+    ClearValue v;
+    v.depthStencil = {d, s};
+    v.isDepth = true;
+    return v;
+  }
 };
 
 struct RenderPassBeginInfo {

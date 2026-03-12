@@ -224,4 +224,78 @@ constexpr StringView ToView(ERhiResult e) {
   }
 }
 
+constexpr StringView ToView(EShaderStage e) {
+  switch (e) {
+  case EShaderStage::Vertex:
+    return "Vertex";
+  case EShaderStage::Fragment:
+    return "Fragment";
+  case EShaderStage::Compute:
+    return "Compute";
+  case EShaderStage::None:
+    return "None";
+  case EShaderStage::All:
+    return "All";
+  }
+}
+
+constexpr StringView ToView(EAttachmentLoadOp op) {
+  switch (op) {
+  case EAttachmentLoadOp::Load:
+    return "Load";
+  case EAttachmentLoadOp::Clear:
+    return "Clear";
+  case EAttachmentLoadOp::DontCare:
+    return "DontCare";
+    break;
+  }
+}
+
+constexpr StringView ToView(ETextureUsage usage) {
+  switch (usage) {
+  case ETextureUsage::None:
+    return "None";
+  case ETextureUsage::Sampled:
+    return "Sampled";
+  case ETextureUsage::ColorAttachment:
+    return "ColorAttachment";
+  case ETextureUsage::DepthStencilAttachment:
+    return "DepthStencilAttachment";
+  case ETextureUsage::Storage:
+    return "Storage";
+  case ETextureUsage::TransferSrc:
+    return "TransferSrc";
+  }
+}
+
+constexpr StringView ToView(EAttachmentStoreOp op) {
+  switch (op) {
+  case EAttachmentStoreOp::Store:
+    return "Store";
+  case EAttachmentStoreOp::DontCare:
+    return "DontCare";
+    break;
+  }
+}
+
+constexpr StringView ToView(EResourceLayout e) {
+  switch (e) {
+  case EResourceLayout::Undefined:
+    return "Undefined";
+  case EResourceLayout::ColorAttachment:
+    return "ColorAttachment";
+  case EResourceLayout::DepthStencilAttachment:
+    return "DepthStencilAttachment";
+  case EResourceLayout::ShaderReadOnly:
+    return "ShaderReadOnly";
+  case EResourceLayout::Present:
+    return "Present";
+  case EResourceLayout::TransferSrc:
+    return "TransferSrc";
+  case EResourceLayout::TransferDst:
+    return "TransferDst";
+    break;
+  }
+}
+
 } // namespace avalon::rhi

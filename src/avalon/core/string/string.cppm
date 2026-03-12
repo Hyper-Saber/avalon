@@ -23,11 +23,14 @@ public:
             .m_small{.buffer = {0}, .state = 0},
         } {}
 
+  String(const char *cstr);
+  String(const std::string &stdStr);
   String(StringView view);
   String(const String &other);
   String(String &&other) noexcept;
   ~String();
 
+  String &operator=(const std::string &stdStr);
   String &operator=(const String &other);
   String &operator=(String &&other) noexcept;
 
@@ -101,6 +104,12 @@ public:
 
   bool IsEmpty() const noexcept { return GetSize() == 0; }
 
+  template <typename... Args>
+  static String Format(std::format_string<Args...> format, Args &&...args) {
+    std::string s = std::format(format, std::forward<Args>(args)...);
+    return String(s);
+  }
+
 private:
   static constexpr size_t kSSOCapacity = 30;
 
@@ -129,7 +138,7 @@ private:
   void SetLargeFlag() { m_data.m_small.state = 0x80; }
 };
 
-inline String operator+(String &lhs, StringView rhs) {
+inline String operator+(String lhs, StringView rhs) {
   lhs += rhs;
   return lhs;
 }

@@ -15,6 +15,8 @@ public:
              rhi::Extent2D extent)
       : m_pipeline(pipeline), m_rendePass(renderPass), m_extent(extent) {}
 
+  void SetClearColor(Color color) override { m_color = color; }
+
   void OnResize(const rhi::Extent2D &extent) override { m_extent = extent; }
 
   void Execute(RenderContext &context, const RenderPacket &packet) override {
@@ -33,6 +35,7 @@ public:
     context.cmd.SetScissor(info.renderArea);
 
     m_executor.Execute(context.cmd, m_pipeline, packet);
+
     context.cmd.EndRenderPass();
   }
 
@@ -47,11 +50,9 @@ private:
     outInfo.renderArea.extent = m_extent;
 
     outInfo.clearValues.Clear();
-    rhi::ClearValue clear{
-        .color = {0.1f, 0.1f, 0.15f, 1.0f},
-        .depthStencil = {1.f, 0},
-    };
-    outInfo.clearValues.PushBack(clear);
+    outInfo.clearValues.PushBack(
+        rhi::ClearValue::Color(m_color.r, m_color.g, m_color.b));
+    // outInfo.clearValues.PushBack(rhi::ClearValue::DepthStencil());
   }
 
   MeshRenderExecutor m_executor;
@@ -59,5 +60,6 @@ private:
   rhi::PipelineHandle m_pipeline;
   rhi::RenderPassHandle m_rendePass;
   Extent2D m_extent;
+  Color m_color;
 };
 } // namespace avalon::graphics

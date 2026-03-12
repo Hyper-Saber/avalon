@@ -40,7 +40,7 @@ public:
   auto CreateBuffer(const BufferCreateInfo &info) -> BufferHandle override;
   void ReleaseBuffer(BufferHandle handle) override;
 
-  auto CreateCommandBuffer() -> ICommandBuffer * override;
+  auto GetMainCommandBuffer() -> ICommandBuffer * override;
 
   void ExcuteOnce(EQueueType queueType,
                   const std::function<void(ICommandBuffer *)> &action) override;
@@ -62,6 +62,7 @@ private:
   auto CreateSyncObjects() -> std::expected<void, ERhiResult>;
   void CleanupSwapchainFrameBuffers();
   void CreateSwapchianFrameBuffers(RenderPassHandle handle);
+  void CreateCommandBuffer();
 
 private:
   struct FrameSyncObject {

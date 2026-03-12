@@ -2,11 +2,17 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <string>
 module avalon.core;
 import :string;
 
 namespace avalon {
-void String::__ForceDebugSymbolExport() const {}
+
+String::String(const char *cstr) { InitWith(cstr, std::strlen(cstr)); }
+
+String::String(const std::string &stdStr) {
+  InitWith(stdStr.data(), stdStr.size());
+}
 
 String::String(StringView view) { InitWith(view.GetData(), view.GetSize()); }
 
@@ -22,6 +28,12 @@ String::String(String &&other) noexcept {
 }
 
 String::~String() { Release(); }
+
+String &String::operator=(const std::string &stdStr) {
+  Release();
+  InitWith(stdStr.data(), stdStr.size());
+  return *this;
+}
 
 String &String::operator=(const String &other) {
   if (this == &other)

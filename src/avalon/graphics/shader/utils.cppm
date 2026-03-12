@@ -12,7 +12,7 @@ import :serialization;
 using namespace avalon::rhi;
 
 export namespace avalon::graphics {
-auto ToView(rhi::EShaderStage stage) {
+auto ToEntryNameView(rhi::EShaderStage stage) {
   switch (stage) {
   case rhi::EShaderStage::Vertex:
     return kDefaultVsEntryPointName;

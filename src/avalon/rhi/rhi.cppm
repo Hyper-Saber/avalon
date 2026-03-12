@@ -31,7 +31,7 @@ public:
   virtual auto CreateBuffer(const BufferCreateInfo &info) -> BufferHandle = 0;
   virtual void ReleaseBuffer(BufferHandle handle) = 0;
 
-  virtual auto CreateCommandBuffer() -> ICommandBuffer * = 0;
+  virtual auto GetMainCommandBuffer() -> ICommandBuffer * = 0;
 
   virtual void
   ExcuteOnce(EQueueType queueType,

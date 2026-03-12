@@ -127,10 +127,6 @@ auto VkRhi::RecreateSwapchain(RenderPassHandle handle, uint32_t width,
 
   CreateSwapchianFrameBuffers(handle);
 
-  // for (auto &syncObject : m_frameSyncObjects) {
-  //   vkResetFences(m_context->GetDevice(), 1, &syncObject.m_inflightFence);
-  // }
-
   return ERhiResult::Success;
 }
 
@@ -151,7 +147,11 @@ auto VkRhi::CreateRenderPass(const RenderPassCreateInfo &info)
   return {m_resourcePool->CreateRenderPass(info).id};
 }
 
-auto VkRhi::CreateCommandBuffer() -> ICommandBuffer * {
+auto VkRhi::GetMainCommandBuffer() -> ICommandBuffer * {
+  return m_frameCommandBuffers[m_currentFrame].Get();
+}
+
+void VkRhi::CreateCommandBuffer() {
   VkCommandBufferAllocateInfo info{
       .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
       .commandPool = m_frameCommandPools[m_currentFrame],
@@ -166,12 +166,10 @@ auto VkRhi::CreateCommandBuffer() -> ICommandBuffer * {
   if (result != VK_SUCCESS) {
     Error("[Vulkan]: Failed to allocate command buffer! Error code: {}.",
           ToView(result));
-    return nullptr;
+    return;
   }
   auto cmdBuffer = MakeUnique<CommandBuffer>(vkCmdBuffer, *this);
   m_frameCommandBuffers.PushBack(std::move(cmdBuffer));
-
-  return m_frameCommandBuffers.GetBack().Get();
 }
 
 void VkRhi::ExcuteOnce(EQueueType queueType,
@@ -283,7 +281,6 @@ auto VkRhi::BeginFrame() -> ERhiResult {
 
   vkResetFences(m_deviceContext->GetDevice(), 1,
                 &m_frameSyncObjects[m_currentFrame].m_inflightFence);
-  m_frameCommandBuffers.Clear();
   vkResetCommandPool(m_deviceContext->GetDevice(),
                      m_frameCommandPools[m_currentFrame], 0);
 
@@ -337,7 +334,12 @@ auto VkRhi::CreateCommandPools() -> std::expected<void, ERhiResult> {
                     ToView(result));
       return std::unexpected(HandleVkError(result));
     }
+
+    CreateCommandBuffer();
+    m_currentFrame++;
   }
+
+  m_currentFrame = 0;
 
   auto queueFamilyIndex = indices.transferFamily.has_value()
                               ? indices.transferFamily.value()

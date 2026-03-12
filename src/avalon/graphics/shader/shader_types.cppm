@@ -116,7 +116,7 @@ private:
 
       m_stageInfos.PushBack({
           .stage = header.stageType,
-          .entryName = ToView(header.stageType),
+          .entryName = ToEntryNameView(header.stageType),
           .shaderCode = CreateViewBlob(pData + header.bytecodeOffset,
                                        header.bytecodeSize),
       });

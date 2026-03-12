@@ -287,10 +287,20 @@ public:
         AddArg(L"-spirv");
         AddArg(L"-fspv-target-env=universal1.5");
       }
+
       AddArg(L"-fspv-reflect");
       AddArg(L"-D");
       AddArg(L"VK_LOCATION(n)=[[vk::location(n)]]");
+
+      AddArg(L"-D");
+      AddArg(L"VK_PUSH_CONSTANT=[[vk::push_constant]]");
+
+      AddArg(L"-D");
+      AddArg(L"VK_BINDING(b, s)=[[vk::binding(b, s)]]");
+
       AddArg(L"-fvk-use-dx-layout");
+      AddArg(L"-Zpr");
+
       AddArg(L"-Fi");
       AddDynamicArg(Utf8ToWstring(desc.filePath.GetCStr()));
 

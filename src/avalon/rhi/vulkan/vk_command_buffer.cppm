@@ -22,11 +22,15 @@ public:
   VkCommandBuffer GetRaw() const { return m_cmd; }
 
   void Begin() override {
+    m_lastBoundPipeline = {};
     VkCommandBufferBeginInfo beginInfo{
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
         .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
 
-    vkBeginCommandBuffer(m_cmd, &beginInfo);
+    auto result = vkBeginCommandBuffer(m_cmd, &beginInfo);
+    if (result != VK_SUCCESS) {
+      Debug("[Vulkan]: Failed to begin command buffer!");
+    }
   }
 
   void BeginRenderPass(const RenderPassBeginInfo &info) override {

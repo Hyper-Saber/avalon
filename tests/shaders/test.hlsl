@@ -7,6 +7,12 @@
 
 // ConstantBuffer<CameraUniform> camera : register(b0);
 
+struct ModelData {
+  float4x4 model;
+};
+
+VK_PUSH_CONSTANT ModelData push;
+
 struct VSInput {
   VK_LOCATION(0) float3 position : POSITION;
   VK_LOCATION(1) float2 uv : TEXCOORD;
@@ -21,12 +27,11 @@ struct VSOutput {
 
 VSOutput VsMain(VSInput input) {
   VSOutput output;
-  // float4 worldPos = float4(input.position, 1.0f);
+  float4 worldPos = mul(push.model, float4(input.position, 1.0f));
   // float4 viewPos = mul(camera.view, worldPos);
   // output.clipPos = mul(camera.projection, viewPos);
   output.color = input.color;
-  output.uv = input.uv;
-  output.clipPos = float4(input.position, 1.0);
+  output.clipPos = float4(worldPos.xyz, 1.0);
 
   return output;
 }

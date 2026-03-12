@@ -19,6 +19,7 @@ struct WindowProps {
 
 class IWindow : public IPlugin {
 public:
+  virtual void SetTitle(StringView title) = 0;
   virtual auto Initialize(const WindowProps &props) -> EStatusCode = 0;
   virtual auto GetNativeInfo() -> NativeWindowInfo const = 0;
   virtual bool IsMinimized() const = 0;

@@ -1,4 +1,6 @@
 module;
+#include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <debug/assert.hpp>
 #include <expected>
@@ -45,8 +47,8 @@ auto Engine::Initialize(const EngineConfig &config)
   vfs::GetVfs().Mount(shaderVirtualFolderPath.GetString(), shaderFolderPath,
                       device.Get());
 
-  auto rhiLoadRes =
-      LoadPlugin<rhi::IRhi>({kVkRhiPluginPath + platform::kPluginExtension});
+  auto rhiLoadRes = LoadPlugin<rhi::IRhi>(
+      {String(kVkRhiPluginPath) + platform::kPluginExtension});
 
   if (!rhiLoadRes) {
     return std::unexpected(EStatusCode::PluginInitializeError);
@@ -57,7 +59,7 @@ auto Engine::Initialize(const EngineConfig &config)
   rhi::ERhiResult result;
   if (config.renderDeviceRequirement.queueRequirement.isRequirePresent) {
     auto windowLoadRes = LoadPlugin<window::IWindow>(
-        {kWindowPluginPath + platform::kPluginExtension});
+        {String(kWindowPluginPath) + platform::kPluginExtension});
 
     if (!windowLoadRes) {
       return std::unexpected(EStatusCode::PluginInitializeError);
@@ -123,16 +125,42 @@ auto Engine::Initialize(const EngineConfig &config)
 
   m_world = MakeUnique<ecs::World>();
 
-  CreateTriangleEntity(material);
+  m_model = CreateTriangleEntity(material);
 
   return {};
 }
 
 void Engine::Run() {
   AVALON_ASSERT(m_window.Get() && m_rhi.Get());
+
+  m_lastFrameTime = std::chrono::steady_clock::now();
+
   bool isRequestExit = false;
   while (!m_window->ShouldClose() && !isRequestExit) {
     m_window->PollEvents();
+
+    auto currentTime = std::chrono::steady_clock::now();
+    m_deltaTime =
+        std::chrono::duration<float>(currentTime - m_lastFrameTime).count();
+    m_lastFrameTime = currentTime;
+
+    if constexpr (debug::kIsDebug) {
+      m_deltaTime = std::min(m_deltaTime, 0.1f);
+    }
+
+    m_frameCount++;
+    m_fpsTimer += m_deltaTime;
+
+    if (m_fpsTimer >= 1.f) {
+      m_lastFps = m_frameCount;
+
+      float avgFps = static_cast<float>(m_lastFps) / m_fpsTimer;
+      float avgMs = 1000.f / avgFps;
+
+      String title =
+          String::Format("FPS: {:.1f} | FrameTime: {:.2f} ms", avgFps, avgMs);
+      m_window->SetTitle(title);
+    }
 
     if (m_window->IsMinimized())
       continue;
@@ -158,17 +186,27 @@ void Engine::Run() {
 }
 
 auto Engine::ExecuteFrame() -> rhi::ERhiResult {
+  Update();
   auto beginRes = m_rhi->BeginFrame();
   if (beginRes != rhi::ERhiResult::Success) {
     TryHandleRhiError(beginRes);
     return beginRes;
   }
-  auto cmd = m_rhi->CreateCommandBuffer();
+  auto cmd = m_rhi->GetMainCommandBuffer();
   cmd->Begin();
   m_renderer->Render(*cmd, *m_world.Get());
   cmd->End();
   m_rhi->Submit(cmd);
   return beginRes != rhi::ERhiResult::Success ? beginRes : m_rhi->EndFrame();
+}
+
+void Engine::Update() {
+  static float totalTime = 0.f;
+  totalTime += m_deltaTime;
+
+  auto transform = m_world->GetComponent<graphics::TransformComponent>(m_model);
+  transform->local.rotation.z = totalTime * 90;
+  m_renderer->SetClearColor({std::sin(totalTime), 0, 0, 0});
 }
 
 bool Engine::TryHandleRhiError(rhi::ERhiResult error) {
@@ -201,10 +239,10 @@ bool Engine::TryHandleRhiError(rhi::ERhiResult error) {
   return true;
 }
 
-void Engine::CreateTriangleEntity(const graphics::Material &material) {
+ecs::Entity Engine::CreateTriangleEntity(const graphics::Material &material) {
   graphics::MeshData data{
       .positions{
-          {0.0f, -0.5f, 0.0f},
+          {0.0f, 0.f, 0.0f},
           {0.5f, 0.5f, 0.0f},
           {-0.5f, 0.5f, 0.0f},
       },
@@ -228,6 +266,8 @@ void Engine::CreateTriangleEntity(const graphics::Material &material) {
   Transform transform;
   m_world->AddComponent<graphics::MeshComponent>(entity, m_mesh)
       ->AddComponent<graphics::TransformComponent>(entity, transform);
+
+  return entity;
 }
 
 } // namespace avalon

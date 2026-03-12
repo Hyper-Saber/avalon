@@ -15,6 +15,12 @@ class AVALON_GRAPHICS_API Renderer : public NonCopyable,
 public:
   Renderer(rhi::IRhi &rhi) : m_rhi(rhi) {}
 
+  void SetClearColor(Color color) {
+    for (auto &pass : m_passes) {
+      pass->SetClearColor(color);
+    }
+  }
+
   void OnResize(const rhi::Extent2D &extent) {
     for (auto &pass : m_passes) {
       pass->OnResize(extent);
@@ -26,6 +32,7 @@ public:
   }
 
   void Render(rhi::ICommandBuffer &cmd, ecs::World &world) {
+    m_packet.Clear();
     m_extractor.Extract(world, m_packet);
     RenderContext context{.cmd = cmd};
 

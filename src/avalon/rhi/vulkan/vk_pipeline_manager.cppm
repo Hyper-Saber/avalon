@@ -106,6 +106,7 @@ private:
 
     auto builder = PipelineBuilder();
     builder.SetRenderPass(renderPass)
+        .LoadStates(info)
         .SetVertexInput(info.vertexBindings, info.vertexInputAttributes);
 
     for (const auto &stageInfo : info.stageInfos) {

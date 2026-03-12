@@ -1,6 +1,6 @@
 module;
+#include <chrono>
 #include <expected>
-
 export module avalon.engine;
 
 import avalon.core;
@@ -34,9 +34,12 @@ private:
   Engine() = default;
 
   auto ExecuteFrame() -> rhi::ERhiResult;
+
+  void Update();
+
   bool TryHandleRhiError(rhi::ERhiResult error);
 
-  void CreateTriangleEntity(const graphics::Material &material);
+  ecs::Entity CreateTriangleEntity(const graphics::Material &material);
 
 private:
   EngineConfig m_config;
@@ -47,5 +50,14 @@ private:
   rhi::PipelineHandle m_pipeline;
   rhi::RenderPassHandle m_renderPass;
   graphics::MeshHandle m_mesh;
+
+  ecs::Entity m_model;
+
+  std::chrono::steady_clock::time_point m_lastFrameTime;
+  float m_deltaTime = 0.0f;
+
+  float m_fpsTimer = 0.f;
+  int m_frameCount = 0;
+  int m_lastFps = 0;
 };
 } // namespace avalon

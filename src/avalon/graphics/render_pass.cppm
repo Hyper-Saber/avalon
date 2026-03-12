@@ -14,6 +14,7 @@ struct RenderContext {
 class IRenderPass : public NonCopyable, public mem::IAutoDestroyable {
 public:
   virtual ~IRenderPass() = default;
+  virtual void SetClearColor(Color) = 0;
   virtual void OnResize(const rhi::Extent2D &extent) = 0;
   virtual void Setup(rhi::RenderPassBeginInfo &info) = 0;
   virtual void Execute(RenderContext &context, const RenderPacket &packet) = 0;

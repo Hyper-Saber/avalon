@@ -39,7 +39,7 @@ private:
 
   bool TryHandleRhiError(rhi::ERhiResult error);
 
-  ecs::Entity CreateTriangleEntity(const graphics::Material &material);
+  ecs::Entity CreateGeometryEntity(const graphics::Material &material);
 
 private:
   EngineConfig m_config;

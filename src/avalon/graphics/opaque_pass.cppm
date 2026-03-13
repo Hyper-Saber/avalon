@@ -52,7 +52,7 @@ private:
     outInfo.clearValues.Clear();
     outInfo.clearValues.PushBack(
         rhi::ClearValue::Color(m_color.r, m_color.g, m_color.b));
-    // outInfo.clearValues.PushBack(rhi::ClearValue::DepthStencil());
+    outInfo.clearValues.PushBack(rhi::ClearValue::DepthStencil());
   }
 
   MeshRenderExecutor m_executor;
@@ -60,6 +60,6 @@ private:
   rhi::PipelineHandle m_pipeline;
   rhi::RenderPassHandle m_rendePass;
   Extent2D m_extent;
-  Color m_color;
+  Color m_color = {0, 0, 0.1f, 1};
 };
 } // namespace avalon::graphics

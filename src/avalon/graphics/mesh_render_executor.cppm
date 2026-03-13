@@ -44,6 +44,7 @@ public:
       }
 
       auto model = packet.transforms[i].GetMatrix();
+
       cmd.PushConstants(rhi::EShaderStage::Vertex, 0, sizeof(Matrix4x4),
                         &model);
 

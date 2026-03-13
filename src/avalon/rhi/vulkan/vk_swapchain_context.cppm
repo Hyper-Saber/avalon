@@ -25,17 +25,20 @@ public:
     return CreateSwapchain(width, height);
   }
 
-  auto GetSwapchain() noexcept { return m_swapchain; }
-  auto GetImageFormat() noexcept { return m_imageFormat; }
-  auto GetImageViews() noexcept -> const Array<VkImageView> & {
+  auto GetSwapchain() const noexcept -> VkSwapchainKHR { return m_swapchain; }
+  auto GetImageFormat() const noexcept -> VkFormat { return m_imageFormat; }
+  auto GetImageViews() const noexcept -> const Array<VkImageView> & {
     return m_imageViews;
   }
 
-  auto GetImageCount() const noexcept { return m_images.GetSize(); }
+  auto GetImageCount() const noexcept -> size_t { return m_images.GetSize(); }
 
-  auto GetExtent() noexcept { return m_extent; }
-  auto GetFrameBuffer(uint32_t index) noexcept { return m_frameBuffers[index]; }
-  auto GetFrameBuffers() noexcept
+  auto GetExtent() const noexcept -> VkExtent2D { return m_extent; }
+  auto GetFrameBuffer(uint32_t index) const noexcept
+      -> Handle<FrameBufferResource> {
+    return m_frameBuffers[index];
+  }
+  auto GetFrameBuffers() const noexcept
       -> const Array<Handle<FrameBufferResource>> & {
     return m_frameBuffers;
   }

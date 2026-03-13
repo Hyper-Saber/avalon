@@ -5,6 +5,7 @@ module;
 export module avalon.core:math;
 
 import :debug;
+import :string;
 
 export namespace avalon {
 constexpr float kPi = 3.1415926535897932384626433832795f;
@@ -20,6 +21,7 @@ inline constexpr float ToDegrees(float radians) {
 
 struct Vec2 {
   float x = 0, y = 0;
+  auto ToString() { return String::Format("x: {}, y: {}", x, y); }
 };
 
 struct Vec3 {
@@ -27,7 +29,27 @@ struct Vec3 {
 
   Vec3 operator+(const Vec3 &v) const { return {x + v.x, y + v.y, z + v.z}; }
   Vec3 operator-(const Vec3 &v) const { return {x - v.x, y - v.y, z - v.z}; }
+  Vec3 operator+(float s) const { return {x + s, y + s, z + s}; }
+  Vec3 operator-(float s) const { return {x - s, y - s, z - s}; }
   Vec3 operator*(float s) const { return {x * s, y * s, z * s}; }
+  Vec3 operator+=(float s) {
+    x += s;
+    y += s;
+    z += s;
+    return *this;
+  }
+  Vec3 operator-=(float s) {
+    x -= s;
+    y -= s;
+    z -= s;
+    return *this;
+  }
+  Vec3 operator*=(float s) {
+    x *= s;
+    y *= s;
+    z *= s;
+    return *this;
+  }
 
   static Vec3 Right() { return {1.0f, 0.0f, 0.0f}; }
   static Vec3 Left() { return {-1.0f, 0.0f, 0.0f}; }
@@ -38,6 +60,8 @@ struct Vec3 {
 
   static Vec3 Zero() { return {0.0f, 0.0f, 0.0f}; }
   static Vec3 One() { return {1.0f, 1.0f, 1.0f}; }
+
+  auto ToString() { return String::Format("x: {}, y: {}, z: {}", x, y, z); }
 };
 
 inline float LengthSquared(const Vec3 &v) {
@@ -64,6 +88,10 @@ struct Vec4 {
   static Vec4 FromVec3(const Vec3 &v, float w = 1.0f) {
     return {v.x, v.y, v.z, w};
   }
+
+  auto ToString() {
+    return String::Format("x: {}, y: {}, z: {}, w: {}", x, y, z, w);
+  }
 };
 
 struct alignas(16) Matrix4x4 {
@@ -87,6 +115,16 @@ struct alignas(16) Matrix4x4 {
       }
     }
     return res;
+  }
+  String ToString() const {
+    return String::Format("[{:>8.4f}, {:>8.4f}, {:>8.4f}, {:>8.4f}]\n"
+                          "[{:>8.4f}, {:>8.4f}, {:>8.4f}, {:>8.4f}]\n"
+                          "[{:>8.4f}, {:>8.4f}, {:>8.4f}, {:>8.4f}]\n"
+                          "[{:>8.4f}, {:>8.4f}, {:>8.4f}, {:>8.4f}]",
+                          data[0][0], data[1][0], data[2][0], data[3][0],
+                          data[0][1], data[1][1], data[2][1], data[3][1],
+                          data[0][2], data[1][2], data[2][2], data[3][2],
+                          data[0][3], data[1][3], data[2][3], data[3][3]);
   }
 };
 

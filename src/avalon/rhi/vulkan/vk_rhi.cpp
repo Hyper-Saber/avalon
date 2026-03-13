@@ -374,9 +374,22 @@ void VkRhi::CleanupSwapchainFrameBuffers() {
 
 void VkRhi::CreateSwapchianFrameBuffers(RenderPassHandle handle) {
   auto extent = m_swapchainContext->GetExtent();
+  auto renderPassRes = m_resourcePool->ResolveRenderPass({handle.id});
+  VkImageView depthView{VK_NULL_HANDLE};
+  if (renderPassRes->createInfo.hasDepth) {
+    TextureCreateInfo info{
+        .width = extent.width,
+        .height = extent.height,
+        .format = renderPassRes->createInfo.depthAttachment.format,
+    };
+
+    auto handle = m_resourcePool->CreateTexture(info);
+    depthView = m_resourcePool->ResolveTexture(handle)->imageView;
+  }
+
   auto frameBuffers = m_resourcePool->CreateSwapchainFrameBuffers(
-      handle, m_swapchainContext->GetImageViews(), extent.width, extent.height,
-      1);
+      handle, m_swapchainContext->GetImageViews(), depthView, extent.width,
+      extent.height, 1);
   m_swapchainContext->SetFrameBuffers(std::move(frameBuffers));
 }
 

@@ -71,16 +71,15 @@ struct TextureResource : public mem::AutoDestroyable<TextureResource> {
 struct RenderPassResource : public mem::AutoDestroyable<RenderPassResource> {
   const VkDevice device{VK_NULL_HANDLE};
   const VkRenderPass renderPass{VK_NULL_HANDLE};
-  const Array<AttachmentDescription> AttachmentDescriptions;
+  const RenderPassCreateInfo createInfo;
 
   static RenderPassResource Null() {
     return RenderPassResource{VK_NULL_HANDLE, VK_NULL_HANDLE, {}};
   }
 
   RenderPassResource(VkDevice device, VkRenderPass renderPass,
-                     Array<AttachmentDescription> attachmentDescriptions)
-      : device(device), renderPass(renderPass),
-        AttachmentDescriptions(std::move(attachmentDescriptions)) {}
+                     RenderPassCreateInfo info)
+      : device(device), renderPass(renderPass), createInfo(info) {}
 
   ~RenderPassResource() { vkDestroyRenderPass(device, renderPass, nullptr); }
 };

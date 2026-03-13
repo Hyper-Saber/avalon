@@ -95,7 +95,7 @@ auto Engine::Initialize(const EngineConfig &config)
   };
 
   rhi::AttachmentDescription depthAttachment{
-      .format = rhi::EFormat::D32_SFLOAT,
+      .format = rhi::EFormat::D32_SFLOAT_S8_UINT,
       .loadOp = rhi::EAttachmentLoadOp::Clear,
       .storeOp = rhi::EAttachmentStoreOp::DontCare,
       .initialLayout = rhi::EResourceLayout::Undefined,
@@ -105,7 +105,7 @@ auto Engine::Initialize(const EngineConfig &config)
   rhi::RenderPassCreateInfo passCreateInfo{
       .colorAttachments = {colorAttachment},
       .depthAttachment = depthAttachment,
-      .hasDepth = false,
+      .hasDepth = true,
   };
 
   m_renderPass = m_rhi->CreateRenderPass(passCreateInfo);
@@ -125,7 +125,7 @@ auto Engine::Initialize(const EngineConfig &config)
 
   m_world = MakeUnique<ecs::World>();
 
-  m_model = CreateTriangleEntity(material);
+  m_model = CreateGeometryEntity(material);
 
   return {};
 }
@@ -206,7 +206,11 @@ void Engine::Update() {
 
   auto transform = m_world->GetComponent<graphics::TransformComponent>(m_model);
   transform->local.rotation.z = totalTime * 90;
-  m_renderer->SetClearColor({std::sin(totalTime), 0, 0, 0});
+  transform->local.rotation.x = totalTime * 60;
+  transform->local.rotation.y = totalTime * 30;
+  transform->local.position.x = std::sin(totalTime) * 0.5f;
+  transform->local.position.y = std::cos(totalTime) * 0.5f;
+  transform->local.scale = Vec3::One() * std::sin(totalTime) * 0.4f + 0.8f;
 }
 
 bool Engine::TryHandleRhiError(rhi::ERhiResult error) {
@@ -239,25 +243,47 @@ bool Engine::TryHandleRhiError(rhi::ERhiResult error) {
   return true;
 }
 
-ecs::Entity Engine::CreateTriangleEntity(const graphics::Material &material) {
-  graphics::MeshData data{
-      .positions{
-          {0.0f, 0.f, 0.0f},
-          {0.5f, 0.5f, 0.0f},
-          {-0.5f, 0.5f, 0.0f},
-      },
-      .indices{0, 1, 2},
-      .colors{
-          {1, 0, 0, 1},
-          {0, 1, 0, 1},
-          {0, 0, 1, 1},
-      },
-      .texCoords{
-          {0.5f, 1.f},
-          {0.f, 0.f},
-          {1.f, 0.f},
-      },
-  };
+ecs::Entity Engine::CreateGeometryEntity(const graphics::Material &material) {
+  graphics::MeshData data{.positions{// Front face (Z = 0.5)
+                                     {-0.5f, -0.5f, 0.5f},
+                                     {0.5f, -0.5f, 0.5f},
+                                     {0.5f, 0.5f, 0.5f},
+                                     {-0.5f, 0.5f, 0.5f},
+                                     // Back face (Z = -0.5)
+                                     {-0.5f, -0.5f, -0.5f},
+                                     {0.5f, -0.5f, -0.5f},
+                                     {0.5f, 0.5f, -0.5f},
+                                     {-0.5f, 0.5f, -0.5f}},
+                          .indices{// Front
+                                   0, 1, 2, 2, 3, 0,
+                                   // Right
+                                   1, 5, 6, 6, 2, 1,
+                                   // Back
+                                   7, 6, 5, 5, 4, 7,
+                                   // Left
+                                   4, 0, 3, 3, 7, 4,
+                                   // Top
+                                   3, 2, 6, 6, 7, 3,
+                                   // Bottom
+                                   4, 5, 1, 1, 0, 4},
+                          .colors{
+                              {1, 0, 0, 1},
+                              {0, 1, 0, 1},
+                              {0, 0, 1, 1},
+                              {1, 1, 0, 1}, // 前四个顶点颜色
+                              {1, 0, 1, 1},
+                              {0, 1, 1, 1},
+                              {1, 1, 1, 1},
+                              {0, 0, 0, 1} // 后四个顶点颜色
+                          },
+                          .texCoords{{0.f, 0.f},
+                                     {1.f, 0.f},
+                                     {1.f, 1.f},
+                                     {0.f, 1.f},
+                                     {0.f, 0.f},
+                                     {1.f, 0.f},
+                                     {1.f, 1.f},
+                                     {0.f, 1.f}}};
 
   m_mesh =
       graphics::GetMeshManager().CreateMesh(data, material.GetVertexLayout());

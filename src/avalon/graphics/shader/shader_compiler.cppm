@@ -299,7 +299,6 @@ public:
       AddArg(L"VK_BINDING(b, s)=[[vk::binding(b, s)]]");
 
       AddArg(L"-fvk-use-dx-layout");
-      AddArg(L"-Zpr");
 
       AddArg(L"-Fi");
       AddDynamicArg(Utf8ToWstring(desc.filePath.GetCStr()));

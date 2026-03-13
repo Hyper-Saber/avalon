@@ -112,12 +112,7 @@ public:
       return {};
     }
 
-    auto attachments = createInfo.colorAttachments;
-    if (createInfo.hasDepth) {
-      attachments.PushBack(createInfo.depthAttachment);
-    }
-
-    auto handle = m_renderPassPool.Create(m_device, pass, attachments);
+    auto handle = m_renderPassPool.Create(m_device, pass, createInfo);
 
     m_cache.Insert(hash, handle);
     return handle;

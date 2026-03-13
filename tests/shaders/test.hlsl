@@ -1,11 +1,10 @@
-// struct CameraUniform {
-//   float4x4 view;
-//   float4x4 projection;
-//   float3 position;
-//   float padding;
-// };
+struct CameraUniform {
+  float4x4 view;
+  float4x4 projection;
+  float4 position;
+};
 
-// ConstantBuffer<CameraUniform> camera : register(b0);
+VK_BINDING(0, 0) ConstantBuffer<CameraUniform> camera : register(b0, space0);
 
 struct ModelData {
   float4x4 model;
@@ -28,10 +27,10 @@ struct VSOutput {
 VSOutput VsMain(VSInput input) {
   VSOutput output;
   float4 worldPos = mul(push.model, float4(input.position, 1.0f));
-  // float4 viewPos = mul(camera.view, worldPos);
-  // output.clipPos = mul(camera.projection, viewPos);
+  float4 viewPos = mul(camera.view, worldPos);
+  output.clipPos = mul(camera.projection, viewPos);
   output.color = input.color;
-  output.clipPos = float4(worldPos.xyz, 1.0);
+  output.uv = input.uv;
 
   return output;
 }

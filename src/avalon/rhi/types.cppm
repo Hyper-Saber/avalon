@@ -271,7 +271,7 @@ struct TextureCreateInfo {
   uint32_t layers = 1;
   uint32_t mipLevels = 1;
 
-  EFormat format = EFormat::R16G16B16A16_Uint;
+  EFormat format = EFormat::B8G8R8A8_SRGB;
 };
 
 struct VertexBinding {
@@ -390,7 +390,7 @@ struct PipelineCreateInfo {
   Span<const ShaderStageInfo> stageInfos;
   EPrimitiveTopology topology = EPrimitiveTopology::TriangleList;
   EPolygonMode polygonMode = EPolygonMode::Fill;
-  ECullMode cullMode = ECullMode::None;
+  ECullMode cullMode = ECullMode::Back;
   bool isDepthTestEnable = false;
   bool isDepthWriteEnable = false;
   EDepthCompareOp depthCompareOp = EDepthCompareOp::Less;

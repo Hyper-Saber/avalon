@@ -197,6 +197,14 @@ constexpr StringView ToView(EFormat format) {
   }
 }
 
+bool IsDepthFormat(EFormat format) {
+  return format == EFormat::D32_SFLOAT || format == EFormat::D32_SFLOAT_S8_UINT;
+}
+
+bool HasStencilComponent(EFormat format) {
+  return format == EFormat::D32_SFLOAT_S8_UINT;
+}
+
 constexpr StringView ToView(ERhiResult e) {
   switch (e) {
   case ERhiResult::Success:

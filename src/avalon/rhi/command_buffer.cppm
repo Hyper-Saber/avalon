@@ -21,13 +21,16 @@ public:
                                 const uint64_t *pOffsets) = 0;
   virtual void BindIndexBuffer(BufferHandle handle, uint64_t offset,
                                EFormat format) = 0;
+  virtual void BindDescriptorSet(uint32_t firstSet,
+                                 Span<const DescriptorSetHandle> sets) = 0;
 
   virtual void PushConstants(EShaderStage stage, uint32_t offset, uint32_t size,
                              const void *pData) = 0;
 
   virtual void UpdateBuffer(BufferHandle handle, uint64_t offset,
                             const void *pData, uint64_t size) = 0;
-virtual void CopyBuffer(BufferHandle src, BufferHandle dst, const BufferCopy &region) = 0;
+  virtual void CopyBuffer(BufferHandle src, BufferHandle dst,
+                          const BufferCopy &region) = 0;
   virtual void Draw(uint32_t vertexCount, uint32_t instanceCount,
                     uint32_t firstVertex, uint32_t firstInstance) = 0;
   virtual void DrawIndexed(uint32_t indexCount, uint32_t instanceCount,

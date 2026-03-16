@@ -9,6 +9,10 @@ export namespace avalon::graphics {
 
 struct RenderContext {
   rhi::ICommandBuffer &cmd;
+  const Matrix4x4 &view;
+  const Matrix4x4 &projection;
+  const Vec3 cameraPosition;
+  DescriptorSetHandle globalSet;
 };
 
 class IRenderPass : public NonCopyable, public mem::IAutoDestroyable {

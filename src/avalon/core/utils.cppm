@@ -1,4 +1,5 @@
 module;
+#include <cstddef>
 #include <type_traits>
 
 export module avalon.core:utils;
@@ -38,6 +39,13 @@ constexpr T operator&=(T lhs, T rhs) noexcept {
   return lhs;
 }
 
+template <typename T>
+  requires EnableBitmaskOperators<T>::value
+constexpr T operator~(T value) noexcept {
+  using U = std::underlying_type_t<T>;
+  return static_cast<T>(~static_cast<U>(value));
+}
+
 } // namespace avalon::rhi
 //
 export namespace avalon {
@@ -70,4 +78,13 @@ auto EstatusCodeToView(EStatusCode code) {
     break;
   }
 }
+
 } // namespace avalon
+
+export namespace avalon::mem {
+size_t AlignUp(size_t structSize, size_t alignment) {
+  if (alignment == 0)
+    return structSize;
+  return (structSize + alignment - 1) & ~(alignment - 1);
+}
+} // namespace avalon::mem

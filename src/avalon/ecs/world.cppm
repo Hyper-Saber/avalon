@@ -1,5 +1,5 @@
 module;
-#include <tuple>
+#include <type_traits>
 #include <typeindex>
 #include <utility>
 
@@ -49,6 +49,7 @@ public:
 
   void Update(float dt) {
     for (auto &system : m_systems) {
+      system->OnUpdate(*this, dt);
     }
   }
 
@@ -95,6 +96,30 @@ private:
 };
 
 template <typename... Components>
+template <typename T>
+T &View<Components...>::Get(Entity entity) {
+  return *m_world.GetComponent<T>(entity);
+}
+
+template <typename... Components>
+template <typename T>
+const T &View<Components...>::Get(Entity entity) const {
+  return *m_world.GetComponent<T>(entity);
+}
+
+template <typename... Components>
+template <typename Func>
+void View<Components...>::ForEach(Func &&func) {
+  for (Entity entity : *this) {
+    if constexpr (std::is_invocable_v<Func, Entity, Components &...>) {
+      func(entity, Get<Components>(entity)...);
+    } else {
+      func(Get<Components>(entity)...);
+    }
+  }
+}
+
+template <typename... Components>
 auto View<Components...>::Iterator::operator++() -> Iterator & {
   while (++currentEntity <= world.GetMaxEntity()) { // 现在 World 是完整的！
     if ((world.HasComponent<Components>(currentEntity) && ...)) {
@@ -105,10 +130,8 @@ auto View<Components...>::Iterator::operator++() -> Iterator & {
 }
 
 template <typename... Components>
-auto View<Components...>::Iterator::operator*()
-    -> std::tuple<Entity, Components &...> const {
-  return std::forward_as_tuple(
-      currentEntity, *world.GetComponent<Components>(currentEntity)...);
+auto View<Components...>::Iterator::operator*() -> Entity const {
+  return currentEntity;
 }
 
 template <typename... Components>

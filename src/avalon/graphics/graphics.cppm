@@ -7,3 +7,4 @@ export import :components;
 export import :render_pass;
 export import :opaque_pass;
 export import :renderer;
+export import :types;

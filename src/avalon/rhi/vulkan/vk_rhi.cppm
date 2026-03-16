@@ -13,6 +13,8 @@ import :pipeline_manager;
 import :device_context;
 import :swapchain_context;
 import :resource_pool;
+import :descriptor_allocator;
+import :descriptor_writer;
 
 namespace avalon::rhi {
 
@@ -26,8 +28,12 @@ public:
                   const window::NativeWindowInfo &inWindowInfo, uint32_t width,
                   uint32_t height) -> ERhiResult override;
 
+  auto GetMainCommandBuffer() const -> ICommandBuffer * override;
+  auto GetSwapchainImageFormat() const -> EFormat override;
+  uint32_t GetCurrentFrameIndex() const override;
+  uint32_t GetMaxFrameInFlight() const override;
+  auto GetCapabilities() const -> DeviceCapabilities override;
   void SetSwapchainRenderPass(RenderPassHandle) override;
-  auto GetSwapchainImageFormat() -> EFormat override;
 
   auto CreateRenderPass(const RenderPassCreateInfo &info)
       -> RenderPassHandle override;
@@ -40,7 +46,8 @@ public:
   auto CreateBuffer(const BufferCreateInfo &info) -> BufferHandle override;
   void ReleaseBuffer(BufferHandle handle) override;
 
-  auto GetMainCommandBuffer() -> ICommandBuffer * override;
+  auto CreateDescriptorWriter(PipelineHandle handle, uint32_t set)
+      -> IDescriptorWriter * override;
 
   void ExcuteOnce(EQueueType queueType,
                   const std::function<void(ICommandBuffer *)> &action) override;
@@ -56,6 +63,8 @@ public:
   auto GetFrameBuffer(ERenderTarget) -> const FrameBufferResource & override;
   auto GetPipeline(PipelineHandle) -> const PipelineResource & override;
   auto GetBuffer(BufferHandle) -> const BufferResource & override;
+  auto GetDescriptorSet(DescriptorSetHandle handle)
+      -> const DescriptorSetResource & override;
 
 private:
   auto CreateCommandPools() -> std::expected<void, ERhiResult>;
@@ -75,6 +84,8 @@ private:
   UniquePtr<SwapchainContext> m_swapchainContext;
   UniquePtr<ResourcePool> m_resourcePool;
   UniquePtr<PipelineManager> m_pipelineManager;
+  Array<UniquePtr<DescriptorAllocator>> m_descriptorAllocators;
+  UniquePtr<DescriptorWriter> m_descriptorWriter;
 
   VkCommandPool m_immTransferPool;
   Array<VkCommandPool> m_frameCommandPools;

@@ -82,8 +82,6 @@ auto Engine::Initialize(const EngineConfig &config)
   GetContext().RegisterService<graphics::MeshManager>(
       EEngineService::MeshManager, *m_rhi.Get());
 
-  m_renderer = MakeUnique<graphics::Renderer>(*m_rhi.Get());
-
   rhi::Extent2D extent = {width, height};
 
   rhi::AttachmentDescription colorAttachment{
@@ -120,12 +118,24 @@ auto Engine::Initialize(const EngineConfig &config)
 
   m_pipeline = m_rhi->CreatePipeline(pipelineCreateInfo);
 
+  m_renderer = MakeUnique<graphics::Renderer>(*m_rhi.Get(), m_pipeline);
+
   m_renderer->AddPass(
       MakeUnique<graphics::OpaquePass>(m_pipeline, m_renderPass, extent));
 
-  m_world = MakeUnique<ecs::World>();
-
+  m_scene = MakeUnique<scene::Scene>();
   m_model = CreateGeometryEntity(material);
+
+  auto &world = m_scene->GetWorld();
+  m_camera = world.CreateEntity();
+  world.AddComponent<ecs::CameraComponent>(m_camera);
+  auto transform = Transform{
+      .position = {0, 0, 5},
+      .rotation = {0, 180, 0},
+      .scale = Vec3::One(),
+  };
+  world.AddComponent<ecs::TransformComponent>(m_camera, transform);
+  world.AddSystem<ecs::CameraSystem>();
 
   return {};
 }
@@ -194,7 +204,7 @@ auto Engine::ExecuteFrame() -> rhi::ERhiResult {
   }
   auto cmd = m_rhi->GetMainCommandBuffer();
   cmd->Begin();
-  m_renderer->Render(*cmd, *m_world.Get());
+  m_scene->Render(*m_renderer.Get(), *cmd);
   cmd->End();
   m_rhi->Submit(cmd);
   return beginRes != rhi::ERhiResult::Success ? beginRes : m_rhi->EndFrame();
@@ -204,13 +214,22 @@ void Engine::Update() {
   static float totalTime = 0.f;
   totalTime += m_deltaTime;
 
-  auto transform = m_world->GetComponent<graphics::TransformComponent>(m_model);
-  transform->local.rotation.z = totalTime * 90;
-  transform->local.rotation.x = totalTime * 60;
-  transform->local.rotation.y = totalTime * 30;
-  transform->local.position.x = std::sin(totalTime) * 0.5f;
-  transform->local.position.y = std::cos(totalTime) * 0.5f;
-  transform->local.scale = Vec3::One() * std::sin(totalTime) * 0.4f + 0.8f;
+  m_scene->GetWorld().Update(m_deltaTime);
+
+  auto transform =
+      m_scene->GetWorld().GetComponent<ecs::TransformComponent>(m_model);
+  Vec3 rotation;
+  rotation.z = totalTime * 90;
+  rotation.x = totalTime * 60;
+  rotation.y = totalTime * 30;
+  Vec3 position;
+  position.x = std::sin(totalTime) * 0.5f;
+  position.y = std::cos(totalTime) * 0.5f;
+  Vec3 scale;
+  scale = Vec3::One() * std::sin(totalTime) * 0.4f + 0.8f;
+  transform->SetPosition(position);
+  // transform->SetScale(scale);
+  transform->SetRotation(rotation);
 }
 
 bool Engine::TryHandleRhiError(rhi::ERhiResult error) {
@@ -288,10 +307,11 @@ ecs::Entity Engine::CreateGeometryEntity(const graphics::Material &material) {
   m_mesh =
       graphics::GetMeshManager().CreateMesh(data, material.GetVertexLayout());
 
-  auto entity = m_world->CreateEntity();
+  auto entity = m_scene->GetWorld().CreateEntity();
   Transform transform;
-  m_world->AddComponent<graphics::MeshComponent>(entity, m_mesh)
-      ->AddComponent<graphics::TransformComponent>(entity, transform);
+  m_scene->GetWorld()
+      .AddComponent<ecs::MeshComponent>(entity, m_mesh)
+      ->AddComponent<ecs::TransformComponent>(entity, transform);
 
   return entity;
 }

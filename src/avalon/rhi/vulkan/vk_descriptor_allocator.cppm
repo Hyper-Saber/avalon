@@ -6,12 +6,25 @@ export module avalon.rhi.vulkan:descriptor_allocator;
 import avalon.core;
 import avalon.rhi;
 import :utils;
+import :types;
 
 namespace avalon::rhi {
-class DescriptorAllocator : public NonCopyable,
-                            public mem::AutoDestroyable<DescriptorAllocator> {
+class DescriptorAllocator final
+    : public NonCopyable,
+      public mem::AutoDestroyable<DescriptorAllocator> {
+
 public:
+  bool Initialize() {
+    auto res = CreatePool(1000);
+    if (!res.has_value()) {
+      return false;
+    }
+    m_currentPool = res.value();
+    return true;
+  }
+
   explicit DescriptorAllocator(VkDevice device) : m_device(device) {}
+
   ~DescriptorAllocator() {
     if (m_currentPool != VK_NULL_HANDLE) {
       vkDestroyDescriptorPool(m_device, m_currentPool, nullptr);
@@ -24,16 +37,7 @@ public:
     m_usedPools.Clear();
   }
 
-  auto Initialzie() -> std::expected<void, ERhiResult> {
-    auto res = CreatePool(1000);
-    if (!res.has_value()) {
-      return std::unexpected(HandleVkError(res.error()));
-    }
-    m_currentPool = res.value();
-    return {};
-  }
-
-  auto Allocate(VkDescriptorSetLayout layout) -> VkDescriptorSet {
+  auto Allocate(VkDescriptorSetLayout layout) -> Handle<DescriptorSetResource> {
     VkDescriptorSetAllocateInfo allocateInfo{
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
         .descriptorPool = m_currentPool,
@@ -52,7 +56,7 @@ public:
       if (!newPoolRes.has_value()) {
         Error("[vulkan]: Failed to create descriptor pool! Error code: {}.",
               ToView(newPoolRes.error()));
-        return VK_NULL_HANDLE;
+        return {};
       }
 
       m_currentPool = newPoolRes.value();
@@ -63,10 +67,14 @@ public:
       if (result != VK_SUCCESS) {
         Error("[vulkan]: Failed to allocate descriptor set! Error code: {}.",
               ToView(result));
-        return VK_NULL_HANDLE;
+        return {};
       }
     }
-    return descriptorSet;
+    return m_descriptorSetPool.Create(descriptorSet, layout);
+  }
+
+  auto Resolve(Handle<DescriptorSetResource> handle) {
+    return m_descriptorSetPool.Resolve(handle);
   }
 
   void ResetPools() {
@@ -83,13 +91,11 @@ public:
       m_currentPool = m_usedPools.GetBack();
       m_usedPools.PopBack();
     }
+
+    m_descriptorSetPool.Clear();
   }
 
 private:
-  VkDevice m_device;
-  VkDescriptorPool m_currentPool{VK_NULL_HANDLE};
-  Array<VkDescriptorPool> m_usedPools;
-
   auto CreatePool(uint32_t count) -> std::expected<VkDescriptorPool, VkResult> {
     Array<VkDescriptorPoolSize> poolSizes{
         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, count},
@@ -98,7 +104,6 @@ private:
 
     VkDescriptorPoolCreateInfo createInfo{
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-        .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
         .maxSets = count,
         .poolSizeCount = static_cast<uint32_t>(poolSizes.GetSize()),
         .pPoolSizes = poolSizes.GetData(),
@@ -110,5 +115,10 @@ private:
     }
     return pool;
   }
+
+  VkDevice m_device;
+  VkDescriptorPool m_currentPool{VK_NULL_HANDLE};
+  Array<VkDescriptorPool> m_usedPools;
+  mem::ResourcePool<DescriptorSetResource> m_descriptorSetPool;
 };
 } // namespace avalon::rhi

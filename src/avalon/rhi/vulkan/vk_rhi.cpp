@@ -10,6 +10,8 @@ module avalon.rhi.vulkan;
 import avalon.core;
 import avalon.rhi;
 import :utils;
+import :descriptor_writer;
+import :descriptor_allocator;
 
 import :command_buffer;
 
@@ -40,6 +42,9 @@ VkRhi::~VkRhi() {
     vkDestroyCommandPool(m_deviceContext->GetDevice(), m_immTransferPool,
                          nullptr);
 
+  for (auto &allocator : m_descriptorAllocators) {
+    allocator.Reset();
+  }
   m_pipelineManager.Reset();
   m_resourcePool.Reset();
   m_swapchainContext.Reset();
@@ -70,10 +75,14 @@ auto VkRhi::Initialize(const DeviceRequirement &requirement,
       m_deviceContext->GetDevice(), m_deviceContext->GetPhysicalDevice());
   m_pipelineManager =
       MakeUnique<PipelineManager>(m_deviceContext->GetDevice(), *this);
+  for (uint32_t i = 0; i < m_maxFrameInFlight; i++) {
+    m_descriptorAllocators.PushBack(
+        MakeUnique<DescriptorAllocator>(m_deviceContext->GetDevice()));
+  }
   return {};
 }
 
-auto VkRhi::GetSwapchainImageFormat() -> EFormat {
+auto VkRhi::GetSwapchainImageFormat() const -> EFormat {
   auto format = m_swapchainContext->GetImageFormat();
   switch (format) {
   case VkFormat::VK_FORMAT_B8G8R8_UNORM:
@@ -89,6 +98,17 @@ auto VkRhi::GetSwapchainImageFormat() -> EFormat {
   default:
     return EFormat::Undefined;
   }
+}
+
+auto VkRhi::GetMainCommandBuffer() const -> ICommandBuffer * {
+  return m_frameCommandBuffers[m_currentFrame].Get();
+}
+
+uint32_t VkRhi::GetCurrentFrameIndex() const { return m_currentFrame; }
+uint32_t VkRhi::GetMaxFrameInFlight() const { return m_maxFrameInFlight; }
+
+auto VkRhi::GetCapabilities() const -> DeviceCapabilities {
+  return m_deviceContext->GetCapabilities();
 }
 
 void VkRhi::SetSwapchainRenderPass(RenderPassHandle handle) {
@@ -116,6 +136,11 @@ auto VkRhi::GetBuffer(BufferHandle handle) -> const BufferResource & {
   return *m_resourcePool->ResolveBuffer({handle.id});
 }
 
+auto VkRhi::GetDescriptorSet(DescriptorSetHandle handle)
+    -> const DescriptorSetResource & {
+  return *m_descriptorAllocators[m_currentFrame]->Resolve({handle.id});
+}
+
 auto VkRhi::RecreateSwapchain(RenderPassHandle handle, uint32_t width,
                               uint32_t height) -> ERhiResult {
   vkDeviceWaitIdle(m_deviceContext->GetDevice());
@@ -138,6 +163,14 @@ void VkRhi::ReleaseBuffer(BufferHandle handle) {
   m_resourcePool->ReleaseBuffer({handle.id});
 }
 
+auto VkRhi::CreateDescriptorWriter(PipelineHandle handle, uint32_t set)
+    -> IDescriptorWriter * {
+  m_descriptorWriter = MakeUnique<DescriptorWriter>(
+      m_deviceContext->GetDevice(), *this,
+      *m_descriptorAllocators[m_currentFrame].Get(), handle, set);
+  return m_descriptorWriter.Get();
+}
+
 auto VkRhi::CreatePipeline(const PipelineCreateInfo &info) -> PipelineHandle {
   return {m_pipelineManager->GetOrCreate(info).id};
 }
@@ -145,10 +178,6 @@ auto VkRhi::CreatePipeline(const PipelineCreateInfo &info) -> PipelineHandle {
 auto VkRhi::CreateRenderPass(const RenderPassCreateInfo &info)
     -> RenderPassHandle {
   return {m_resourcePool->CreateRenderPass(info).id};
-}
-
-auto VkRhi::GetMainCommandBuffer() -> ICommandBuffer * {
-  return m_frameCommandBuffers[m_currentFrame].Get();
 }
 
 void VkRhi::CreateCommandBuffer() {
@@ -284,6 +313,7 @@ auto VkRhi::BeginFrame() -> ERhiResult {
   vkResetCommandPool(m_deviceContext->GetDevice(),
                      m_frameCommandPools[m_currentFrame], 0);
 
+  m_descriptorAllocators[m_currentFrame]->ResetPools();
   return {};
 }
 

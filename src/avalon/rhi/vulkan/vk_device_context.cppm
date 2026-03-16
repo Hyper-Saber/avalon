@@ -114,6 +114,10 @@ public:
     }
   }
 
+  auto GetCapabilities() const noexcept -> const DeviceCapabilities & override {
+    return m_capabilities;
+  }
+
   auto GetQueueFamilyIndices() noexcept -> const QueueFamilyIndices & override {
     return m_queueFamilyIndices;
   }
@@ -266,6 +270,7 @@ private:
     for (auto device : m_availablePhysicalDevices) {
       if (IsDeviceSuitable(device)) {
         m_physicalDevice = device;
+        PopulateCapabilities();
         return {};
       }
     }
@@ -282,6 +287,15 @@ private:
 
     return m_queueFamilyIndices.IsComplete(m_config.queueRequirement) &&
            deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
+  }
+
+  void PopulateCapabilities() {
+    VkPhysicalDeviceProperties properties;
+    vkGetPhysicalDeviceProperties(m_physicalDevice, &properties);
+    m_capabilities.limits.minUniformBufferOffsetAlignment =
+        properties.limits.minUniformBufferOffsetAlignment;
+    m_capabilities.limits.minStorageBufferOffsetAlignment =
+        properties.limits.minStorageBufferOffsetAlignment;
   }
 
   auto CreateLogicalDevice() -> std::expected<void, ERhiResult> {
@@ -443,6 +457,8 @@ private:
   VkQueue m_presentQueue{VK_NULL_HANDLE};
   VkQueue m_computeQueue{VK_NULL_HANDLE};
   VkQueue m_transferQueue{VK_NULL_HANDLE};
+
+  DeviceCapabilities m_capabilities;
 
   QueueFamilyIndices m_queueFamilyIndices;
 };

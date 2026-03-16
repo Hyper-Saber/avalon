@@ -1,5 +1,4 @@
 module;
-#include <tuple>
 export module avalon.ecs:view;
 
 import :types;
@@ -10,6 +9,10 @@ class World;
 template <typename... Components> class View {
 public:
   explicit View(World &world) : m_world(world) {}
+  template <typename T> T &Get(Entity entity);
+  template <typename T> T const &Get(Entity entity) const;
+
+  template <typename Func> void ForEach(Func &&func);
 
   struct Iterator {
     World &world;
@@ -17,13 +20,12 @@ public:
 
     auto operator++() -> Iterator &;
 
-    auto operator*() -> std::tuple<Entity, Components &...> const;
+    auto operator*() -> Entity const;
 
     bool operator!=(const Iterator &other) const;
   };
 
   Iterator begin();
-
   Iterator end();
 
 private:

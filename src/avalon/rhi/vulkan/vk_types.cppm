@@ -1,4 +1,5 @@
 module;
+#include <debug/assert.hpp>
 #include <optional>
 #include <vulkan/vulkan.h>
 
@@ -14,24 +15,91 @@ struct DeviceConfig {
   VkPhysicalDeviceFeatures features;
 };
 
+struct RenderPassResource : public mem::AutoDestroyable<RenderPassResource> {
+  const VkDevice device{VK_NULL_HANDLE};
+  const VkRenderPass renderPass{VK_NULL_HANDLE};
+  const RenderPassCreateInfo createInfo;
+
+  static RenderPassResource Null() {
+    return RenderPassResource{VK_NULL_HANDLE, VK_NULL_HANDLE, {}};
+  }
+
+  RenderPassResource(VkDevice device, VkRenderPass renderPass,
+                     RenderPassCreateInfo info)
+      : device(device), renderPass(renderPass), createInfo(info) {}
+
+  ~RenderPassResource() { vkDestroyRenderPass(device, renderPass, nullptr); }
+};
+
+struct DescriptorSetLayoutBindingMap {
+  const StringId nameHash;
+  const uint32_t index;
+};
+
+struct DescriptorSetLayoutMeta {
+  const Span<const VkDescriptorSetLayoutBinding> bindings;
+  const VkDescriptorSetLayout setLayout;
+  Array<DescriptorSetLayoutBindingMap> maps;
+
+  DescriptorSetLayoutMeta(Span<const DescriptorSetLayoutBinding> bindings,
+                          Span<const VkDescriptorSetLayoutBinding> vkBindings,
+                          VkDescriptorSetLayout setLayout)
+      : bindings(vkBindings), setLayout(setLayout) {
+    AVALON_ASSERT(bindings.GetSize() == vkBindings.GetSize());
+    uint32_t lastBinding = 0;
+    maps.Reserve(bindings.GetSize());
+    for (uint32_t i = 0; i < bindings.GetSize(); ++i) {
+      AVALON_ASSERT(bindings[i].binding == vkBindings[i].binding &&
+                    bindings[i].binding >= lastBinding)
+      maps.PushBack({
+          .nameHash = bindings[i].nameHash,
+          .index = i,
+      });
+      lastBinding = bindings[i].binding;
+    }
+  }
+
+  auto Get(StringId nameHash) const -> const VkDescriptorSetLayoutBinding * {
+    for (auto &map : maps) {
+      if (map.nameHash == nameHash) {
+        return &bindings[map.index];
+      }
+    }
+    return nullptr;
+  }
+};
+
 struct PipelineResource : public mem::AutoDestroyable<PipelineResource> {
   const VkDevice device{VK_NULL_HANDLE};
   const VkPipeline pipeline{VK_NULL_HANDLE};
   const VkPipelineLayout pipelineLayout{VK_NULL_HANDLE};
-  const Array<VkDescriptorSetLayout> setLayouts;
+  const Array<DescriptorSetLayoutMeta> descSetLayoutMaps;
 
   PipelineResource(VkDevice device, VkPipeline pipeline,
                    VkPipelineLayout layout,
-                   Array<VkDescriptorSetLayout> &&setLayouts)
+                   Array<DescriptorSetLayoutMeta> &&meta)
       : device(device), pipeline(pipeline), pipelineLayout(layout),
-        setLayouts(std::move(setLayouts)) {}
+        descSetLayoutMaps(std::move(meta)) {}
 
-  ~PipelineResource() {
-    vkDestroyPipeline(device, pipeline, nullptr);
+  ~PipelineResource() { vkDestroyPipeline(device, pipeline, nullptr); }
+};
 
-    for (auto setLayout : setLayouts) {
-      vkDestroyDescriptorSetLayout(device, setLayout, nullptr);
-    }
+struct DescriptorSetLayoutResource
+    : public mem::AutoDestroyable<DescriptorSetLayoutResource> {
+  const VkDevice device{VK_NULL_HANDLE};
+  const VkDescriptorSetLayout setLayout{VK_NULL_HANDLE};
+  const Array<VkDescriptorSetLayoutBinding> bindings;
+
+  DescriptorSetLayoutResource(VkDevice device, VkDescriptorSetLayout setLayout,
+                              Array<VkDescriptorSetLayoutBinding> &&bindings)
+      : device(device), setLayout(setLayout), bindings(std::move(bindings)) {}
+
+  ~DescriptorSetLayoutResource() {
+    vkDestroyDescriptorSetLayout(device, setLayout, nullptr);
+  }
+
+  auto GetBindings() -> Span<const VkDescriptorSetLayoutBinding> {
+    return Span{bindings.GetData(), bindings.GetSize()};
   }
 };
 
@@ -68,22 +136,6 @@ struct TextureResource : public mem::AutoDestroyable<TextureResource> {
   }
 };
 
-struct RenderPassResource : public mem::AutoDestroyable<RenderPassResource> {
-  const VkDevice device{VK_NULL_HANDLE};
-  const VkRenderPass renderPass{VK_NULL_HANDLE};
-  const RenderPassCreateInfo createInfo;
-
-  static RenderPassResource Null() {
-    return RenderPassResource{VK_NULL_HANDLE, VK_NULL_HANDLE, {}};
-  }
-
-  RenderPassResource(VkDevice device, VkRenderPass renderPass,
-                     RenderPassCreateInfo info)
-      : device(device), renderPass(renderPass), createInfo(info) {}
-
-  ~RenderPassResource() { vkDestroyRenderPass(device, renderPass, nullptr); }
-};
-
 struct FrameBufferResource : public mem::AutoDestroyable<FrameBufferResource> {
   const VkDevice device{VK_NULL_HANDLE};
   const VkFramebuffer frameBuffer{VK_NULL_HANDLE};
@@ -92,6 +144,16 @@ struct FrameBufferResource : public mem::AutoDestroyable<FrameBufferResource> {
       : device(device), frameBuffer(buffer) {}
 
   ~FrameBufferResource() { vkDestroyFramebuffer(device, frameBuffer, nullptr); }
+};
+
+struct DescriptorSetResource
+    : public mem::AutoDestroyable<DescriptorSetResource> {
+  const VkDescriptorSet descriptorSet{VK_NULL_HANDLE};
+  const VkDescriptorSetLayout layout{VK_NULL_HANDLE};
+
+  DescriptorSetResource(VkDescriptorSet descriptorSet,
+                        VkDescriptorSetLayout layout)
+      : descriptorSet(descriptorSet), layout(layout) {}
 };
 
 struct QueueFamilyIndices {
@@ -128,15 +190,20 @@ public:
   virtual auto GetQueue(EQueueType) -> VkQueue = 0;
   virtual auto QuerySwapchainSupportDetails(VkPhysicalDevice device)
       -> SwapchainSupportDetails = 0;
+  virtual auto GetCapabilities() const noexcept
+      -> const DeviceCapabilities & = 0;
 };
 
 class IRenderResourceProvider {
 public:
   virtual auto GetRenderPass(RenderPassHandle)
       -> const RenderPassResource & = 0;
+
   virtual auto GetFrameBuffer(ERenderTarget) -> const FrameBufferResource & = 0;
   virtual auto GetPipeline(PipelineHandle) -> const PipelineResource & = 0;
   virtual auto GetBuffer(BufferHandle) -> const BufferResource & = 0;
+  virtual auto GetDescriptorSet(DescriptorSetHandle)
+      -> const DescriptorSetResource & = 0;
 };
 
 } // namespace avalon::rhi

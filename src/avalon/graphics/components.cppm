@@ -3,14 +3,10 @@ export module avalon.graphics:components;
 
 import avalon.ecs;
 import :mesh;
-export namespace avalon::graphics {
+export namespace avalon::ecs {
 
 struct MeshComponent {
-  MeshHandle meshHandle;
+  graphics::MeshHandle meshHandle;
 };
 
-struct TransformComponent {
-  Transform local;
-};
-
-} // namespace avalon::graphics
+} // namespace avalon::ecs

@@ -13,12 +13,12 @@ namespace avalon::graphics {
 
 struct RenderPacket {
   Array<MeshHandle> meshHandles;
-  Array<Transform> transforms;
+  Array<Matrix4x4> worldMatrices;
   Array<uint64_t> sortKeys;
 
   void Clear() {
     meshHandles.Clear();
-    transforms.Clear();
+    worldMatrices.Clear();
     sortKeys.Clear();
   }
 
@@ -29,14 +29,15 @@ class MeshExtractor {
 public:
   void Extract(ecs::World &world, RenderPacket &outPacket) {
 
-    auto view = world.GetView<MeshComponent, TransformComponent>();
+    auto view = world.GetView<ecs::MeshComponent, ecs::TransformComponent>();
 
-    for (auto [entity, meshComp, transComp] : view) {
+    view.ForEach([&](auto entity, auto &meshComp, auto &transComp) {
       outPacket.meshHandles.PushBack(meshComp.meshHandle);
-      outPacket.transforms.PushBack(transComp.local);
+      transComp.UpdateWorldMatrix();
+      outPacket.worldMatrices.PushBack(transComp.worldMatrix);
       auto sortKey = static_cast<uint64_t>(meshComp.meshHandle.id) << 32;
       outPacket.sortKeys.PushBack(sortKey);
-    }
+    });
   }
 
   void Sort(RenderPacket &packet) {

@@ -30,6 +30,9 @@ public:
 
   auto Initialize(const WindowProps &props) -> EStatusCode override {
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+#ifdef WAYLAND_CLIENT_H
+    glfwWindowHintString(GLFW_WAYLAND_APP_ID, "avalon");
+#endif // WAYLAND_CLIENT_H
     m_window = glfwCreateWindow(props.width, props.height, props.title, nullptr,
                                 nullptr);
 
@@ -37,6 +40,8 @@ public:
       avalon::Error("[GlfwWindow]: Failed to create GLFW window!");
       return EStatusCode::WindowError;
     }
+
+    glfwSetWindowAspectRatio(m_window, props.width, props.height);
 
     int width, height;
     glfwGetFramebufferSize(m_window, &width, &height);

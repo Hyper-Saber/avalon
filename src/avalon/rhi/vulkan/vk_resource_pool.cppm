@@ -38,6 +38,25 @@ public:
         FindMemoryType(memRequirements.memoryTypeBits,
                        ToVkMemoryPropertyFlags(info.memoryProperty));
 
+    if (memoryTypeIndex == kInvalidMemoryTypeIndex &&
+        (info.memoryProperty & EMemoryProperty::DeviceLocal) !=
+            EMemoryProperty::None) {
+      auto fallback = info.memoryProperty & ~EMemoryProperty::DeviceLocal;
+      if (fallback != EMemoryProperty::None) {
+        memoryTypeIndex = FindMemoryType(memRequirements.memoryTypeBits,
+                                         ToVkMemoryPropertyFlags(fallback));
+
+        Warn("[Vulkan] Failed to allocate DeviceLocal memory for buffer. "
+             "Falling back to System RAM (HostVisible).");
+      }
+    }
+
+    if (memoryTypeIndex == kInvalidMemoryTypeIndex) {
+      vkDestroyBuffer(m_device, buffer, nullptr);
+      avalon::Error("[Vulkan] Failed to find suitable memory type for buffer!");
+      return {};
+    }
+
     AVALON_ASSERT(memoryTypeIndex != kInvalidMemoryTypeIndex);
     VkMemoryAllocateInfo allocInfo{
         .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,

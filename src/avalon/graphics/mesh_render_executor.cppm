@@ -14,17 +14,13 @@ export namespace avalon::graphics {
 
 class MeshRenderExecutor {
 public:
-  void Execute(rhi::ICommandBuffer &cmd, rhi::PipelineHandle pipeline,
-               const RenderPacket &packet) {
-    binded = false;
+  void Execute(rhi::ICommandBuffer &cmd, const RenderPacket &packet) {
     if (packet.IsEmpty())
       return;
 
     rhi::BufferHandle lastVBO;
     rhi::BufferHandle lastIBO;
 
-    cmd.BindPipeline(pipeline);
-    binded = true;
     const size_t instanceCount = packet.meshHandles.GetSize();
     for (size_t i = 0; i < instanceCount; i++) {
       auto mesh = GetMeshManager().Resolve(packet.meshHandles[i]);
@@ -43,20 +39,12 @@ public:
         lastIBO = currentIBO;
       }
 
-      auto model = packet.transforms[i].GetMatrix();
-
       cmd.PushConstants(rhi::EShaderStage::Vertex, 0, sizeof(Matrix4x4),
-                        &model);
+                        &packet.worldMatrices[i]);
 
-      if (!binded) {
-        Debug("WTF");
-      }
       cmd.DrawIndexed(mesh->GetIndexCount(), 1, 0, 0, 0);
     }
   }
-
-private:
-  bool binded = false;
 };
 
 } // namespace avalon::graphics

@@ -9,6 +9,7 @@ import avalon.rhi;
 import avalon.graphics;
 import avalon.ecs;
 import avalon.shader;
+import avalon.scene;
 export import :utils;
 
 export namespace avalon {
@@ -46,12 +47,13 @@ private:
   PluginInstance<window::IWindow> m_window;
   PluginInstance<rhi::IRhi> m_rhi;
   UniquePtr<graphics::Renderer> m_renderer;
-  UniquePtr<ecs::World> m_world;
+  UniquePtr<scene::Scene> m_scene;
   rhi::PipelineHandle m_pipeline;
   rhi::RenderPassHandle m_renderPass;
   graphics::MeshHandle m_mesh;
 
   ecs::Entity m_model;
+  ecs::Entity m_camera;
 
   std::chrono::steady_clock::time_point m_lastFrameTime;
   float m_deltaTime = 0.0f;

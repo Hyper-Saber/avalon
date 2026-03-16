@@ -3,7 +3,7 @@ module;
 export module avalon.shader:shader_manager;
 
 import avalon.core;
-import :shader_types;
+import :shader;
 import :shader_compiler;
 import :serialization;
 
@@ -13,7 +13,7 @@ class ShaderManager final : public NonCopyable,
                             public mem::AutoDestroyable<ShaderManager> {
 public:
   AVALON_SHADER_API ShaderManager(rhi::IRhi &rhi) : m_rhi(rhi) {
-    m_compiler.Initialize();
+    m_compiler = MakeUnique<ShaderCompiler>();
   }
 
   AVALON_SHADER_API ~ShaderManager() override = default;
@@ -46,7 +46,7 @@ public:
             },
     };
 
-    auto binaryCode = m_compiler.Compile(desc);
+    auto binaryCode = m_compiler->Compile(desc);
 
     auto handle = m_shaderPool.Create(std::move(binaryCode));
     m_shaderCache.Insert(pathHash, handle);
@@ -59,7 +59,7 @@ public:
 
 private:
   rhi::IRhi &m_rhi;
-  ShaderCompiler m_compiler;
+  UniquePtr<ShaderCompiler> m_compiler;
   HashMap<StringId, Handle<Shader>> m_shaderCache;
   mem::ResourcePool<Shader> m_shaderPool;
 };

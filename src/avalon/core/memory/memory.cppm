@@ -51,12 +51,11 @@ public:
                   m_lifecycleState == State::Created);
   }
 
-  virtual void Destroy() = 0;
-
-  virtual bool Initialize() { return true; }
-
 protected:
   friend class LifeCycle;
+
+  virtual void Destroy() = 0;
+  virtual bool Initialize() { return true; }
 
   enum class State { Created, Initialized, Invalidated };
   State m_lifecycleState = State::Created;

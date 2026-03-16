@@ -1,5 +1,6 @@
 module;
-#include <algorithm>
+#include <debug/assert.hpp>
+#include <utility>
 #include <vulkan/vulkan.h>
 export module avalon.rhi.vulkan:pipeline_manager;
 
@@ -9,6 +10,7 @@ import avalon.rhi;
 import :pipeline_builder;
 import :shader_module_cache;
 import :pipeline_layout_cache;
+import :descriptor_set_layout_cache;
 import :utils;
 
 namespace avalon::rhi {
@@ -19,6 +21,7 @@ public:
   PipelineManager(VkDevice device, IRenderResourceProvider &provider)
       : m_device(device), m_resourceProvider(provider) {
     m_shaderModuleCache = MakeUnique<ShaderModuleCache>(device);
+    m_descriptorSetLayoutCache = MakeUnique<DescriptorSetLayoutCache>(device);
     m_pipelineLayoutCache = MakeUnique<PipelineLayoutCache>(device);
   }
 
@@ -114,43 +117,44 @@ private:
       builder.AddShaderStage(stageInfo.stage, stageInfo.entryName, module);
     }
 
-    uint32_t maxSet = 0;
-    for (const auto &binding : info.descriptorSetLayoutBindings) {
-      maxSet = std::max(maxSet, binding.set);
-    }
+    Array<VkDescriptorSetLayout> vkSetLayouts;
+    Array<DescriptorSetLayoutMeta> meta;
+    uint32_t startIdx = 0;
+    uint32_t set = info.descriptorSetLayoutBindings.IsEmpty()
+                       ? 0
+                       : info.descriptorSetLayoutBindings[0].set;
+    auto total = info.descriptorSetLayoutBindings.GetSize();
+    for (uint32_t i = 0; i <= total; ++i) {
+      bool isEnd = (i == total);
+      if (isEnd || info.descriptorSetLayoutBindings[i].set != set) {
+        auto subSpan =
+            info.descriptorSetLayoutBindings.Subspan(startIdx, i - startIdx);
+        if (!subSpan.IsEmpty()) {
+          while (vkSetLayouts.GetSize() < set) {
+            vkSetLayouts.PushBack(VK_NULL_HANDLE);
+          }
 
-    Array<Array<VkDescriptorSetLayoutBinding>> setGroups(maxSet + 1);
-    for (const auto &binding : info.descriptorSetLayoutBindings) {
-      setGroups[binding.set].PushBack({
-          .binding = binding.binding,
-          .descriptorType = ToVkDescriptorType(binding.type),
-          .descriptorCount = binding.count,
-          .stageFlags = ToVkShaderStageFlags(binding.visibleStages),
-      });
-    }
+          Span<const VkDescriptorSetLayoutBinding> vkBindings;
+          auto setLayout =
+              m_descriptorSetLayoutCache->GetOrCreate(subSpan, vkBindings);
+          if (setLayout == VK_NULL_HANDLE)
+            return {};
+          vkSetLayouts.PushBack(setLayout);
+          meta.PushBack(
+              DescriptorSetLayoutMeta(subSpan, vkBindings, setLayout));
+        }
+        if (isEnd) {
+          break;
+        }
 
-    Array<VkDescriptorSetLayout> setLayouts(setGroups.GetSize());
-    uint32_t i = 0;
-    for (const auto &group : setGroups) {
-      VkDescriptorSetLayoutCreateInfo info{
-          .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-          .bindingCount = static_cast<uint32_t>(group.GetSize()),
-          .pBindings = group.GetData(),
-      };
-      VkDescriptorSetLayout setLayout = VK_NULL_HANDLE;
-      auto vkResult =
-          vkCreateDescriptorSetLayout(m_device, &info, nullptr, &setLayout);
-      if (vkResult != VK_SUCCESS) {
-        Error(
-            "[Vulkan]: Failed to create descriptor set layout! Error code: {}",
-            ToView(vkResult));
-        return {};
+        AVALON_ASSERT(info.descriptorSetLayoutBindings[i].set > set);
+
+        set = info.descriptorSetLayoutBindings[i].set;
+        startIdx = i;
       }
-
-      setLayouts[i++] = setLayout;
     }
 
-    i = 0;
+    uint32_t i = 0;
     Array<VkPushConstantRange> ranges(info.pushConstantRanges.GetSize());
     for (const auto &range : info.pushConstantRanges) {
       ranges[i] = {
@@ -161,13 +165,13 @@ private:
     }
 
     VkPushConstantRange range;
-    auto layout = m_pipelineLayoutCache->GetOrCreateLayout(setLayouts, ranges);
+    auto layout =
+        m_pipelineLayoutCache->GetOrCreateLayout(vkSetLayouts, ranges);
     auto pipeline = builder.Build(m_device, layout);
     if (pipeline == VK_NULL_HANDLE)
       return {};
 
-    return m_pipelinePool.Create(m_device, pipeline, layout,
-                                 std::move(setLayouts));
+    return m_pipelinePool.Create(m_device, pipeline, layout, std::move(meta));
   }
 
   VkDevice m_device;
@@ -176,6 +180,7 @@ private:
   HashMap<PipelineKey, Handle<PipelineResource>, PipelineKeyHasher>
       m_pipelineCaches;
   UniquePtr<ShaderModuleCache> m_shaderModuleCache;
+  UniquePtr<DescriptorSetLayoutCache> m_descriptorSetLayoutCache;
   UniquePtr<PipelineLayoutCache> m_pipelineLayoutCache;
 };
 } // namespace avalon::rhi

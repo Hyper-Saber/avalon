@@ -4,10 +4,13 @@ export module avalon.graphics:opaque_pass;
 import avalon.core;
 import :mesh_render_executor;
 import :render_pass;
+import :types;
+
+namespace {
+constexpr avalon::StringView kOpaquePassName = "OpaquePass";
+}
 
 export namespace avalon::graphics {
-
-constexpr StringView kOpaquePassName = "OpaquePass";
 
 class AVALON_GRAPHICS_API OpaquePass final : public RenderPass<OpaquePass> {
 public:
@@ -34,7 +37,10 @@ public:
     context.cmd.SetViewport(viewport);
     context.cmd.SetScissor(info.renderArea);
 
-    m_executor.Execute(context.cmd, m_pipeline, packet);
+    context.cmd.BindPipeline(m_pipeline);
+    if (context.globalSet.IsValid())
+      context.cmd.BindDescriptorSet(0, {&context.globalSet, 1});
+    m_executor.Execute(context.cmd, packet);
 
     context.cmd.EndRenderPass();
   }

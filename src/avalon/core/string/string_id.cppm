@@ -5,12 +5,11 @@ export module avalon.core:string_id;
 import :hash;
 import :constants;
 import :string_view;
+import :string_registry;
 
 export namespace avalon {
 
-#ifdef AVALON_DEBUG
-void RegisterStringId(HashType id, StringView str) noexcept;
-#endif
+class String;
 
 class StringId {
 public:
@@ -21,10 +20,10 @@ public:
       : m_id(Hash::Compute(str.GetData(), str.GetSize())) {
 
     if (!std::is_constant_evaluated()) {
-#ifdef AVALON_DEBUG
-      if (str.GetData())
-        RegisterStringId(m_id, str);
-#endif
+      if constexpr (debug::kIsDebug) {
+        if (str.GetData())
+          RegisterStringId(m_id, str);
+      }
     }
   }
 
@@ -44,6 +43,8 @@ public:
   constexpr bool IsValid() const noexcept { return m_id != 0; }
 
   HashType GetHash() const noexcept { return m_id; }
+
+  String Resolve();
 
 private:
   HashType m_id;

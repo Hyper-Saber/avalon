@@ -1,4 +1,5 @@
 module;
+#include <array>
 #include <cstdint>
 #include <debug/assert.hpp>
 #include <vulkan/vulkan.h>
@@ -93,10 +94,12 @@ public:
     if (m_lastBoundPipeline == handle)
       return;
 
-    VkPipeline pipeline = m_resourceProvider.GetPipeline(handle).pipeline;
+    auto& res = m_resourceProvider.GetPipeline(handle);
+    VkPipeline pipeline = res.pipeline;
     vkCmdBindPipeline(
         m_cmd, VkPipelineBindPoint::VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
     m_lastBoundPipeline = handle;
+    m_layout = res.pipelineLayout;
   }
 
   void BindVertexBuffer(uint32_t firstBinding, uint32_t bindingCount,
@@ -131,12 +134,27 @@ public:
     vkCmdBindIndexBuffer(m_cmd, buffer, offset, indexType);
   }
 
+  void BindDescriptorSet(uint32_t firstSet,
+                         Span<const DescriptorSetHandle> sets) override {
+    if (sets.IsEmpty())
+      return;
+
+    Array<VkDescriptorSet> vkSets;
+
+    for (const auto &handle : sets) {
+      auto &setResouce = m_resourceProvider.GetDescriptorSet(handle);
+      vkSets.PushBack(setResouce.descriptorSet);
+    }
+
+    vkCmdBindDescriptorSets(m_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_layout,
+                            firstSet, vkSets.GetSize(), vkSets.GetData(), 0,
+                            nullptr);
+  }
+
   void PushConstants(EShaderStage stage, uint32_t offset, uint32_t size,
                      const void *pData) override {
     VkShaderStageFlags vkStage = ToVkShaderStageFlags(stage);
-    auto layout =
-        m_resourceProvider.GetPipeline(m_lastBoundPipeline).pipelineLayout;
-    vkCmdPushConstants(m_cmd, layout, vkStage, offset, size, pData);
+    vkCmdPushConstants(m_cmd, m_layout, vkStage, offset, size, pData);
   }
 
   void UpdateBuffer(BufferHandle handle, uint64_t offset, const void *pData,
@@ -175,6 +193,8 @@ private:
   const VkCommandBuffer m_cmd;
   IRenderResourceProvider &m_resourceProvider;
   PipelineHandle m_lastBoundPipeline;
+  VkPipelineLayout m_layout;
+  
 };
 
 } // namespace avalon::rhi

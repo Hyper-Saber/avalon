@@ -11,9 +11,11 @@ export namespace avalon::rhi {
 
 using BufferHandle = Handle<class BufferTag>;
 using TextureHandle = Handle<class TextureTag>;
+using SamplerHandle = Handle<class SamplerTag>;
 using PipelineHandle = Handle<class PipelineTag>;
 using RenderPassHandle = Handle<class RenderPassTag>;
 using FrameBufferHandle = Handle<class FramebufferTag>;
+using DescriptorSetHandle = Handle<class DescriptorSetTag>;
 
 enum class EFormat {
   Undefined,
@@ -177,6 +179,13 @@ template <> struct EnableBitmaskOperators<EBufferUsage> : std::true_type {};
 template <> struct EnableBitmaskOperators<EShaderStage> : std::true_type {};
 template <> struct EnableBitmaskOperators<EMemoryProperty> : std::true_type {};
 
+struct DeviceCapabilities {
+  struct Limits {
+    size_t minUniformBufferOffsetAlignment;
+    size_t minStorageBufferOffsetAlignment;
+  } limits;
+};
+
 struct QueueRequirement {
   bool isRequireGraphics = false;
   bool isRequireCompute = false;
@@ -274,6 +283,8 @@ struct TextureCreateInfo {
   EFormat format = EFormat::B8G8R8A8_SRGB;
 };
 
+struct DescriptorSetAllocInfo {};
+
 struct VertexBinding {
   uint32_t binding;
   uint32_t stride;
@@ -340,6 +351,7 @@ struct ShaderStageInfo {
 };
 
 struct DescriptorSetLayoutBinding {
+  StringId nameHash;
   uint32_t binding;
   uint32_t set;
   EDescriptorType type;
@@ -379,6 +391,14 @@ struct PushConstantRange {
     return visibleStages == other.visibleStages && offset == other.offset &&
            size == other.size;
   }
+};
+
+struct BufferWriteInfo {
+  BufferHandle buffer;
+  uint64_t offset = 0;
+  uint64_t range = 0;
+
+  static BufferWriteInfo Whole(BufferHandle h) { return {h, 0, 0}; }
 };
 
 struct PipelineCreateInfo {

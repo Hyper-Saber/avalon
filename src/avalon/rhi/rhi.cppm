@@ -6,6 +6,8 @@ export module avalon.rhi;
 export import :command_buffer;
 export import :types;
 export import :utils;
+export import :descriptor_writer;
+
 import avalon.core;
 
 export namespace avalon::rhi {
@@ -17,8 +19,12 @@ public:
                           uint32_t width = 0, uint32_t height = 0)
       -> ERhiResult = 0;
 
+  virtual auto GetSwapchainImageFormat() const -> EFormat = 0;
+  virtual auto GetMainCommandBuffer() const -> ICommandBuffer * = 0;
+  virtual uint32_t GetCurrentFrameIndex() const = 0;
+  virtual uint32_t GetMaxFrameInFlight() const = 0;
+  virtual auto GetCapabilities() const -> DeviceCapabilities = 0;
   virtual void SetSwapchainRenderPass(RenderPassHandle) = 0;
-  virtual auto GetSwapchainImageFormat() -> EFormat = 0;
 
   virtual auto RecreateSwapchain(RenderPassHandle handle, uint32_t width,
                                  uint32_t height) -> ERhiResult = 0;
@@ -31,7 +37,8 @@ public:
   virtual auto CreateBuffer(const BufferCreateInfo &info) -> BufferHandle = 0;
   virtual void ReleaseBuffer(BufferHandle handle) = 0;
 
-  virtual auto GetMainCommandBuffer() -> ICommandBuffer * = 0;
+  virtual auto CreateDescriptorWriter(PipelineHandle handle, uint32_t set)
+      -> IDescriptorWriter * = 0;
 
   virtual void
   ExcuteOnce(EQueueType queueType,

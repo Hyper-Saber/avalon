@@ -31,10 +31,6 @@ void ExtractVertexInputs(SpvReflectShaderModule *pModule,
 
     outReflectionData.inputAttributes.PushBack(attr);
   }
-  std::sort(
-      outReflectionData.inputAttributes.begin(),
-      outReflectionData.inputAttributes.end(),
-      [](const auto &a, const auto &b) { return a.location < b.location; });
 }
 
 void ExtractDescriptorBindings(SpvReflectShaderModule *module,
@@ -239,6 +235,7 @@ private:
 };
 
 class ShaderCompiler : public mem::AutoDestroyable<ShaderCompiler> {
+
 public:
   bool Initialize() {
     HRESULT hr =

@@ -5,12 +5,13 @@ VK_PUSH_CONSTANT ModelData push;
 struct VSInput {
   VK_LOCATION(0) float3 position : POSITION;
   VK_LOCATION(1) float2 uv : TEXCOORD;
-  VK_LOCATION(2) float4 color : COLOR;
+  VK_LOCATION(2) float3 color : COLOR;
+  VK_LOCATION(3) float3 normal : NORMAL;
 };
 
 struct VSOutput {
   float4 clipPos : SV_POSITION;
-  VK_LOCATION(0) float4 color : COLOR;
+  VK_LOCATION(0) float3 color : COLOR;
   VK_LOCATION(1) float2 uv : TEXCOORD;
 };
 
@@ -27,5 +28,5 @@ VSOutput VsMain(VSInput input) {
 
 float4 FsMain(VSOutput input) : SV_TARGET {
   // return float4(1, 1, 1, 1);
-  return input.color;
+  return float4(input.color, 1);
 }

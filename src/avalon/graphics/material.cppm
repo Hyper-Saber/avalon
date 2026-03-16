@@ -1,9 +1,9 @@
 module;
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <debug/assert.hpp>
 #include <utility>
-#include <algorithm>
 export module avalon.graphics:material;
 import avalon.shader;
 import avalon.core;
@@ -131,13 +131,12 @@ private:
         .isInstanceData = false,
     });
 
-  std::sort(m_vertexAttributes.begin(), m_vertexAttributes.end(),
-            [](auto &a, auto &b) { return a.location < b.location; });
+    std::sort(m_vertexAttributes.begin(), m_vertexAttributes.end(),
+              [](auto &a, auto &b) { return a.location < b.location; });
 
     m_vertexLayout.attributes = {m_vertexAttributes.GetData(),
                                  m_vertexAttributes.GetSize()};
     m_vertexLayout.stride = ComputeStride();
-
   }
 
   uint32_t ComputeStride() {
@@ -158,7 +157,7 @@ private:
           actualStride += sizeof(Vec2);
           break;
         case EVertexSemantic::Color:
-          actualStride += sizeof(Vec4);
+          actualStride += sizeof(Vec3);
           break;
         case EVertexSemantic::Normal:
           actualStride += sizeof(Vec3);

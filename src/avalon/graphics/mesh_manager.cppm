@@ -64,7 +64,7 @@ void InterleaveVertexData(const MeshData &data, const VertexLayout &layout,
         std::memcpy(targetAddr, &data.texCoords[i], sizeof(Vec2));
         break;
       case EVertexSemantic::Color:
-        std::memcpy(targetAddr, &data.colors[i], sizeof(Vec4));
+        std::memcpy(targetAddr, &data.colors[i], sizeof(Vec3));
         break;
       case EVertexSemantic::Normal:
         std::memcpy(targetAddr, &data.normals[i], sizeof(Vec3));

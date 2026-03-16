@@ -25,7 +25,7 @@ struct MeshData {
 
   Array<Vec3> positions;
   Array<uint32_t> indices;
-  Array<Vec4> colors;
+  Array<Vec3> colors;
   Array<Vec3> normals;
   Array<Vec2> texCoords;
   Array<SubMesh> subMeshs;
@@ -34,7 +34,6 @@ struct MeshData {
     float min[3];
     float max[3];
   } bounds;
-
 };
 
 class AVALON_GRAPHICS_API Mesh final : public mem::AutoDestroyable<Mesh> {

@@ -4,5 +4,5 @@ target ("test.utils")
 
 target ("test.geometry")
     set_kind("binary")
-    add_files("unit/test_geometry.cpp")
+    add_files("unit/test_geometry/*.cppm")
     add_deps("avalon.engine", "test.utils")

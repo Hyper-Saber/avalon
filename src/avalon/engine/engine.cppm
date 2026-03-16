@@ -10,9 +10,13 @@ import avalon.graphics;
 import avalon.ecs;
 import avalon.shader;
 import avalon.scene;
+export import :application;
 export import :utils;
 
 export namespace avalon {
+
+constexpr StringView kShaderFolderPath = "/tests/shaders/";
+constexpr StringView kShaderFolderVirtualPath = "shader:";
 
 struct AVALON_ENGINE_API EngineConfig {
   rhi::DeviceRequirement renderDeviceRequirement;
@@ -25,8 +29,20 @@ public:
 
   ~Engine() = default;
 
-  auto Initialize(const EngineConfig &config)
+  auto Initialize(const EngineConfig &config, UniquePtr<IApplication> &&userApp)
       -> std::expected<void, EStatusCode>;
+
+  void SetRenderer(UniquePtr<graphics::Renderer> &&renderer) {
+    m_renderer = std::move(renderer);
+  }
+
+  void SetMainPass(rhi::RenderPassHandle pass) {
+    m_rhi->SetSwapchainRenderPass(pass);
+    m_renderPass = pass;
+  }
+
+  float GetTotalTime() const { return m_totalTime; }
+
   void Run();
 
   void Clear();
@@ -48,16 +64,14 @@ private:
   PluginInstance<rhi::IRhi> m_rhi;
   UniquePtr<graphics::Renderer> m_renderer;
   UniquePtr<scene::Scene> m_scene;
-  rhi::PipelineHandle m_pipeline;
-  rhi::RenderPassHandle m_renderPass;
-  graphics::MeshHandle m_mesh;
 
-  ecs::Entity m_model;
-  ecs::Entity m_camera;
+  rhi::RenderPassHandle m_renderPass;
+
+  UniquePtr<IApplication> m_userApp;
 
   std::chrono::steady_clock::time_point m_lastFrameTime;
   float m_deltaTime = 0.0f;
-
+  float m_totalTime = 0.0f;
   float m_fpsTimer = 0.f;
   int m_frameCount = 0;
   int m_lastFps = 0;

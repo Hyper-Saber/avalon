@@ -13,6 +13,7 @@ import avalon.rhi;
 import avalon.shader;
 import avalon.graphics;
 import :utils;
+import :application;
 
 namespace avalon {
 
@@ -29,12 +30,11 @@ Engine &Engine::Get() {
 constexpr StringView kWindowPluginPath = "plugins/libavalon.window.glfw";
 constexpr StringView kVkRhiPluginPath = "plugins/libavalon.rhi.vulkan";
 
-constexpr StringView kShaderFolderPath = "/tests/shaders/";
-constexpr StringView kShaderFolderVirtualPath = "shader:";
-
-auto Engine::Initialize(const EngineConfig &config)
+auto Engine::Initialize(const EngineConfig &config,
+                        UniquePtr<IApplication> &&userApp)
     -> std::expected<void, EStatusCode> {
   m_config = config;
+  m_userApp = std::move(userApp);
 
   avalon::InitializeLogger();
 
@@ -82,61 +82,8 @@ auto Engine::Initialize(const EngineConfig &config)
   GetContext().RegisterService<graphics::MeshManager>(
       EEngineService::MeshManager, *m_rhi.Get());
 
-  rhi::Extent2D extent = {width, height};
-
-  rhi::AttachmentDescription colorAttachment{
-      .format = m_rhi->GetSwapchainImageFormat(),
-      .loadOp = rhi::EAttachmentLoadOp::Clear,
-      .storeOp = rhi::EAttachmentStoreOp::Store,
-      .initialLayout = rhi::EResourceLayout::Undefined,
-      .finalLayout = rhi::EResourceLayout::Present,
-  };
-
-  rhi::AttachmentDescription depthAttachment{
-      .format = rhi::EFormat::D32_SFLOAT_S8_UINT,
-      .loadOp = rhi::EAttachmentLoadOp::Clear,
-      .storeOp = rhi::EAttachmentStoreOp::DontCare,
-      .initialLayout = rhi::EResourceLayout::Undefined,
-      .finalLayout = rhi::EResourceLayout::DepthStencilAttachment,
-  };
-
-  rhi::RenderPassCreateInfo passCreateInfo{
-      .colorAttachments = {colorAttachment},
-      .depthAttachment = depthAttachment,
-      .hasDepth = true,
-  };
-
-  m_renderPass = m_rhi->CreateRenderPass(passCreateInfo);
-  m_rhi->SetSwapchainRenderPass(m_renderPass);
-
-  auto shaderHandle = graphics::GetShaderManager().GetOrCreateShader(
-      shaderVirtualFolderPath / StringView("test.hlsl"));
-  auto material = graphics::Material(shaderHandle);
-
-  auto pipelineCreateInfo = material.GetPipelineCreateInfo();
-  pipelineCreateInfo.renderPassHandle = m_renderPass;
-
-  m_pipeline = m_rhi->CreatePipeline(pipelineCreateInfo);
-
-  m_renderer = MakeUnique<graphics::Renderer>(*m_rhi.Get(), m_pipeline);
-
-  m_renderer->AddPass(
-      MakeUnique<graphics::OpaquePass>(m_pipeline, m_renderPass, extent));
-
   m_scene = MakeUnique<scene::Scene>();
-  m_model = CreateGeometryEntity(material);
-
-  auto &world = m_scene->GetWorld();
-  m_camera = world.CreateEntity();
-  world.AddComponent<ecs::CameraComponent>(m_camera);
-  auto transform = Transform{
-      .position = {0, 0, 5},
-      .rotation = {0, 180, 0},
-      .scale = Vec3::One(),
-  };
-  world.AddComponent<ecs::TransformComponent>(m_camera, transform);
-  world.AddSystem<ecs::CameraSystem>();
-
+  m_userApp->OnInitialize(*m_scene.Get(), *m_rhi.Get(), {width, height});
   return {};
 }
 
@@ -211,37 +158,29 @@ auto Engine::ExecuteFrame() -> rhi::ERhiResult {
 }
 
 void Engine::Update() {
-  static float totalTime = 0.f;
-  totalTime += m_deltaTime;
+  m_totalTime += m_deltaTime;
 
   m_scene->GetWorld().Update(m_deltaTime);
 
-  auto transform =
-      m_scene->GetWorld().GetComponent<ecs::TransformComponent>(m_model);
-  Vec3 rotation;
-  rotation.z = totalTime * 90;
-  rotation.x = totalTime * 60;
-  rotation.y = totalTime * 30;
-  Vec3 position;
-  position.x = std::sin(totalTime) * 0.5f;
-  position.y = std::cos(totalTime) * 0.5f;
-  Vec3 scale;
-  scale = Vec3::One() * std::sin(totalTime) * 0.4f + 0.8f;
-  transform->SetPosition(position);
-  // transform->SetScale(scale);
-  transform->SetRotation(rotation);
+  m_userApp->OnUpdate(m_deltaTime, *m_scene.Get());
 }
 
 bool Engine::TryHandleRhiError(rhi::ERhiResult error) {
   switch (error) {
   case rhi::ERhiResult::SwapchainOutOfDate: {
     uint32_t width, height;
+
     m_window->GetFrameBufferSize(width, height);
     if (width == 0 || height == 0)
       break;
     avalon::Info("[Engine]: Swapchain out of date, resizing swapchain...");
     auto res = m_rhi->RecreateSwapchain(m_renderPass, width, height);
     m_renderer->OnResize({width, height});
+    auto view = m_scene->GetWorld().GetView<ecs::CameraComponent>();
+    view.ForEach([&](ecs::Entity entity, ecs::CameraComponent &camera) {
+      camera.SetAspectRatio(width / static_cast<float>(height));
+    });
+
     if (res != rhi::ERhiResult::Success) {
       avalon::Error("[Engine]: Failed to recreate swapchain!");
       return false;
@@ -260,60 +199,6 @@ bool Engine::TryHandleRhiError(rhi::ERhiResult error) {
     return false;
   }
   return true;
-}
-
-ecs::Entity Engine::CreateGeometryEntity(const graphics::Material &material) {
-  graphics::MeshData data{.positions{// Front face (Z = 0.5)
-                                     {-0.5f, -0.5f, 0.5f},
-                                     {0.5f, -0.5f, 0.5f},
-                                     {0.5f, 0.5f, 0.5f},
-                                     {-0.5f, 0.5f, 0.5f},
-                                     // Back face (Z = -0.5)
-                                     {-0.5f, -0.5f, -0.5f},
-                                     {0.5f, -0.5f, -0.5f},
-                                     {0.5f, 0.5f, -0.5f},
-                                     {-0.5f, 0.5f, -0.5f}},
-                          .indices{// Front
-                                   0, 1, 2, 2, 3, 0,
-                                   // Right
-                                   1, 5, 6, 6, 2, 1,
-                                   // Back
-                                   7, 6, 5, 5, 4, 7,
-                                   // Left
-                                   4, 0, 3, 3, 7, 4,
-                                   // Top
-                                   3, 2, 6, 6, 7, 3,
-                                   // Bottom
-                                   4, 5, 1, 1, 0, 4},
-                          .colors{
-                              {1, 0, 0, 1},
-                              {0, 1, 0, 1},
-                              {0, 0, 1, 1},
-                              {1, 1, 0, 1}, // 前四个顶点颜色
-                              {1, 0, 1, 1},
-                              {0, 1, 1, 1},
-                              {1, 1, 1, 1},
-                              {0, 0, 0, 1} // 后四个顶点颜色
-                          },
-                          .texCoords{{0.f, 0.f},
-                                     {1.f, 0.f},
-                                     {1.f, 1.f},
-                                     {0.f, 1.f},
-                                     {0.f, 0.f},
-                                     {1.f, 0.f},
-                                     {1.f, 1.f},
-                                     {0.f, 1.f}}};
-
-  m_mesh =
-      graphics::GetMeshManager().CreateMesh(data, material.GetVertexLayout());
-
-  auto entity = m_scene->GetWorld().CreateEntity();
-  Transform transform;
-  m_scene->GetWorld()
-      .AddComponent<ecs::MeshComponent>(entity, m_mesh)
-      ->AddComponent<ecs::TransformComponent>(entity, transform);
-
-  return entity;
 }
 
 } // namespace avalon

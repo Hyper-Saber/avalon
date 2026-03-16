@@ -2,7 +2,7 @@ module;
 #include <expected>
 #include <iostream>
 
-export module test.geometry;
+export module test;
 
 import test.utils;
 import avalon.engine;
@@ -45,7 +45,7 @@ public:
     Engine::Get().SetMainPass(renderPass);
 
     auto shaderHandle = graphics::GetShaderManager().GetOrCreateShader(
-        Path(kShaderFolderVirtualPath) / StringView("test.hlsl"));
+        Path(vfs::kShaderFolderVirtualPath) / StringView("lit.hlsl"));
     auto material = graphics::Material(shaderHandle);
 
     auto pipelineCreateInfo = material.GetPipelineCreateInfo();
@@ -101,14 +101,14 @@ private:
                                      // Bottom
                                      4, 5, 1, 1, 0, 4},
                             .colors{
-                                {1, 0, 0, 1},
-                                {0, 1, 0, 1},
-                                {0, 0, 1, 1},
-                                {1, 1, 0, 1}, // 前四个顶点颜色
-                                {1, 0, 1, 1},
-                                {0, 1, 1, 1},
                                 {1, 1, 1, 1},
-                                {0, 0, 0, 1} // 后四个顶点颜色
+                                {1, 1, 1, 1},
+                                {1, 1, 1, 1},
+                                {1, 1, 1, 1}, // 前四个顶点颜色
+                                {1, 1, 1, 1},
+                                {1, 1, 1, 1},
+                                {1, 1, 1, 1},
+                                {1, 1, 1, 1} // 后四个顶点颜色
                             },
                             .texCoords{{0.f, 0.f},
                                        {1.f, 0.f},
@@ -155,7 +155,6 @@ void TestHelloTriangle() {
           },
       .windowProps =
           {
-              .title = "Hello Triangle Test",
               .width = 800,
               .height = 600,
           },
@@ -171,8 +170,7 @@ void TestHelloTriangle() {
 
   engine.Clear();
 
-  std::cout << "Hello Triangle Integration Test Finished Successfully!"
-            << std::endl;
+  std::cout << "Test Finished Successfully!" << std::endl;
 }
 
 extern "C++" int main() {

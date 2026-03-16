@@ -1,6 +1,6 @@
 module;
 #include <cmath>
-export module test.geometry:systems;
+export module test:systems;
 
 import avalon.core;
 import avalon.ecs;

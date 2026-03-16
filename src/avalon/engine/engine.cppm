@@ -13,10 +13,11 @@ import avalon.scene;
 export import :application;
 export import :utils;
 
-export namespace avalon {
-
+export namespace avalon::vfs {
 constexpr StringView kShaderFolderPath = "/tests/shaders/";
-constexpr StringView kShaderFolderVirtualPath = "shader:";
+}
+
+export namespace avalon {
 
 struct AVALON_ENGINE_API EngineConfig {
   rhi::DeviceRequirement renderDeviceRequirement;

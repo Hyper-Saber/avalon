@@ -286,19 +286,16 @@ public:
       }
 
       AddArg(L"-fspv-reflect");
-      AddArg(L"-D");
-      AddArg(L"VK_LOCATION(n)=[[vk::location(n)]]");
-
-      AddArg(L"-D");
-      AddArg(L"VK_PUSH_CONSTANT=[[vk::push_constant]]");
-
-      AddArg(L"-D");
-      AddArg(L"VK_BINDING(b, s)=[[vk::binding(b, s)]]");
-
       AddArg(L"-fvk-use-dx-layout");
-
       AddArg(L"-Fi");
       AddDynamicArg(Utf8ToWstring(desc.filePath.GetCStr()));
+
+      Path shaderPath;
+      auto res = vfs::GetVfs().GetAbsolute(
+          Path(vfs::kShaderFolderVirtualPath) / StringView("."), shaderPath);
+
+      AddArg(L"-I");
+      AddDynamicArg(Utf8ToWstring(shaderPath.GetCStr()));
 
       auto wEntryPoint = Utf8ToWstring(stageDesc.entryPointName.GetData());
       auto wProfile = GetTargetProfile(stageDesc.shaderStage, desc.level);
@@ -310,9 +307,12 @@ public:
 
       DxcPtr<IDxcResult> pResult;
 
+      DxcPtr<IDxcIncludeHandler> pIncludeHandler;
+      m_utils->CreateDefaultIncludeHandler(pIncludeHandler.GetAddressOf());
+
       auto hr = m_compiler->Compile(
           &sourceBuffer, reinterpret_cast<LPCWSTR *>(wArgs.data()),
-          static_cast<uint32_t>(wArgs.size()), nullptr,
+          static_cast<uint32_t>(wArgs.size()), pIncludeHandler.Get(),
           IID_PPV_ARGS(pResult.GetAddressOf()));
 
       if (FAILED(hr)) {

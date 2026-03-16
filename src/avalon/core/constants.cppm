@@ -3,6 +3,10 @@ export module avalon.core:constants;
 
 import :string_view;
 
+export namespace avalon::vfs {
+constexpr StringView kShaderFolderVirtualPath = "shader:";
+}
+
 export namespace avalon::platform {
 #ifdef _WIN32
 constexpr bool kIsWindows = true;

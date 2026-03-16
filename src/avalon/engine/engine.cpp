@@ -42,8 +42,8 @@ auto Engine::Initialize(const EngineConfig &config,
   auto device = vfs::VfsProvider::CreateDevice();
   GetContext().RegisterService<vfs::IVfs>(EEngineService::Vfs, std::move(vfs));
   auto root = vfs::FindProjectRoot(*device.Get());
-  auto shaderVirtualFolderPath = Path(kShaderFolderVirtualPath);
-  auto shaderFolderPath = root / kShaderFolderPath;
+  auto shaderVirtualFolderPath = Path(vfs::kShaderFolderVirtualPath);
+  auto shaderFolderPath = root / vfs::kShaderFolderPath;
   vfs::GetVfs().Mount(shaderVirtualFolderPath.GetString(), shaderFolderPath,
                       device.Get());
 

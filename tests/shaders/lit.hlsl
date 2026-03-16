@@ -1,15 +1,4 @@
-struct SceneGlobals {
-  float4x4 view;
-  float4x4 projection;
-  float4 position;
-};
-
-VK_BINDING(0, 0) ConstantBuffer<SceneGlobals> uSceneGlobals
-    : register(b0, space0);
-
-struct ModelData {
-  float4x4 model;
-};
+#include "common.hlsli"
 
 VK_PUSH_CONSTANT ModelData push;
 

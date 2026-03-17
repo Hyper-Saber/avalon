@@ -24,10 +24,10 @@ public:
   Entity CreateEntity() { return ++m_entityConuter; }
 
   template <typename T, typename... Args>
-  World *AddComponent(Entity entity, Args &&...args) {
+  World &AddComponent(Entity entity, Args &&...args) {
     auto &pool = GetPool<T>();
     pool.Upsert(entity, T(std::forward<Args>(args)...));
-    return this;
+    return *this;
   }
 
   template <typename T> T *GetComponent(Entity entity) {

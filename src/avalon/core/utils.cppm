@@ -20,7 +20,7 @@ constexpr T operator|(T lhs, T rhs) noexcept {
 
 template <typename T>
   requires EnableBitmaskOperators<T>::value
-constexpr T operator|=(T lhs, T rhs) noexcept {
+constexpr T operator|=(T &lhs, T rhs) noexcept {
   lhs = lhs | rhs;
   return lhs;
 }
@@ -34,7 +34,7 @@ constexpr T operator&(T lhs, T rhs) noexcept {
 
 template <typename T>
   requires EnableBitmaskOperators<T>::value
-constexpr T operator&=(T lhs, T rhs) noexcept {
+constexpr T operator&=(T &lhs, T rhs) noexcept {
   lhs = lhs & rhs;
   return lhs;
 }

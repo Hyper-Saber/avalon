@@ -21,4 +21,11 @@ struct SceneGlobals {
   LightData lightData;
 };
 
+enum class EPrimitiveType {
+  Cube,
+  Plane,
+  Quad,
+  Sphere,
+};
+
 } // namespace avalon::graphics

@@ -3,10 +3,13 @@ module;
 #include <cstdint>
 #include <cstring>
 #include <debug/assert.hpp>
+#include <utility>
 
 export module avalon.graphics:mesh_manager;
 
 import :mesh;
+import :types;
+import :primitive_generator;
 import avalon.core;
 
 using namespace avalon::rhi;
@@ -85,7 +88,32 @@ class AVALON_GRAPHICS_API MeshManager final
 public:
   explicit MeshManager(IRhi &rhi) : m_rhi(rhi) {}
 
-  MeshHandle CreateMesh(const MeshData &data, const VertexLayout &layout) {
+  MeshHandle GetDefaultMesh(EPrimitiveType primitiveType) {
+    if (m_defaultMeshes.Contains(primitiveType)) {
+      return *m_defaultMeshes.Get(primitiveType);
+    }
+
+    return CreateDefaultMesh(primitiveType);
+  }
+
+  MeshHandle CreateMesh(MeshData &&data) {
+    if (data.positions.IsEmpty() || data.indices.IsEmpty()) {
+      Error("[MeshManager]: Mesh data is invalid!");
+      return {};
+    }
+
+    return m_meshPool.Create(std::move(data));
+  }
+
+  bool UploadMesh(MeshHandle handle, const VertexLayout &layout) {
+    auto mesh = m_meshPool.Resolve(handle);
+    if (!mesh) {
+      Error("[MeshManager]: Invalid mesh handle! Handle: {}", handle.id);
+      return false;
+    }
+
+    auto data = mesh->GetData();
+
     if (!IsValid(data, layout))
       return {};
 
@@ -140,15 +168,39 @@ public:
     });
 
     m_rhi.ReleaseBuffer(stagingHandle);
-
-    return m_meshPool.Create(vHandle, iHandle, data.indices.GetSize(), iFormat);
+    mesh->Upload(vHandle, iHandle, iFormat);
+    return true;
   }
 
   Mesh *Resolve(MeshHandle handle) { return m_meshPool.Resolve(handle); }
 
 private:
+  MeshHandle CreateDefaultMesh(EPrimitiveType type) {
+    graphics::MeshData data;
+    switch (type) {
+    case EPrimitiveType::Cube:
+      data = PrimitiveGenerator::GenerateCube();
+      break;
+    case EPrimitiveType::Plane:
+      data = PrimitiveGenerator::GeneratePlane();
+      break;
+    case EPrimitiveType::Quad:
+      data = PrimitiveGenerator::GenerateQuad();
+      break;
+    case EPrimitiveType::Sphere:
+      data = PrimitiveGenerator::GenerateSphere();
+      break;
+    }
+
+    auto meshHandle = CreateMesh(std::move(data));
+    m_defaultMeshes.Insert(type, meshHandle);
+    return meshHandle;
+  }
+
   IRhi &m_rhi;
   mem::ResourcePool<Mesh> m_meshPool;
+
+  HashMap<EPrimitiveType, MeshHandle> m_defaultMeshes;
 };
 
 } // namespace avalon::graphics

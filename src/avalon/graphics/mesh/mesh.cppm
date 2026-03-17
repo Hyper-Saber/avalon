@@ -1,6 +1,7 @@
 module;
 #include <cstdint>
 #include <debug/assert.hpp>
+#include <utility>
 export module avalon.graphics:mesh;
 
 import avalon.core;
@@ -38,17 +39,40 @@ struct MeshData {
 
 class AVALON_GRAPHICS_API Mesh final : public mem::AutoDestroyable<Mesh> {
 public:
-  Mesh(BufferHandle vbo, BufferHandle ibo, uint32_t indexCount,
-       EFormat indexFormat)
-      : m_vertexBuffer(vbo), m_indexBuffer(ibo), m_indexCount(indexCount),
-        m_indexFormat(indexFormat) {}
+  void Upload(BufferHandle vbo, BufferHandle ibo, EFormat indexFormat) {
+    m_vertexBuffer = vbo;
+    m_indexBuffer = ibo;
+    m_indexFormat = indexFormat;
+    m_isUploaded = true;
+  }
 
-  BufferHandle GetVBO() const noexcept { return m_vertexBuffer; }
-  BufferHandle GetIBO() const noexcept { return m_indexBuffer; }
-  EFormat GetIndexFormat() const noexcept { return m_indexFormat; }
-  uint32_t GetIndexCount() const noexcept { return m_indexCount; }
+  Mesh(MeshData &&data) : m_data(std::move(data)), m_isUploaded(false), m_indexCount(m_data.indices.GetSize()) {}
+
+  auto GetData() const noexcept -> const MeshData & { return m_data; }
+
+  BufferHandle GetVBO() const noexcept {
+    AVALON_ASSERT(m_isUploaded);
+    return m_vertexBuffer;
+  }
+
+  BufferHandle GetIBO() const noexcept {
+    AVALON_ASSERT(m_isUploaded);
+    return m_indexBuffer;
+  }
+
+  uint32_t GetIndexCount() const noexcept {
+    AVALON_ASSERT(m_isUploaded);
+    return m_indexCount;
+  }
+
+  EFormat GetIndexFormat() const noexcept {
+    AVALON_ASSERT(m_isUploaded);
+    return m_indexFormat;
+  }
 
 private:
+  MeshData m_data;
+  bool m_isUploaded;
   BufferHandle m_vertexBuffer;
   BufferHandle m_indexBuffer;
   uint32_t m_indexCount;

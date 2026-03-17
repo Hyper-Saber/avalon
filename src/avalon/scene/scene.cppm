@@ -7,6 +7,7 @@ import avalon.core;
 import avalon.rhi;
 import avalon.graphics;
 import :components;
+import :utils;
 
 export namespace avalon::scene {
 class AVALON_SCENE_API Scene final : public mem::AutoDestroyable<Scene> {
@@ -23,13 +24,17 @@ public:
 
     auto view = m_world->GetView<ecs::LightComponent>();
     view.ForEach([&](ecs::Entity entity, ecs::LightComponent &light) {
-    globals.lightData.color = light.color;
-    globals.lightData.dirOrPos = light.directionOrPosition;
-    globals.lightData.type =
-        std::underlying_type_t<ELightType>(light.lightType);
+      globals.lightData.color = light.color;
+      globals.lightData.dirOrPos = light.directionOrPosition;
+      globals.lightData.type =
+          std::underlying_type_t<ELightType>(light.lightType);
     });
 
     renderer.Render(cmd, GetWorld(), globals);
+  }
+
+  auto CreatePrimitive(graphics::EPrimitiveType type) {
+    return Utils::CreatePrimitive(*m_world.Get(), type);
   }
 
 private:

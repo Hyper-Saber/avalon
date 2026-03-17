@@ -138,7 +138,7 @@ enum class EDescriptorType : uint32_t {
 
 enum class EAttachmentLoadOp { Load, Clear, DontCare };
 enum class EAttachmentStoreOp { Store, DontCare };
-enum class EMemoryProperty : uint8_t {
+enum class EMemoryProperty : uint32_t {
   None = 0,
   DeviceLocal = 1 << 0,
   HostVisible = 1 << 1,

@@ -60,7 +60,12 @@ public:
 
     Engine::Get().SetRenderer(std::move(renderer));
 
-    m_model = CreateGeometryEntity(scene, material);
+    m_model = scene.CreatePrimitive(graphics::EPrimitiveType::Cube);
+
+    auto meshComponent =
+        scene.GetWorld().GetComponent<ecs::MeshComponent>(m_model);
+    auto handle = meshComponent->meshHandle;
+    graphics::GetMeshManager().UploadMesh(handle, material.GetVertexLayout());
 
     auto &world = scene.GetWorld();
     m_camera = world.CreateEntity();
@@ -76,61 +81,6 @@ public:
   }
 
 private:
-  ecs::Entity CreateGeometryEntity(scene::Scene &scene,
-                                   const graphics::Material &material) {
-    graphics::MeshData data{.positions{// Front face (Z = 0.5)
-                                       {-0.5f, -0.5f, 0.5f},
-                                       {0.5f, -0.5f, 0.5f},
-                                       {0.5f, 0.5f, 0.5f},
-                                       {-0.5f, 0.5f, 0.5f},
-                                       // Back face (Z = -0.5)
-                                       {-0.5f, -0.5f, -0.5f},
-                                       {0.5f, -0.5f, -0.5f},
-                                       {0.5f, 0.5f, -0.5f},
-                                       {-0.5f, 0.5f, -0.5f}},
-                            .indices{// Front
-                                     0, 1, 2, 2, 3, 0,
-                                     // Right
-                                     1, 5, 6, 6, 2, 1,
-                                     // Back
-                                     7, 6, 5, 5, 4, 7,
-                                     // Left
-                                     4, 0, 3, 3, 7, 4,
-                                     // Top
-                                     3, 2, 6, 6, 7, 3,
-                                     // Bottom
-                                     4, 5, 1, 1, 0, 4},
-                            .colors{
-                                {1, 0, 0},
-                                {0, 1, 0},
-                                {0, 0, 1},
-                                {1, 1, 0}, // 前四个顶点颜色
-                                {1, 0, 1},
-                                {0, 1, 1},
-                                {1, 1, 1},
-                                {0, 0, 0} // 后四个顶点颜色
-                            },
-                            .texCoords{{0.f, 0.f},
-                                       {1.f, 0.f},
-                                       {1.f, 1.f},
-                                       {0.f, 1.f},
-                                       {0.f, 0.f},
-                                       {1.f, 0.f},
-                                       {1.f, 1.f},
-                                       {0.f, 1.f}}};
-
-    m_mesh =
-        graphics::GetMeshManager().CreateMesh(data, material.GetVertexLayout());
-
-    auto entity = scene.GetWorld().CreateEntity();
-    Transform transform;
-    scene.GetWorld()
-        .AddComponent<ecs::MeshComponent>(entity, m_mesh)
-        ->AddComponent<ecs::TransformComponent>(entity, transform);
-
-    return entity;
-  }
-
   UniquePtr<scene::Scene> m_scene;
   rhi::PipelineHandle m_pipeline;
   graphics::MeshHandle m_mesh;

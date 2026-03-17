@@ -17,8 +17,19 @@ public:
 
   void Render(graphics::Renderer &renderer, rhi::ICommandBuffer &cmd) {
     auto snapshot = CaptureActiveCamera();
+    graphics::SceneGlobals globals{
+        .camera = snapshot,
+    };
 
-    renderer.Render(cmd, GetWorld(), snapshot);
+    auto view = m_world->GetView<ecs::LightComponent>();
+    view.ForEach([&](ecs::Entity entity, ecs::LightComponent &light) {
+    globals.lightData.color = light.color;
+    globals.lightData.dirOrPos = light.directionOrPosition;
+    globals.lightData.type =
+        std::underlying_type_t<ELightType>(light.lightType);
+    });
+
+    renderer.Render(cmd, GetWorld(), globals);
   }
 
 private:
@@ -31,7 +42,7 @@ private:
           .view = std::move(CalculateViewMatrix(transComp.local.position,
                                                 transComp.local.rotation)),
           .projection = view.Get<ecs::CameraComponent>(entity).projectionMatrix,
-          .position = transComp.GetWorldPosition(),
+          .position = Vec4::FromVec3(transComp.GetWorldPosition()),
       };
     }
 

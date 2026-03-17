@@ -3,11 +3,15 @@ module;
 module avalon.core;
 
 import :string_view;
+import :vfs;
+import :path;
 
 namespace avalon {
 
 void *InternalLoadLibrary(StringView path) {
-  return dlopen(path.GetData(), RTLD_NOW | RTLD_LOCAL);
+  Path absPath;
+  vfs::GetVfs().GetAbsolute(path, absPath);
+  return dlopen(absPath.GetCStr(), RTLD_NOW | RTLD_LOCAL);
 }
 
 void *InternalGetSymbol(void *handle, StringView symbol) {

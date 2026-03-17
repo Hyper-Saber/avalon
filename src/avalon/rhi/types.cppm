@@ -411,8 +411,8 @@ struct PipelineCreateInfo {
   EPrimitiveTopology topology = EPrimitiveTopology::TriangleList;
   EPolygonMode polygonMode = EPolygonMode::Fill;
   ECullMode cullMode = ECullMode::Back;
-  bool isDepthTestEnable = false;
-  bool isDepthWriteEnable = false;
+  bool isDepthTestEnable = true;
+  bool isDepthWriteEnable = true;
   EDepthCompareOp depthCompareOp = EDepthCompareOp::Less;
 
   float lineWidth = 1.0f;

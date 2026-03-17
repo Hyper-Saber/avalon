@@ -287,6 +287,7 @@ public:
 
       AddArg(L"-fspv-reflect");
       AddArg(L"-fvk-use-dx-layout");
+      AddArg(L"-Zpc");
       AddArg(L"-Fi");
       AddDynamicArg(Utf8ToWstring(desc.filePath.GetCStr()));
 

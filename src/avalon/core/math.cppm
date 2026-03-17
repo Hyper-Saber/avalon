@@ -257,9 +257,9 @@ inline Matrix4x4 CalculatePerspectiveMatrix(float fovDeg, float aspect,
   Matrix4x4 res;
   res.data[0][0] = w;
   res.data[1][1] = -h;
-  res.data[2][2] = far / (far - near);
-  res.data[2][3] = 1.0f;
-  res.data[3][2] = -(far * near) / (far - near);
+  res.data[2][2] = far / (near - far);
+  res.data[2][3] = -1.0f;
+  res.data[3][2] = (far * near) / (near - far);
   res.data[3][3] = 0;
   return res;
 }

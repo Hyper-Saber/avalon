@@ -27,8 +27,8 @@ Engine &Engine::Get() {
   return instance;
 }
 
-constexpr StringView kWindowPluginPath = "plugins/libavalon.window.glfw";
-constexpr StringView kVkRhiPluginPath = "plugins/libavalon.rhi.vulkan";
+constexpr StringView kWindowPluginPath = "plugins:/libavalon.window.glfw";
+constexpr StringView kVkRhiPluginPath = "plugins:/libavalon.rhi.vulkan";
 
 auto Engine::Initialize(const EngineConfig &config,
                         UniquePtr<IApplication> &&userApp)
@@ -46,6 +46,7 @@ auto Engine::Initialize(const EngineConfig &config,
   auto shaderFolderPath = root / vfs::kShaderFolderPath;
   vfs::GetVfs().Mount(shaderVirtualFolderPath.GetString(), shaderFolderPath,
                       device.Get());
+  vfs::GetVfs().Mount("plugins:", root / vfs::kPluginFolderPath, device.Get());
 
   auto rhiLoadRes = LoadPlugin<rhi::IRhi>(
       {String(kVkRhiPluginPath) + platform::kPluginExtension});

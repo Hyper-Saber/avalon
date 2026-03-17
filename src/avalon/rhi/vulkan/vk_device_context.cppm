@@ -1,4 +1,5 @@
 module;
+#include <cstring>
 #include <debug/assert.hpp>
 #include <expected>
 #include <optional>
@@ -35,17 +36,49 @@ debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
   return VK_FALSE;
 }
 
+// auto GetSurfaceExtension() -> Array<const char *> {
+//   Array<const char *> extensions{VK_KHR_SURFACE_EXTENSION_NAME};
+//
+// #ifdef VK_USE_PLATFORM_WAYLAND_KHR
+//   extensions.PushBack(VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME);
+// #elif VK_USE_PLATFORM_XCB_KHR
+//   extensions.PushBack(VK_KHR_XCB_SURFACE_EXTENSION_NAME);
+// #elif defined(VK_USE_PLATFORM_WIN32_KHR)
+//   extensions.PushBack(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
+// #endif
+//
+//   return extensions;
+// }
+//
 auto GetSurfaceExtension() -> Array<const char *> {
-  Array<const char *> extensions{VK_KHR_SURFACE_EXTENSION_NAME};
+  // 1. 获取系统支持的所有实例扩展
+  uint32_t extensionCount = 0;
+  vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
+  Array<VkExtensionProperties> availableExtensions(extensionCount);
+  vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount,
+                                         availableExtensions.GetData());
 
-#ifdef VK_USE_PLATFORM_WAYLAND_KHR
-  extensions.PushBack(VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME);
-#endif
-#ifdef VK_USE_PLATFORM_XCB_KHR
-  extensions.PushBack(VK_KHR_XCB_SURFACE_EXTENSION_NAME);
-#elif defined(VK_USE_PLATFORM_WIN32_KHR)
-  extensions.PushBack(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
-#endif
+  auto isSupported = [&](const char *name) {
+    for (const auto &ext : availableExtensions) {
+      if (strcmp(ext.extensionName, name) == 0)
+        return true;
+    }
+    return false;
+  };
+
+  Array<const char *> extensions;
+
+  if (isSupported(VK_KHR_SURFACE_EXTENSION_NAME))
+    extensions.PushBack(VK_KHR_SURFACE_EXTENSION_NAME);
+
+  if (isSupported("VK_KHR_wayland_surface"))
+    extensions.PushBack("VK_KHR_wayland_surface");
+
+  if (isSupported("VK_KHR_xcb_surface"))
+    extensions.PushBack("VK_KHR_xcb_surface");
+
+  if (isSupported("VK_KHR_xlib_surface"))
+    extensions.PushBack("VK_KHR_xlib_surface");
 
   return extensions;
 }
@@ -181,7 +214,8 @@ private:
     if (result != VK_SUCCESS) {
       avalon::Error(
           "[Vulkan]: Failed to create instance! Check if your drivers "
-          "support Vulkan.");
+          "support Vulkan. Error code: {}",
+          static_cast<int>(result));
       return std::unexpected(HandleVkError(result));
     }
 

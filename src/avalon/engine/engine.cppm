@@ -15,7 +15,8 @@ export import :utils;
 
 export namespace avalon::vfs {
 constexpr StringView kShaderFolderPath = "/tests/shaders/";
-}
+constexpr StringView kPluginFolderPath = "/build/linux/x86_64/debug/plugins/";
+} // namespace avalon::vfs
 
 export namespace avalon {
 

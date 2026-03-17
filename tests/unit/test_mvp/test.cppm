@@ -67,7 +67,7 @@ public:
     world.AddComponent<ecs::CameraComponent>(m_camera);
     auto transform = Transform{
         .position = {0, 0, 5},
-        .rotation = {0, 180, 0},
+        .rotation = {0, 0, 0},
         .scale = Vec3::One(),
     };
     world.AddComponent<ecs::TransformComponent>(m_camera, transform);

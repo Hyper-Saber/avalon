@@ -58,18 +58,10 @@ public:
   }
 
   void Render(rhi::ICommandBuffer &cmd, ecs::World &world,
-              const CameraSnapshot &snapshot) {
+              const SceneGlobals &globals) {
 
     RenderContext context{
         .cmd = cmd,
-        .view = snapshot.view,
-        .projection = snapshot.projection,
-    };
-
-    SceneGlobals globals{
-        .view = snapshot.view,
-        .projection = snapshot.projection,
-        .cameraPosition = Vec4::FromVec3(snapshot.position),
     };
 
     auto frameIndex = m_rhi.GetCurrentFrameIndex();

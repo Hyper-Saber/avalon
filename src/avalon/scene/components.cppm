@@ -47,11 +47,10 @@ struct AVALON_SCENE_API CameraComponent {
   }
 };
 
-struct alignas(16) LightComponent {
+struct LightComponent {
   Vec4 color = Vec4(1.f, 1.f, 1.f, 1.f);
   Vec4 directionOrPosition{0.f, -1.f, 0.f, 10.f};
   scene::ELightType lightType = scene::ELightType::Directional;
-  float padding[3];
 };
 
 } // namespace avalon::ecs

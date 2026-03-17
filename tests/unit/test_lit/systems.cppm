@@ -1,28 +1,43 @@
 module;
-#include <cmath>
 export module test:systems;
 
 import avalon.core;
 import avalon.ecs;
 import avalon.engine;
 import avalon.graphics;
+import avalon.scene;
 
 namespace avalon::ecs {
-class UpdateTransformSystem : public ecs::SystemBase<UpdateTransformSystem> {
+class UpdateLightSystem : public ecs::SystemBase<UpdateLightSystem> {
   void OnUpdate(ecs::World &world, float dt) override {
-    // auto view = world.GetView<ecs::TransformComponent, ecs::MeshComponent>();
-    // auto totalTime = Engine::Get().GetTotalTime();
-    // view.ForEach([&](auto &transComp, auto &_) {
-    //   auto position = transComp.local.position;
-    //   auto rotation = transComp.local.rotation;
-    //   position.x = std::sin(totalTime);
-    //   position.y = std::cos(totalTime);
-    //   rotation.x = totalTime * 60;
-    //   rotation.y = totalTime * 60;
-    //   rotation.z = totalTime * 60;
-    //   transComp.SetPosition(position);
-    //   transComp.SetRotation(rotation);
-    // });
+    auto view = world.GetView<ecs::LightComponent>();
+
+    float rotationSpeed = 45.0f;
+    float angleDelta = ToRadians(rotationSpeed * dt);
+
+    float cosA = Cos(angleDelta);
+    float sinA = Sin(angleDelta);
+
+    view.ForEach([&](auto &light) {
+      if (light.lightType == scene::ELightType::Directional) {
+        float x = light.directionOrPosition.x;
+        float y = light.directionOrPosition.y;
+
+        float newX = x * cosA - y * sinA;
+        float newY = x * sinA + y * cosA;
+
+        light.directionOrPosition.x = newX;
+        light.directionOrPosition.y = newY;
+
+        Vec3 dir =
+            Normalize({light.directionOrPosition.x, light.directionOrPosition.y,
+                       light.directionOrPosition.z});
+
+        light.directionOrPosition.x = dir.x;
+        light.directionOrPosition.y = dir.y;
+        light.directionOrPosition.z = dir.z;
+      }
+    });
   }
 };
 } // namespace avalon::ecs

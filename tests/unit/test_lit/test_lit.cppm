@@ -65,15 +65,17 @@ public:
     world.AddComponent<ecs::CameraComponent>(m_camera);
     auto transform = Transform{
         .position = {0, 0, 5},
-        .rotation = {0, 0, 0},
         .scale = Vec3::One(),
     };
     world.AddComponent<ecs::TransformComponent>(m_camera, transform);
     world.AddSystem<ecs::CameraSystem>();
-    world.AddSystem<ecs::UpdateTransformSystem>();
+    world.AddSystem<ecs::UpdateLightSystem>();
 
     auto light = world.CreateEntity();
     world.AddComponent<ecs::LightComponent>(light);
+
+    auto lightComp = world.GetComponent<ecs::LightComponent>(light);
+    lightComp->directionOrPosition = Vec4::FromVec3(Vec3{0, -1, -2});
 
     auto cube = scene.CreatePrimitive(graphics::EPrimitiveType::Cube);
     auto sphere = scene.CreatePrimitive(graphics::EPrimitiveType::Sphere);

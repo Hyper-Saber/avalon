@@ -14,7 +14,7 @@ class UpdateTransformSystem : public ecs::SystemBase<UpdateTransformSystem> {
     auto totalTime = Engine::Get().GetTotalTime();
     view.ForEach([&](auto &transComp, auto &_) {
       auto position = transComp.local.position;
-      auto rotation = transComp.local.rotation;
+      auto rotation = transComp.GetRotationEuler();
       position.x = std::sin(totalTime);
       position.y = std::cos(totalTime);
       rotation.x = totalTime * 60;

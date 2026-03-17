@@ -11,8 +11,13 @@ struct TransformComponent {
     isDirty = true;
   }
 
-  void SetRotation(const Vec3 &r) {
-    local.rotation = r;
+  void SetRotation(const Vec3 &eulerDegrees) {
+    local.rotation = Quaternion::FromEuler(eulerDegrees);
+    isDirty = true;
+  }
+
+  void SetRotation(const Quaternion &q) {
+    local.rotation = q;
     isDirty = true;
   }
 
@@ -20,6 +25,8 @@ struct TransformComponent {
     local.scale = s;
     isDirty = true;
   }
+
+  Vec3 GetRotationEuler() const { return local.rotation.ToEuler(); }
 
   Vec3 GetWorldPosition() {
     UpdateWorldMatrix();
@@ -37,7 +44,7 @@ struct TransformComponent {
       return;
     isDirty = false;
     auto T = Translate(local.position);
-    auto R = Rotate(local.rotation);
+    auto R = local.rotation.ToMatrix();
     auto S = Scale(local.scale);
     worldMatrix = T * R * S;
   }

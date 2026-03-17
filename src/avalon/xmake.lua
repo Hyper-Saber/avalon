@@ -96,10 +96,17 @@ target "avalon.scene"
     add_files ("scene/*.cppm", {public = true})
     add_deps("avalon.core", "avalon.ecs", "avalon.graphics", "avalon.rhi")
 
+
+target "avalon.physics"
+    set_kind "shared"
+    add_avalon_api_rules("avalon.physics")
+    add_files ("physics/*.cppm", {public = true})
+    add_deps("avalon.core", "avalon.ecs")
+
 target "avalon.engine"
     set_kind "shared"
     add_avalon_api_rules("avalon.engine")
-    add_deps("avalon.core", "avalon.window", "avalon.rhi", "avalon.shader", "avalon.graphics", "avalon.ecs", "avalon.scene")
+    add_deps("avalon.core", "avalon.window", "avalon.rhi", "avalon.shader", "avalon.graphics", "avalon.ecs", "avalon.scene", "avalon.physics")
     add_deps("avalon.rhi.vulkan", "avalon.window.glfw")
     add_files("engine/*.cppm", {public = true})
     add_files("engine/*.cpp")

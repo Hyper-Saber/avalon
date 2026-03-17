@@ -45,7 +45,7 @@ private:
       auto transComp = view.Get<ecs::TransformComponent>(entity);
       return {
           .view = std::move(CalculateViewMatrix(transComp.local.position,
-                                                transComp.local.rotation)),
+                                                transComp.GetRotationEuler())),
           .projection = view.Get<ecs::CameraComponent>(entity).projectionMatrix,
           .position = Vec4::FromVec3(transComp.GetWorldPosition()),
       };

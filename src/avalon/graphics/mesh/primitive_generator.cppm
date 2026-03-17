@@ -161,12 +161,12 @@ public:
         uint32_t second = first + segments + 1;
 
         data.indices.PushBack(first);
-        data.indices.PushBack(second);
         data.indices.PushBack(first + 1);
+        data.indices.PushBack(second);
 
         data.indices.PushBack(second);
-        data.indices.PushBack(second + 1);
         data.indices.PushBack(first + 1);
+        data.indices.PushBack(second + 1);
       }
     }
     return data;

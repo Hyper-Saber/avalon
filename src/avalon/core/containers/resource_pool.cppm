@@ -114,9 +114,10 @@ private:
       m_slots[i].nextFreeIndex = i + 1;
       m_slots[i].generation = 1;
       m_slots[i].isActive = false;
+      m_slots[i].nextFreeIndex = (i == newSize - 1) ? m_freeListHead : i + 1;
+      ;
     }
     m_freeListHead = oldSize;
-    m_slots[newCapacity - 1].nextFreeIndex = UINT32_MAX;
   }
 
   Array<Slot> m_slots;

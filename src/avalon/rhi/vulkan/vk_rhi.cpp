@@ -164,11 +164,11 @@ void VkRhi::ReleaseBuffer(BufferHandle handle) {
 }
 
 auto VkRhi::CreateDescriptorWriter(PipelineHandle handle, uint32_t set)
-    -> IDescriptorWriter * {
+    -> IDescriptorWriter & {
   m_descriptorWriter = MakeUnique<DescriptorWriter>(
       m_deviceContext->GetDevice(), *this,
       *m_descriptorAllocators[m_currentFrame].Get(), handle, set);
-  return m_descriptorWriter.Get();
+  return *m_descriptorWriter.Get();
 }
 
 auto VkRhi::CreatePipeline(const PipelineCreateInfo &info) -> PipelineHandle {
@@ -342,6 +342,8 @@ auto VkRhi::EndFrame() -> ERhiResult {
   m_currentFrame = (m_currentFrame + 1) % m_maxFrameInFlight;
   return ret;
 }
+
+void VkRhi::WaitIdle() { vkDeviceWaitIdle(m_deviceContext->GetDevice()); }
 
 auto VkRhi::CreateCommandPools() -> std::expected<void, ERhiResult> {
   if (m_maxFrameInFlight == 0)

@@ -8,6 +8,8 @@
 #define uCamera uSceneGlobals.camera
 #define uMainLight uSceneGlobals.lightData
 
+#define PI 3.14159265
+
 struct Camera {
   float4x4 view;
   float4x4 projection;
@@ -31,6 +33,7 @@ VK_BINDING(0, 0) ConstantBuffer<SceneGlobals> uSceneGlobals
 
 struct ModelData {
   float4x4 model;
+  float4x4 normalMatrix;
 };
 
 #endif // AVALON_COMMON_HLSLI

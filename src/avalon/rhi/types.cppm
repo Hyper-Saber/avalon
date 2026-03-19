@@ -143,6 +143,7 @@ enum class EMemoryProperty : uint32_t {
   DeviceLocal = 1 << 0,
   HostVisible = 1 << 1,
   HostCoherent = 1 << 2,
+  All = DeviceLocal | HostVisible | HostCoherent,
 };
 
 enum class EResourceLayout {
@@ -153,6 +154,14 @@ enum class EResourceLayout {
   Present,
   TransferSrc,
   TransferDst,
+};
+
+enum class ESampleCount {
+  SampleCount1x,
+  SampleCount2x,
+  SampleCount4x,
+  SampleCount8x,
+  SampleCount16x,
 };
 
 enum class ETextureUsage : uint32_t {
@@ -200,6 +209,7 @@ struct DeviceRequirement {
 
 struct AttachmentDescription {
   EFormat format;
+  ESampleCount sampleCount = ESampleCount::SampleCount1x;
   EAttachmentLoadOp loadOp;
   EAttachmentStoreOp storeOp;
   EResourceLayout initialLayout;
@@ -408,6 +418,7 @@ struct PipelineCreateInfo {
   Span<const VertexBinding> vertexBindings;
   Span<const DescriptorSetLayoutBinding> descriptorSetLayoutBindings;
   Span<const ShaderStageInfo> stageInfos;
+  ESampleCount sampleCount = ESampleCount::SampleCount1x;
   EPrimitiveTopology topology = EPrimitiveTopology::TriangleList;
   EPolygonMode polygonMode = EPolygonMode::Fill;
   ECullMode cullMode = ECullMode::Back;
@@ -416,6 +427,12 @@ struct PipelineCreateInfo {
   EDepthCompareOp depthCompareOp = EDepthCompareOp::Less;
 
   float lineWidth = 1.0f;
+};
+
+struct RingAllocation {
+  void *pHostAddress;
+  uint32_t offset;
+  BufferHandle buffer;
 };
 
 struct Offset2D {
@@ -442,18 +459,17 @@ struct Viewport {
   float maxDepth = 1.0f;
 };
 
-struct Color {
-  float r, g, b, a;
-};
-
 struct DepthStencil {
   float depth;
   uint32_t stencil;
 };
 
 struct ClearValue {
+  struct ColorValue {
+    float r, g, b, a;
+  };
   union {
-    Color color;
+    ColorValue color;
     DepthStencil depthStencil;
   };
   bool isDepth = false;

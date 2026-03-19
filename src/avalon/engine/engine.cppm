@@ -66,10 +66,9 @@ private:
   PluginInstance<rhi::IRhi> m_rhi;
   UniquePtr<graphics::Renderer> m_renderer;
   UniquePtr<scene::Scene> m_scene;
+  UniquePtr<IApplication> m_userApp;
 
   rhi::RenderPassHandle m_renderPass;
-
-  UniquePtr<IApplication> m_userApp;
 
   std::chrono::steady_clock::time_point m_lastFrameTime;
   float m_deltaTime = 0.0f;

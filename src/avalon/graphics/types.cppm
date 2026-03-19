@@ -1,6 +1,7 @@
 module;
 #include <cstdint>
 export module avalon.graphics:types;
+
 import avalon.core;
 
 export namespace avalon::graphics {
@@ -27,5 +28,4 @@ enum class EPrimitiveType {
   Quad,
   Sphere,
 };
-
 } // namespace avalon::graphics

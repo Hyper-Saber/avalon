@@ -22,7 +22,8 @@ public:
   virtual void BindIndexBuffer(BufferHandle handle, uint64_t offset,
                                EFormat format) = 0;
   virtual void BindDescriptorSet(uint32_t firstSet,
-                                 Span<const DescriptorSetHandle> sets) = 0;
+                                 Span<const DescriptorSetHandle> sets,
+                                 Span<const uint32_t> dynamicOffsets) = 0;
 
   virtual void PushConstants(EShaderStage stage, uint32_t offset, uint32_t size,
                              const void *pData) = 0;

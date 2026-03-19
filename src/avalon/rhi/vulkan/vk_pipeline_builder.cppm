@@ -64,6 +64,8 @@ public:
     m_inputAssemblyInfo.topology = ToVkPrimitiveTopology(info.topology);
     m_rasterizationInfo.polygonMode = ToVkPolygonMode(info.polygonMode);
     m_rasterizationInfo.cullMode = ToVkCullMode(info.cullMode);
+    m_multisampleStateInfo.rasterizationSamples =
+        ToVkSampleCount(info.sampleCount);
     m_rasterizationInfo.lineWidth = info.lineWidth;
     m_depthStencilStateInfo.depthTestEnable =
         info.isDepthTestEnable ? VK_TRUE : VK_FALSE;

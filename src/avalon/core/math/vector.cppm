@@ -53,15 +53,14 @@ struct Vec3 {
     };
   }
 
-  static Vec3 Right() { return {1.0f, 0.0f, 0.0f}; }
-  static Vec3 Left() { return {-1.0f, 0.0f, 0.0f}; }
-  static Vec3 Up() { return {0.0f, 1.0f, 0.0f}; }
-  static Vec3 Down() { return {0.0f, -1.0f, 0.0f}; }
-  static Vec3 Backward() { return {0.0f, 0.0f, 1.0f}; }
-  static Vec3 Forward() { return {0.0f, 0.0f, -1.0f}; }
-
-  static Vec3 Zero() { return {0.0f, 0.0f, 0.0f}; }
-  static Vec3 One() { return {1.0f, 1.0f, 1.0f}; }
+  static constexpr Vec3 Right() { return {1.0f, 0.0f, 0.0f}; }
+  static constexpr Vec3 Left() { return {-1.0f, 0.0f, 0.0f}; }
+  static constexpr Vec3 Up() { return {0.0f, 1.0f, 0.0f}; }
+  static constexpr Vec3 Down() { return {0.0f, -1.0f, 0.0f}; }
+  static constexpr Vec3 Backward() { return {0.0f, 0.0f, 1.0f}; }
+  static constexpr Vec3 Forward() { return {0.0f, 0.0f, -1.0f}; }
+  static constexpr Vec3 Zero() { return {0.0f, 0.0f, 0.0f}; }
+  static constexpr Vec3 One() { return {1.0f, 1.0f, 1.0f}; }
 
   auto ToString() { return String::Format("x: {}, y: {}, z: {}", x, y, z); }
 };

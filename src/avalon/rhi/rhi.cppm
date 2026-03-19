@@ -2,11 +2,10 @@ module;
 #include <cstdint>
 #include <functional>
 
-export module avalon.rhi;
-export import :command_buffer;
-export import :types;
-export import :utils;
-export import :descriptor_writer;
+export module avalon.rhi:rhi;
+import :command_buffer;
+import :types;
+import :descriptor_writer;
 
 import avalon.core;
 
@@ -38,7 +37,7 @@ public:
   virtual void ReleaseBuffer(BufferHandle handle) = 0;
 
   virtual auto CreateDescriptorWriter(PipelineHandle handle, uint32_t set)
-      -> IDescriptorWriter * = 0;
+      -> IDescriptorWriter & = 0;
 
   virtual void
   ExcuteOnce(EQueueType queueType,
@@ -50,5 +49,7 @@ public:
   virtual void Submit(ICommandBuffer *cmd) = 0;
   virtual auto BeginFrame() -> ERhiResult = 0;
   virtual auto EndFrame() -> ERhiResult = 0;
+
+  virtual void WaitIdle() = 0;
 };
 } // namespace avalon::rhi

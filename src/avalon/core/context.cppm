@@ -12,6 +12,7 @@ enum class EEngineService : uint32_t {
   Vfs = 0,
   ShaderManager,
   MeshManager,
+  MaterialManager,
   Count
 };
 
@@ -36,6 +37,7 @@ public:
     services[static_cast<uint32_t>(serviceType)] = std::move(service);
   }
 
+private:
   UniquePtr<mem::IAutoDestroyable>
       services[static_cast<uint32_t>(EEngineService::Count)];
 };

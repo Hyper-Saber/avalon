@@ -10,7 +10,7 @@ import avalon.graphics;
 namespace avalon::ecs {
 class UpdateTransformSystem : public ecs::SystemBase<UpdateTransformSystem> {
   void OnUpdate(ecs::World &world, float dt) override {
-    auto view = world.GetView<ecs::TransformComponent, ecs::MeshComponent>();
+    auto view = world.GetView<ecs::TransformComponent, ecs::RenderComponent>();
     auto totalTime = Engine::Get().GetTotalTime();
     view.ForEach([&](auto &transComp, auto &_) {
       auto position = transComp.local.position;

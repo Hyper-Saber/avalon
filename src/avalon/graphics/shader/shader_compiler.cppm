@@ -85,7 +85,10 @@ void ExtractDescriptorBindings(SpvReflectShaderModule *module,
         descBinding.usage = EBufferUsage::Storage | EBufferUsage::TransferDst;
         break;
       case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
-        descBinding.type = EDescriptorType::UniformBuffer;
+        descBinding.type =
+            StringView(pSpvReflDescBinding->name).IsStartWith("u")
+                ? EDescriptorType::UniformBuffer
+                : EDescriptorType::UniformBufferDynamic;
         descBinding.usage = EBufferUsage::Uniform | EBufferUsage::TransferDst;
         break;
       case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER:
@@ -93,7 +96,7 @@ void ExtractDescriptorBindings(SpvReflectShaderModule *module,
         descBinding.usage = EBufferUsage::Storage | EBufferUsage::TransferDst;
         break;
       case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
-        descBinding.type = EDescriptorType::UniformBuffer;
+        descBinding.type = EDescriptorType::UniformBufferDynamic;
         descBinding.usage = EBufferUsage::Uniform | EBufferUsage::TransferDst;
         break;
       case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
@@ -115,14 +118,14 @@ void ExtractDescriptorBindings(SpvReflectShaderModule *module,
           pSpvReflDescBinding->descriptor_type ==
               SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER) {
         descBinding.bufferSize = pSpvReflDescBinding->block.size;
-        Debug("Buffer size: {}", pSpvReflDescBinding->block.size);
         descBinding.memberCount = pSpvReflDescBinding->block.member_count;
 
         for (uint32_t j = 0; j < pSpvReflDescBinding->block.member_count; j++) {
           const auto &spvReflMember = pSpvReflDescBinding->block.members[j];
+          auto memberName = String::Format("{}.{}", pSpvReflDescBinding->name,
+                                           spvReflMember.name);
           ShaderBufferMember bufferMember{
-              .nameHash =
-                  StringId(spvReflMember.name ? spvReflMember.name : ""),
+              .nameHash = StringId(memberName),
               .offset = spvReflMember.offset,
               .size = spvReflMember.size,
               .bindingPoint = pSpvReflDescBinding->binding,

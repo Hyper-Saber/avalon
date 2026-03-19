@@ -32,8 +32,9 @@ public:
     VkShaderModuleCreateInfo moduleCreateInfo{
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
         .codeSize = info.shaderCode->GetSize(),
-        .pCode = info.shaderCode->As<uint32_t>(),
+        .pCode = info.shaderCode->ConstAs<uint32_t>(),
     };
+
     auto result =
         vkCreateShaderModule(m_device, &moduleCreateInfo, nullptr, &module);
     if (result != VK_SUCCESS) {

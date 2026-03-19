@@ -25,5 +25,4 @@ public:
     alloc.Deallocate(pDerived, 1);
   }
 };
-
 } // namespace avalon::ecs

@@ -47,7 +47,7 @@ public:
   void ReleaseBuffer(BufferHandle handle) override;
 
   auto CreateDescriptorWriter(PipelineHandle handle, uint32_t set)
-      -> IDescriptorWriter * override;
+      -> IDescriptorWriter & override;
 
   void ExcuteOnce(EQueueType queueType,
                   const std::function<void(ICommandBuffer *)> &action) override;
@@ -65,6 +65,8 @@ public:
   auto GetBuffer(BufferHandle) -> const BufferResource & override;
   auto GetDescriptorSet(DescriptorSetHandle handle)
       -> const DescriptorSetResource & override;
+
+  void WaitIdle() override;
 
 private:
   auto CreateCommandPools() -> std::expected<void, ERhiResult>;

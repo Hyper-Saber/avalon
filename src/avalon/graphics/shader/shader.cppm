@@ -17,7 +17,7 @@ class AVALON_SHADER_API Shader final : public NonCopyable,
                                        public mem::AutoDestroyable<Shader> {
 public:
   bool Initialize() {
-    auto pData = m_shaderBlob->As<std::byte>();
+    const std::byte *pData = m_shaderBlob->ConstAs<std::byte>();
     auto pMainHeader = reinterpret_cast<const ShaderBlobHeader *>(pData);
     AVALON_ASSERT_MSG(pMainHeader->magic == kMagicAVSB &&
                           pMainHeader->stageCount > 0,
@@ -36,6 +36,12 @@ public:
 
   explicit Shader(BlobPtr &&shaderBlob) : m_shaderBlob(std::move(shaderBlob)) {
     AVALON_ASSERT(m_shaderBlob->GetData() != nullptr)
+  }
+
+  auto GetPushConstantStageMask() const {
+    if (m_pushConstantRanges.GetSize() == 0)
+      return EShaderStage::None;
+    return m_pushConstantRanges[0].visibleStages;
   }
 
   auto GetDescriptorMetaData() const noexcept
@@ -207,4 +213,6 @@ private:
   Array<rhi::DescriptorSetLayoutBinding> m_descriptorBindings;
   Array<rhi::PushConstantRange> m_pushConstantRanges;
 };
+
+using ShaderHandle = Handle<Shader>;
 } // namespace avalon::graphics

@@ -99,6 +99,7 @@ private:
   auto CreatePool(uint32_t count) -> std::expected<VkDescriptorPool, VkResult> {
     Array<VkDescriptorPoolSize> poolSizes{
         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, count},
+        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, count},
         {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, count},
         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, count}};
 

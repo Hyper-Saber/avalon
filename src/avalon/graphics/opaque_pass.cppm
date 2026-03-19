@@ -2,6 +2,7 @@ module;
 export module avalon.graphics:opaque_pass;
 
 import avalon.core;
+import avalon.shader;
 import :mesh_render_executor;
 import :render_pass;
 import :types;
@@ -15,14 +16,18 @@ export namespace avalon::graphics {
 class AVALON_GRAPHICS_API OpaquePass final : public RenderPass<OpaquePass> {
 public:
   OpaquePass(rhi::PipelineHandle pipeline, rhi::RenderPassHandle renderPass,
-             rhi::Extent2D extent)
-      : m_pipeline(pipeline), m_rendePass(renderPass), m_extent(extent) {}
+             ShaderHandle handle, rhi::Extent2D extent)
+      : m_pipeline(pipeline), m_rendePass(renderPass), m_extent(extent) {
+    auto shader = GetShaderManager().Resolve(handle);
+    auto mask = shader->GetPushConstantStageMask();
+    m_executor = MeshRenderExecutor(mask);
+  }
 
   void SetClearColor(Color color) override { m_color = color; }
 
   void OnResize(const rhi::Extent2D &extent) override { m_extent = extent; }
 
-  void Execute(RenderContext &context, const RenderPacket &packet) override {
+  void Execute(RenderContext &context, RenderPacket &packet) override {
     RenderPassBeginInfo info;
     Setup(info);
 
@@ -38,8 +43,26 @@ public:
     context.cmd.SetScissor(info.renderArea);
 
     context.cmd.BindPipeline(m_pipeline);
+
+    auto &writer = context.rhi.CreateDescriptorWriter(m_pipeline, 1);
+    if (writer.IsValid()) {
+      for (auto &batch : packet.batches) {
+        auto material = GetMaterialManager().Resolve(
+            packet.materialInstances[batch.firstInstance]);
+        for (auto &buffer : material->GetBufferStates()) {
+          BufferWriteInfo info{
+              .buffer = context.uboHandle,
+              .offset = buffer.bufferOffset,
+              .range = buffer.size,
+          };
+          writer.WriteBuffer(buffer.nameHash, info);
+        }
+        batch.materialSet = writer.Build();
+      }
+    }
     if (context.globalSet.IsValid())
-      context.cmd.BindDescriptorSet(0, {&context.globalSet, 1});
+      context.cmd.BindDescriptorSet(0, {&context.globalSet, 1}, {});
+
     m_executor.Execute(context.cmd, packet);
 
     context.cmd.EndRenderPass();
@@ -66,6 +89,6 @@ private:
   rhi::PipelineHandle m_pipeline;
   rhi::RenderPassHandle m_rendePass;
   Extent2D m_extent;
-  Color m_color = {0, 0, 0.1f, 1};
+  Color m_color = {0, 0, 0.01f, 1};
 };
 } // namespace avalon::graphics

@@ -28,7 +28,7 @@ public:
       const auto &src = createInfo.colorAttachments[i];
       vkAttachments.PushBack({
           .format = ToVkFormat(createInfo.colorAttachments[i].format),
-          .samples = VK_SAMPLE_COUNT_1_BIT,
+          .samples = ToVkSampleCount(createInfo.colorAttachments[i].sampleCount),
           .loadOp = ToVkLoadOp(src.loadOp),
           .storeOp = ToVkStoreOp(src.storeOp),
           .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
@@ -47,7 +47,6 @@ public:
             "{}\n---------------------------------------",
             i, ToView(src.format), ToView(src.loadOp), ToView(src.storeOp),
             ToView(src.initialLayout), ToView(src.finalLayout));
-      Debug("[Vulkan]: Has depth: {}", createInfo.hasDepth);
     }
 
     if (createInfo.hasDepth) {
@@ -64,6 +63,16 @@ public:
           .finalLayout =
               ToVkImageLayout(createInfo.depthAttachment.finalLayout),
       });
+
+      Debug("[Vulkan]: Depth Attachment: "
+            "\n---------------------------------------\nformat: {}\nloadOp: "
+            "{}\nstoreOp: {}\ninitialLayout: {}\nfinalLayout: "
+            "{}\n---------------------------------------",
+            ToView(createInfo.depthAttachment.format),
+            ToView(createInfo.depthAttachment.loadOp),
+            ToView(createInfo.depthAttachment.storeOp),
+            ToView(createInfo.depthAttachment.initialLayout),
+            ToView(createInfo.depthAttachment.finalLayout));
 
       depthReference = {
           .attachment = depthIndex,

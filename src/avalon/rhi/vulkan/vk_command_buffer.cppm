@@ -94,7 +94,7 @@ public:
     if (m_lastBoundPipeline == handle)
       return;
 
-    auto& res = m_resourceProvider.GetPipeline(handle);
+    auto &res = m_resourceProvider.GetPipeline(handle);
     VkPipeline pipeline = res.pipeline;
     vkCmdBindPipeline(
         m_cmd, VkPipelineBindPoint::VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
@@ -135,7 +135,8 @@ public:
   }
 
   void BindDescriptorSet(uint32_t firstSet,
-                         Span<const DescriptorSetHandle> sets) override {
+                         Span<const DescriptorSetHandle> sets,
+                         Span<const uint32_t> dynamicOffsets) override {
     if (sets.IsEmpty())
       return;
 
@@ -147,8 +148,8 @@ public:
     }
 
     vkCmdBindDescriptorSets(m_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_layout,
-                            firstSet, vkSets.GetSize(), vkSets.GetData(), 0,
-                            nullptr);
+                            firstSet, vkSets.GetSize(), vkSets.GetData(),
+                            dynamicOffsets.GetSize(), dynamicOffsets.GetData());
   }
 
   void PushConstants(EShaderStage stage, uint32_t offset, uint32_t size,
@@ -194,7 +195,6 @@ private:
   IRenderResourceProvider &m_resourceProvider;
   PipelineHandle m_lastBoundPipeline;
   VkPipelineLayout m_layout;
-  
 };
 
 } // namespace avalon::rhi

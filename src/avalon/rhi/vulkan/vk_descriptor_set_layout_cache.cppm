@@ -49,6 +49,9 @@ private:
   auto Create(Span<const DescriptorSetLayoutBinding> &bindings)
       -> UniquePtr<DescriptorSetLayoutResource> {
     Array<VkDescriptorSetLayoutBinding> vkBindings;
+
+    Debug("[Vulkan]: DescriptorSetLayout: set {}", bindings[0].set);
+
     for (const auto &binding : bindings) {
       vkBindings.PushBack({
           .binding = binding.binding,
@@ -56,6 +59,12 @@ private:
           .descriptorCount = binding.count,
           .stageFlags = ToVkShaderStageFlags(binding.visibleStages),
       });
+      Debug("\nbinding {}: "
+            "\n---------------------------------------\ntype: {}\ncount: "
+            "{}\nvisibleStages: {}"
+            "\n---------------------------------------",
+            binding.binding, ToView(binding.type), binding.count,
+            ToView(binding.visibleStages));
     }
 
     VkDescriptorSetLayoutCreateInfo info{

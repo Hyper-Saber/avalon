@@ -1,6 +1,7 @@
 module;
 #include <cstddef>
 #include <cstring>
+#include <debug/assert.hpp>
 #include <utility>
 
 module avalon.core;
@@ -13,6 +14,8 @@ class DataBlob final : public BlobBase<DataBlob> {
 public:
   explicit DataBlob(Array<std::byte> &&data) : m_data(std::move(data)) {}
   ~DataBlob() override = default;
+
+  auto GetData() noexcept -> void * override { return m_data.GetData(); }
 
   auto GetData() const noexcept -> const void * override {
     return m_data.GetData();
@@ -35,6 +38,10 @@ public:
   ViewBlob(const void *data, size_t size) : m_ptr(data), m_size(size) {}
   ~ViewBlob() override = default;
 
+  auto GetData() noexcept -> void * override {
+    AVALON_ASSERT_MSG(false, "Cannot modify view blob!");
+    return nullptr;
+  }
   auto GetData() const noexcept -> const void * override { return m_ptr; }
   auto GetSize() const noexcept -> size_t override { return m_size; }
   auto GetHash() const noexcept -> HashType override {

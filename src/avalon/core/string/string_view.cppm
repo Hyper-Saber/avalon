@@ -55,6 +55,14 @@ public:
     return std::memcmp(m_pData, other.m_pData, m_size) == 0;
   }
 
+  constexpr bool IsStartWith(const StringView &prefix) const noexcept {
+    if (prefix.IsEmpty())
+      return true;
+    if (prefix.GetSize() > m_size)
+      return false;
+    return std::memcmp(m_pData, prefix.GetData(), prefix.GetSize()) == 0;
+  }
+
   constexpr char GetFront() const noexcept { return m_pData[0]; }
   constexpr char GetBack() const noexcept {
     return m_size > 0 ? m_pData[m_size - 1] : '\0';

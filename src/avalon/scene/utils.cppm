@@ -12,7 +12,11 @@ public:
                               graphics::EPrimitiveType type) {
     auto entity = world.CreateEntity();
     auto meshHandle = graphics::GetMeshManager().GetDefaultMesh(type);
-    world.AddComponent<ecs::MeshComponent>(entity, meshHandle)
+    auto materialInstanceHandle =
+        graphics::GetMaterialManager().CreateMaterialInstance();
+    world
+        .AddComponent<ecs::RenderComponent>(entity, meshHandle,
+                                            materialInstanceHandle)
         .AddComponent<ecs::TransformComponent>(entity);
 
     return entity;

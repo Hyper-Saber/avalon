@@ -1,4 +1,5 @@
 module;
+#include <cmath>
 #include <cstdint>
 export module avalon.core:math.matrix;
 
@@ -58,6 +59,70 @@ struct alignas(16) Matrix4x4 {
 
     res.data[2][3] = data[3][2];
     res.data[3][2] = data[2][3];
+
+    return res;
+  }
+
+  Matrix4x4 Inverse() const {
+    const float a = data[0][0], b = data[0][1], c = data[0][2], d = data[0][3];
+    const float e = data[1][0], f = data[1][1], g = data[1][2], h = data[1][3];
+    const float i = data[2][0], j = data[2][1], k = data[2][2], l = data[2][3];
+    const float m = data[3][0], n = data[3][1], o = data[3][2], p = data[3][3];
+
+    float v0 = k * p - l * o;
+    float v1 = j * p - l * n;
+    float v2 = j * o - k * n;
+    float v3 = i * p - l * m;
+    float v4 = i * o - k * m;
+    float v5 = i * n - j * m;
+
+    float d0 = (f * v0 - g * v1 + h * v2);
+    float d1 = -(e * v0 - g * v3 + h * v4);
+    float d2 = (e * v1 - f * v3 + h * v5);
+    float d3 = -(e * v2 - f * v4 + g * v5);
+
+    float det = a * d0 + b * d1 + c * d2 + d * d3;
+
+    if (std::abs(det) < 1e-9f) [[unlikely]] {
+      return Matrix4x4::Identity;
+    }
+
+    const float invDet = 1.0f / det;
+
+    Matrix4x4 res;
+    res.data[0][0] = d0 * invDet;
+    res.data[1][0] = d1 * invDet;
+    res.data[2][0] = d2 * invDet;
+    res.data[3][0] = d3 * invDet;
+
+    float v6 = g * p - h * o;
+    float v7 = f * p - h * n;
+    float v8 = f * o - g * n;
+    float v9 = e * p - h * m;
+    float v10 = e * o - g * m;
+    float v11 = e * n - f * m;
+
+    res.data[0][1] = -(b * v0 - c * v1 + d * v2) * invDet;
+    res.data[1][1] = (a * v0 - c * v3 + d * v4) * invDet;
+    res.data[2][1] = -(a * v1 - b * v3 + d * v5) * invDet;
+    res.data[3][1] = (a * v2 - b * v4 + c * v5) * invDet;
+
+    float v12 = c * h - d * g;
+    float v13 = b * h - d * f;
+    float v14 = b * g - c * f;
+    float v15 = a * h - d * e;
+    float v16 = a * g - c * e;
+    float v17 = a * f - b * e;
+
+    res.data[0][2] = (b * v6 - c * v7 + d * v8) * invDet;
+    res.data[1][2] = -(a * v6 - c * v9 + d * v10) * invDet;
+    res.data[2][2] = (a * v7 - b * v9 + d * v11) * invDet;
+    res.data[3][2] = -(a * v8 - b * v10 + c * v11) * invDet;
+
+    res.data[0][3] = -(b * v12 - c * v13 + d * v14) * invDet;
+    res.data[1][3] = (a * v12 - c * v15 + d * v16) * invDet;
+    res.data[2][3] = -(a * v13 - b * v15 + d * v17) * invDet;
+    res.data[3][3] = (a * v14 - b * v16 + c * v17) * invDet;
 
     return res;
   }

@@ -205,6 +205,35 @@ bool HasStencilComponent(EFormat format) {
   return format == EFormat::D32_SFLOAT_S8_UINT;
 }
 
+constexpr StringView ToView(EDescriptorType e) {
+  switch (e) {
+  case EDescriptorType::UniformBuffer:
+    return "UniformBuffer";
+  case EDescriptorType::StorageBuffer:
+    return "StorageBuffer";
+  case EDescriptorType::UniformBufferDynamic:
+    return "UniformBufferDynamic";
+  case EDescriptorType::CombinedImageSampler:
+    return "CombinedImageSampler";
+  case EDescriptorType::SampledImage:
+    return "SampledImage";
+  case EDescriptorType::Sampler:
+    return "Sampler";
+  case EDescriptorType::StorageImage:
+    return "StorageImage";
+  case EDescriptorType::UniformTexelBuffer:
+    return "UniformTexelBuffer";
+  case EDescriptorType::StorageTexelBuffer:
+    return "StorageTexelBuffer";
+  case EDescriptorType::StorageBufferDynamic:
+    return "StorageBufferDynamic";
+  case EDescriptorType::InputAttachment:
+    return "InputAttachment";
+  case EDescriptorType::AccelerationStructure:
+    return "AccelerationStructure";
+  }
+}
+
 constexpr StringView ToView(ERhiResult e) {
   switch (e) {
   case ERhiResult::Success:
@@ -233,18 +262,28 @@ constexpr StringView ToView(ERhiResult e) {
 }
 
 constexpr StringView ToView(EShaderStage e) {
-  switch (e) {
-  case EShaderStage::Vertex:
+  if (e == EShaderStage::Vertex) {
     return "Vertex";
-  case EShaderStage::Fragment:
+  }
+  if (e == EShaderStage::Fragment) {
     return "Fragment";
-  case EShaderStage::Compute:
+  }
+  if (e == EShaderStage::Compute) {
     return "Compute";
-  case EShaderStage::None:
-    return "None";
-  case EShaderStage::All:
+  }
+  if (e == (EShaderStage::Vertex | EShaderStage::Fragment)) {
+    return "Vertex | Fragment";
+  }
+  if (e == (EShaderStage::Vertex | EShaderStage::Compute)) {
+    return "Vertex | Compute";
+  }
+  if (e == (EShaderStage::Fragment | EShaderStage::Compute)) {
+    return "Fragment | Compute";
+  }
+  if (e == EShaderStage::All) {
     return "All";
   }
+  return "Unknown";
 }
 
 constexpr StringView ToView(EAttachmentLoadOp op) {

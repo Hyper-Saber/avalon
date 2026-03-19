@@ -169,6 +169,9 @@ public:
 
     m_rhi.ReleaseBuffer(stagingHandle);
     mesh->Upload(vHandle, iHandle, iFormat);
+
+    Debug("[MeshManager]: Mesh uploaded! Handle: {}, vbo size: {}", handle.id,
+          vBufferSize);
     return true;
   }
 

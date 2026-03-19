@@ -18,6 +18,10 @@ import :application;
 namespace avalon {
 
 void Engine::Clear() {
+  m_scene.Reset();
+  m_userApp.Reset();
+  m_rhi->WaitIdle();
+  m_renderer.Reset();
   m_rhi.Reset();
   m_window.Reset();
 }
@@ -82,6 +86,10 @@ auto Engine::Initialize(const EngineConfig &config,
       EEngineService::ShaderManager, *m_rhi.Get());
   GetContext().RegisterService<graphics::MeshManager>(
       EEngineService::MeshManager, *m_rhi.Get());
+  GetContext().RegisterService<graphics::MaterialManager>(
+      EEngineService::MaterialManager);
+
+  graphics::GraphicsContext::Get().Initialize(*m_rhi.Get());
 
   m_scene = MakeUnique<scene::Scene>();
   m_userApp->OnInitialize(*m_scene.Get(), *m_rhi.Get(), {width, height});

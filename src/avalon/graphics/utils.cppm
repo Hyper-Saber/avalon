@@ -2,16 +2,18 @@ module;
 export module avalon.graphics:utils;
 
 import avalon.core;
-import avalon.shader;
 import :mesh_manager;
+import :material_manager;
 
 export namespace avalon::graphics {
-inline auto GetShaderManager() -> ShaderManager & {
-  return GetContext().GetService<ShaderManager>(EEngineService::ShaderManager);
-}
 
 inline auto GetMeshManager() -> MeshManager & {
   return GetContext().GetService<MeshManager>(EEngineService::MeshManager);
+}
+
+inline auto GetMaterialManager() -> MaterialManager & {
+  return GetContext().GetService<MaterialManager>(
+      EEngineService::MaterialManager);
 }
 
 } // namespace avalon::graphics

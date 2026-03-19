@@ -18,7 +18,7 @@ public:
 
   AVALON_SHADER_API ~ShaderManager() override = default;
 
-  auto AVALON_SHADER_API GetOrCreateShader(const Path &path) -> Handle<Shader> {
+  auto AVALON_SHADER_API GetOrCreateShader(const Path &path) -> ShaderHandle {
     auto pathHash = path.GetId();
 
     if (auto handle = m_shaderCache.Get(pathHash)) {
@@ -53,14 +53,14 @@ public:
     return handle;
   }
 
-  auto AVALON_SHADER_API Resolve(Handle<Shader> handle) -> const Shader * {
+  auto AVALON_SHADER_API Resolve(ShaderHandle handle) -> const Shader * {
     return m_shaderPool.Resolve(handle);
   }
 
 private:
   rhi::IRhi &m_rhi;
   UniquePtr<ShaderCompiler> m_compiler;
-  HashMap<StringId, Handle<Shader>> m_shaderCache;
+  HashMap<StringId, ShaderHandle> m_shaderCache;
   mem::ResourcePool<Shader> m_shaderPool;
 };
 } // namespace avalon::graphics

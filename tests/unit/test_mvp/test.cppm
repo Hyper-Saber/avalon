@@ -7,6 +7,7 @@ export module test;
 import test.utils;
 import avalon.engine;
 import avalon.core;
+import avalon.shader;
 import avalon.rhi;
 import avalon.scene;
 import avalon.ecs;
@@ -46,26 +47,31 @@ public:
 
     auto shaderHandle = graphics::GetShaderManager().GetOrCreateShader(
         Path(vfs::kShaderFolderVirtualPath) / StringView("test_mvp.hlsl"));
-    auto material = graphics::Material(shaderHandle);
 
-    auto pipelineCreateInfo = material.GetPipelineCreateInfo();
+    auto &materialManager = graphics::GetMaterialManager();
+    auto materialHandle =
+        materialManager.CreateMaterial(shaderHandle, "default"_id);
+    auto material = materialManager.Resolve(materialHandle);
+    materialManager.SetDefaultMaterial(materialHandle);
+
+    auto pipelineCreateInfo = material->GetPipelineCreateInfo();
     pipelineCreateInfo.renderPassHandle = renderPass;
 
     m_pipeline = rhi.CreatePipeline(pipelineCreateInfo);
 
     auto renderer = MakeUnique<graphics::Renderer>(rhi, m_pipeline);
 
-    renderer->AddPass(
-        MakeUnique<graphics::OpaquePass>(m_pipeline, renderPass, extent));
+    renderer->AddPass(MakeUnique<graphics::OpaquePass>(m_pipeline, renderPass,
+                                                       shaderHandle, extent));
 
     Engine::Get().SetRenderer(std::move(renderer));
 
     m_model = scene.CreatePrimitive(graphics::EPrimitiveType::Cube);
 
     auto meshComponent =
-        scene.GetWorld().GetComponent<ecs::MeshComponent>(m_model);
+        scene.GetWorld().GetComponent<ecs::RenderComponent>(m_model);
     auto handle = meshComponent->meshHandle;
-    graphics::GetMeshManager().UploadMesh(handle, material.GetVertexLayout());
+    graphics::GetMeshManager().UploadMesh(handle, material->GetVertexLayout());
 
     auto &world = scene.GetWorld();
     m_camera = world.CreateEntity();

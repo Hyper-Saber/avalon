@@ -3,29 +3,77 @@ module;
 #include <cstdint>
 #include <cstring>
 #include <debug/assert.hpp>
-#include <utility>
 export module avalon.graphics:material;
 import avalon.shader;
 import avalon.core;
 import avalon.rhi;
-import :utils;
 import :mesh;
+import :context;
 
 export namespace avalon::graphics {
 
-class AVALON_GRAPHICS_API Material final : public RefCounted<Material> {
+struct UniformBufferState {
+  StringId nameHash;
+  uint32_t bindingPoint;
+  size_t bufferOffset;
+  size_t size;
+  bool isDirty = true;
+
+  UniformBufferState(StringId nameHash, uint32_t bindingPoint, size_t offset,
+                     size_t size)
+      : nameHash(nameHash), bindingPoint(bindingPoint), bufferOffset(offset),
+        size(size) {}
+};
+
+struct PropertyMapping {
+  StringId nameHash;
+  uint32_t bufferIndex;
+  uint32_t memberOffset;
+  uint32_t size;
+};
+
+class AVALON_GRAPHICS_API Material final
+    : public mem::AutoDestroyable<Material> {
 public:
-  explicit Material(Handle<Shader> handle) : m_shaderHandle(handle) {
-    auto shader = GetShaderManager().Resolve(handle);
+  explicit Material(ShaderHandle handle) : m_shaderHandle(handle) {}
+
+  bool Initialize() {
+    auto shader = GetShaderManager().Resolve(m_shaderHandle);
+    if (!shader) {
+      Error("[Graphics]: Failed to initialize material!");
+      return false;
+    }
+
+    auto alignment =
+        GraphicsContext::Get()
+            .deviceCapabilities.limits.minUniformBufferOffsetAlignment;
+
     auto bindings = shader->GetDescriptorMetaData();
 
+    size_t currentOffset = 0;
     for (const auto &binding : bindings) {
-      auto blob = CreateEmptyBlob(binding.bufferSize);
-      m_uniformBufferStates.EmplaceBack(binding.bindingPoint, std::move(blob));
+      if (binding.set == 0)
+        continue;
+      switch (binding.type) {
+      case rhi::EDescriptorType::UniformBuffer:
+      case rhi::EDescriptorType::UniformBufferDynamic: {
+        currentOffset = mem::AlignUp(currentOffset, alignment);
+        m_uniformBufferStates.PushBack(
+            UniformBufferState(binding.nameHash, binding.bindingPoint,
+                               currentOffset, binding.bufferSize));
+        currentOffset += binding.bufferSize;
+        break;
+      }
+      default:
+        break;
+      }
     }
+
+    m_dataBlob = CreateEmptyBlob(currentOffset);
 
     InitializePropertyLayout(shader);
     BuildVertexInputState(shader);
+    return true;
   }
 
   template <typename T> void SetProperty(StringId nameHash, const T &value) {
@@ -37,6 +85,18 @@ public:
     }
     AVALON_ASSERT(false);
   }
+
+  auto GetInitialBufferStates() const -> const Array<UniformBufferState> & {
+    return m_uniformBufferStates;
+  }
+
+  auto GetDataBlob() const -> const IBlob & { return *m_dataBlob.Get(); }
+
+  auto GetPropertyLayout() const -> const Array<PropertyMapping> & {
+    return m_propertyLayout;
+  }
+
+  auto GetSHader() const { return m_shaderHandle; }
 
   auto GetPipelineCreateInfo() const -> rhi::PipelineCreateInfo {
     auto shader = GetShaderManager().Resolve(m_shaderHandle);
@@ -59,38 +119,19 @@ public:
   }
 
 private:
-  struct UniformBufferState {
-    uint32_t bindingPoint;
-    BlobPtr data;
-    bool isDirty = true;
-
-    UniformBufferState(uint32_t bindingPoint, BlobPtr &&data)
-        : bindingPoint(bindingPoint), data(std::move(data)) {}
-  };
-
-  struct PropertyMapping {
-    StringId nameHash;
-    uint32_t bufferIndex;
-    uint32_t offset;
-    uint32_t size;
-  };
-
   template <typename T>
   void UpdateInternal(const PropertyMapping &mapping, const T &value) {
-    AVALON_ASSERT_MSG(sizeof(T) <= mapping.size, "Property size mismatch!");
+    AVALON_ASSERT_MSG(sizeof(T) == mapping.size, "Property size mismatch!");
 
     auto &state = m_uniformBufferStates[mapping.bufferIndex];
-    auto *dest = state.data->As<uint8_t>() + mapping.offset;
 
-    if (std::memcmp(dest, &value, sizeof(T)) != 0) {
-      std::memcpy(dest, &value, sizeof(T));
-      state.isDirty = true;
-    }
+    state.isDirty = m_dataBlob->Write(
+        &value, state.bufferOffset + mapping.memberOffset, mapping.size);
   }
 
   void InitializePropertyLayout(const Shader *shader) {
     auto members = shader->GetBufferMembers();
-    m_propertyLayout.Reserve(members.GetSize());
+    m_propertyLayout.Reserve(m_uniformBufferStates.GetSize());
 
     for (const auto &member : members) {
       for (uint32_t i = 0; i < m_uniformBufferStates.GetSize(); i++) {
@@ -98,7 +139,7 @@ private:
           m_propertyLayout.PushBack({
               .nameHash = member.nameHash,
               .bufferIndex = i,
-              .offset = member.offset,
+              .memberOffset = member.offset,
               .size = member.size,
           });
           break;
@@ -173,11 +214,15 @@ private:
     return stride;
   }
 
-  Handle<Shader> m_shaderHandle;
+  ShaderHandle m_shaderHandle;
+  BlobPtr m_dataBlob;
   Array<UniformBufferState> m_uniformBufferStates;
   Array<PropertyMapping> m_propertyLayout;
   Array<rhi::VertexInputAttribute> m_vertexAttributes;
   Array<rhi::VertexBinding> m_vertexBindings;
   VertexLayout m_vertexLayout;
 };
+
+using MaterialHandle = Handle<Material>;
+
 } // namespace avalon::graphics

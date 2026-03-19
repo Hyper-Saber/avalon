@@ -31,7 +31,8 @@ target "avalon.core"
     add_syslinks("stdc++exp")
 
 target "avalon.rhi"
-    set_kind "static"
+    set_kind "shared"
+    add_avalon_api_rules("avalon.rhi")
     add_files("rhi/*.cppm", {public = true})
     add_deps("avalon.core")
 
@@ -87,7 +88,8 @@ target "avalon.shader"
 target "avalon.graphics"
     set_kind "shared"
     add_avalon_api_rules("avalon.graphics")
-    add_files ("graphics/**.cppm|shader/**", {public = true})
+    add_files("graphics/**.cppm|shader/**", {public = true})
+    add_files("graphics/**.cpp|shader/**")
     add_deps("avalon.core", "avalon.rhi", "avalon.shader", "avalon.ecs")
 
 target "avalon.scene"

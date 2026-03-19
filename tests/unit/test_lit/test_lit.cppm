@@ -11,7 +11,9 @@ import avalon.rhi;
 import avalon.scene;
 import avalon.ecs;
 import avalon.graphics;
+import avalon.shader;
 import :systems;
+import :components;
 
 using namespace avalon;
 
@@ -46,17 +48,21 @@ public:
 
     auto shaderHandle = graphics::GetShaderManager().GetOrCreateShader(
         Path(vfs::kShaderFolderVirtualPath) / StringView("lit.hlsl"));
-    auto material = graphics::Material(shaderHandle);
+    auto &materialManager = graphics::GetMaterialManager();
+    auto materialHandle =
+        materialManager.CreateMaterial(shaderHandle, "default"_id);
+    materialManager.SetDefaultMaterial(materialHandle);
+    auto material = materialManager.Resolve(materialHandle);
 
-    auto pipelineCreateInfo = material.GetPipelineCreateInfo();
+    auto pipelineCreateInfo = material->GetPipelineCreateInfo();
     pipelineCreateInfo.renderPassHandle = renderPass;
 
     m_pipeline = rhi.CreatePipeline(pipelineCreateInfo);
 
     auto renderer = MakeUnique<graphics::Renderer>(rhi, m_pipeline);
 
-    renderer->AddPass(
-        MakeUnique<graphics::OpaquePass>(m_pipeline, renderPass, extent));
+    renderer->AddPass(MakeUnique<graphics::OpaquePass>(m_pipeline, renderPass,
+                                                       shaderHandle, extent));
 
     Engine::Get().SetRenderer(std::move(renderer));
 
@@ -68,33 +74,47 @@ public:
         .scale = Vec3::One(),
     };
     world.AddComponent<ecs::TransformComponent>(m_camera, transform);
-    world.AddSystem<ecs::CameraSystem>();
-    world.AddSystem<ecs::UpdateLightSystem>();
-
     auto light = world.CreateEntity();
     world.AddComponent<ecs::LightComponent>(light);
 
     auto lightComp = world.GetComponent<ecs::LightComponent>(light);
-    lightComp->directionOrPosition = Vec4::FromVec3(Vec3{0, -1, -2});
+    lightComp->directionOrPosition = Vec4::FromVec3(Vec3{0, -1, -1});
 
     auto cube = scene.CreatePrimitive(graphics::EPrimitiveType::Cube);
     auto sphere = scene.CreatePrimitive(graphics::EPrimitiveType::Sphere);
-    auto plane = scene.CreatePrimitive(graphics::EPrimitiveType::Plane);
 
-    auto handle = world.GetComponent<ecs::MeshComponent>(cube)->meshHandle;
-    graphics::GetMeshManager().UploadMesh(handle, material.GetVertexLayout());
-    handle = world.GetComponent<ecs::MeshComponent>(sphere)->meshHandle;
-    graphics::GetMeshManager().UploadMesh(handle, material.GetVertexLayout());
-    handle = world.GetComponent<ecs::MeshComponent>(plane)->meshHandle;
-    graphics::GetMeshManager().UploadMesh(handle, material.GetVertexLayout());
+    world.AddComponent<ecs::CubeComponent>(cube);
+
+    auto renderComp = world.GetComponent<ecs::RenderComponent>(cube);
+    auto meshHandle = renderComp->meshHandle;
+    graphics::GetMeshManager().UploadMesh(meshHandle,
+                                          material->GetVertexLayout());
+    auto materialInstanceHandle = renderComp->materialInstanceHandle;
+    auto materialInstance = materialManager.Resolve(materialInstanceHandle);
+    materialInstance->SetProperty("mMaterial.baseColor"_id, Color::Red());
+    materialInstance->SetProperty("mMaterial.specularColor"_id, Color::Cyan());
+    materialInstance->SetProperty("mMaterial.shininess"_id, 0.f);
+    materialInstance->SetProperty("mMaterial.f0"_id, 0.04f);
+
+    renderComp = world.GetComponent<ecs::RenderComponent>(sphere);
+    meshHandle = renderComp->meshHandle;
+    graphics::GetMeshManager().UploadMesh(meshHandle,
+                                          material->GetVertexLayout());
+    materialInstanceHandle = renderComp->materialInstanceHandle;
+    materialInstance = materialManager.Resolve(materialInstanceHandle);
+    materialInstance->SetProperty("mMaterial.baseColor"_id, Color::Blue());
+    materialInstance->SetProperty("mMaterial.specularColor"_id, Color::Green());
+    materialInstance->SetProperty("mMaterial.shininess"_id, 200.f);
+    materialInstance->SetProperty("mMaterial.f0"_id, 0.5f);
 
     auto transComp = world.GetComponent<ecs::TransformComponent>(cube);
     transComp->SetPosition(Vec3{-1, 0, 0});
     transComp = world.GetComponent<ecs::TransformComponent>(sphere);
     transComp->SetPosition(Vec3{1, 0, 0});
-    transComp = world.GetComponent<ecs::TransformComponent>(plane);
-    transComp->SetPosition(Vec3{0, -1, 0});
-    transComp->SetScale(Vec3(5, 1, 5));
+
+    world.AddSystem<ecs::CameraSystem>();
+    world.AddSystem<ecs::UpdateLightSystem>();
+    world.AddSystem<ecs::MoveCubeSystem>();
   }
 
 private:

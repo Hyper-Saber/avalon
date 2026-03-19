@@ -28,7 +28,6 @@ public:
 
   explicit Array(size_t size) {
     if (size > 0) {
-      Reserve(size);
       Resize(size);
     }
   }
@@ -42,6 +41,20 @@ public:
       } else {
         for (const auto &value : list) {
           PushBack(value);
+        }
+      }
+    }
+  }
+
+  Array(const T *ptr, size_t size) {
+    if (size > 0) {
+      Reserve(size);
+      if constexpr (std::is_trivially_copyable_v<T>) {
+        std::memcpy(m_data, ptr, size * sizeof(T));
+        m_size = size;
+      } else {
+        for (size_t i = 0; i < size; i++) {
+          PushBack(ptr[i]);
         }
       }
     }
@@ -87,6 +100,10 @@ public:
     }
     return *this;
   }
+
+  Array &operator=(const Array &other)
+    requires(!std::is_copy_constructible_v<T>)
+  = delete;
 
   void PushBack(const T &value) {
     if (m_size == m_capacity)

@@ -185,6 +185,22 @@ auto ToVkPolygonMode(EPolygonMode polygonMode) -> VkPolygonMode {
   }
 }
 
+auto ToVkSampleCount(ESampleCount e) -> VkSampleCountFlagBits {
+  switch (e) {
+  case ESampleCount::SampleCount1x:
+    return VK_SAMPLE_COUNT_1_BIT;
+  case ESampleCount::SampleCount2x:
+    return VK_SAMPLE_COUNT_2_BIT;
+  case ESampleCount::SampleCount4x:
+    return VK_SAMPLE_COUNT_4_BIT;
+  case ESampleCount::SampleCount8x:
+    return VK_SAMPLE_COUNT_8_BIT;
+  case ESampleCount::SampleCount16x:
+    return VK_SAMPLE_COUNT_16_BIT;
+    break;
+  }
+}
+
 auto ToVkDepthCompareOp(EDepthCompareOp compareOp) -> VkCompareOp {
   switch (compareOp) {
   case EDepthCompareOp::Less:

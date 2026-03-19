@@ -3,12 +3,14 @@ export module avalon.graphics:render_pass;
 
 import avalon.core;
 import avalon.rhi;
-import :mesh_extractor;
+import :render_packet_extractor;
 
 export namespace avalon::graphics {
 
 struct RenderContext {
+  rhi::IRhi &rhi;
   rhi::ICommandBuffer &cmd;
+  rhi::BufferHandle uboHandle;
   DescriptorSetHandle globalSet;
 };
 
@@ -18,7 +20,7 @@ public:
   virtual void SetClearColor(Color) = 0;
   virtual void OnResize(const rhi::Extent2D &extent) = 0;
   virtual void Setup(rhi::RenderPassBeginInfo &info) = 0;
-  virtual void Execute(RenderContext &context, const RenderPacket &packet) = 0;
+  virtual void Execute(RenderContext &context, RenderPacket &packet) = 0;
   virtual StringView GetName() const = 0;
 };
 

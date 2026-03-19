@@ -3,6 +3,8 @@ module;
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
+#include <debug/assert.hpp>
 #include <utility>
 export module avalon.core:memory.blobs;
 
@@ -17,12 +19,28 @@ export namespace avalon {
 class IBlob : public IRefCounted {
 public:
   virtual ~IBlob() = default;
+  virtual auto GetData() noexcept -> void * = 0;
   virtual auto GetData() const noexcept -> const void * = 0;
   virtual auto GetSize() const noexcept -> size_t = 0;
   virtual auto GetHash() const noexcept -> HashType = 0;
 
-  template <typename T> auto As() const -> const T * {
+  template <typename T> auto ConstAs() const -> const T * {
     return reinterpret_cast<const T *>(GetData());
+  }
+
+  template <typename T> auto As() -> T * {
+    return reinterpret_cast<T *>(GetData());
+  }
+
+  bool Write(const void *pSource, size_t offset, size_t size) {
+    AVALON_ASSERT(pSource != nullptr);
+    AVALON_ASSERT_MSG(offset + size <= GetSize(),
+                      "[IBlob]: Write out of range!");
+    if (size > 0) {
+      std::memcpy(static_cast<uint8_t *>(GetData()) + offset, pSource, size);
+      return true;
+    }
+    return false;
   }
 };
 
@@ -87,6 +105,7 @@ auto MakeSharedBlob(Args &&...args) -> SharedBlobPtr {
   return MakeShared<T>(std::forward<Args>(args)...);
 }
 
+// auto AVALON_CORE_API CreateSubBlob(const void *data, size_t size);
 auto AVALON_CORE_API CreateBlob(Array<std::byte> &&data) -> BlobPtr;
 auto AVALON_CORE_API CreateBlob(const void *data, size_t size) -> BlobPtr;
 auto AVALON_CORE_API CreateEmptyBlob(size_t size = 0) -> BlobPtr;

@@ -25,8 +25,7 @@ public:
 
     auto &pipelineResource = m_resourceProvider.GetPipeline({pipelineHandle});
     auto &maps = pipelineResource.descSetLayoutMaps;
-    if (maps.GetSize() != 0) {
-      AVALON_ASSERT(setIndex < maps.GetSize());
+    if (maps.GetSize() != 0 && setIndex < maps.GetSize()) {
       m_meta = &maps[setIndex];
       m_isValid = true;
     } else {

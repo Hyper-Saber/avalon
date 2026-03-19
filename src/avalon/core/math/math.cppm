@@ -206,4 +206,8 @@ inline Matrix4x4 CalculateViewMatrix(const Vec3 &position,
   return res;
 }
 
+inline auto ComputeNormalMatrix(const Matrix4x4 &model) {
+  return model.Transpose().Inverse();
+}
+
 } // namespace avalon

@@ -1,10 +1,12 @@
 module;
+#include <concepts>
 #include <cstddef>
 #include <debug/assert.hpp>
 #include <initializer_list>
 #include <type_traits>
 export module avalon.core:span;
 import :debug;
+import :containers.array;
 
 export namespace avalon {
 
@@ -15,6 +17,11 @@ public:
 
   template <size_t N>
   constexpr Span(T (&arr)[N]) noexcept : m_data(arr), m_size(N) {}
+
+  template <typename U>
+    requires std::convertible_to<U *, T *>
+  constexpr Span(const Array<U> &array) noexcept
+      : m_data(array.GetData()), m_size(array.GetSize()) {}
 
   constexpr Span(std::initializer_list<T> list) noexcept
       : m_data(const_cast<T *>(list.begin())), m_size() {}

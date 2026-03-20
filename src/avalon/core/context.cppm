@@ -16,9 +16,18 @@ enum class EEngineService : uint32_t {
   Count
 };
 
+struct GlobalTime {
+  float time;
+  float sineTime;
+  float cosineTime;
+  float deltaTime;
+};
+
 class EngineContext {
 public:
   rhi::RenderBackend rhi;
+
+  GlobalTime globalTime;
 
   template <TAutoDestroyable T>
   auto GetService(EEngineService service) const noexcept -> T & {

@@ -41,6 +41,11 @@ public:
   }
 
   void OnResize(const rhi::Extent2D &extent) {
+    m_resolution.width = static_cast<float>(extent.width);
+    m_resolution.height = static_cast<float>(extent.height);
+    m_resolution.invWidth = 1.0f / extent.width;
+    m_resolution.invHeight = 1.0f / extent.height;
+
     for (auto &pass : m_passes) {
       pass->OnResize(extent);
     }
@@ -51,9 +56,12 @@ public:
   }
 
   void Render(rhi::ICommandBuffer &cmd, ecs::World &world,
-              const SceneGlobals &globals) {
+              SceneGlobals &globals) {
 
     m_uboPool->ResetPool();
+
+    globals.time = GetContext().globalTime;
+    globals.resolution = m_resolution;
 
     RenderContext context{
         .rhi = m_rhi,
@@ -128,6 +136,7 @@ public:
   }
 
 private:
+  Resolution m_resolution;
   rhi::IRhi &m_rhi;
   RenderPacketExtractor m_extractor;
   RenderPacket m_packet;

@@ -17,9 +17,19 @@ struct LightData {
   uint32_t type;    // 0: Dir, 1: Point, 2: Spot
   float padding[3]; // 保证 16 字节对齐
 };
+
+struct Resolution {
+  float width;
+  float height;
+  float invWidth;
+  float invHeight;
+};
+
 struct SceneGlobals {
   CameraSnapshot camera;
   LightData lightData;
+  GlobalTime time;
+  Resolution resolution;
 };
 
 enum class EPrimitiveType {

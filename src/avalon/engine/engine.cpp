@@ -168,6 +168,10 @@ auto Engine::ExecuteFrame() -> rhi::ERhiResult {
 
 void Engine::Update() {
   m_totalTime += m_deltaTime;
+  GetContext().globalTime.time = m_totalTime;
+  GetContext().globalTime.sineTime = Sin(m_totalTime);
+  GetContext().globalTime.cosineTime = Cos(m_totalTime);
+  GetContext().globalTime.deltaTime = m_deltaTime;
 
   m_scene->GetWorld().Update(m_deltaTime);
 

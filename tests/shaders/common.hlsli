@@ -7,6 +7,10 @@
 
 #define uCamera uSceneGlobals.camera
 #define uMainLight uSceneGlobals.lightData
+#define uTime uSceneGlobals.time.time
+#define uSineTime uSceneGlobals.time.sineTime
+#define uCosineTime uSceneGlobals.time.cosineTime
+#define uDeltaTime uSceneGlobals.time.deltaTime
 
 #define PI 3.14159265
 
@@ -23,9 +27,25 @@ struct LightData {
   float3 padding;  // 保证 16 字节对齐
 };
 
+struct GlobalTime {
+  float time;
+  float sineTime;
+  float cosineTime;
+  float deltaTime;
+};
+
+struct Resolution {
+  float width;
+  float height;
+  float invWidth;
+  float invHeight;
+};
+
 struct SceneGlobals {
   Camera camera;
   LightData lightData;
+  GlobalTime time;
+  Resolution resolution;
 };
 
 VK_BINDING(0, 0) ConstantBuffer<SceneGlobals> uSceneGlobals

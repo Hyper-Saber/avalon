@@ -9,7 +9,7 @@ export namespace avalon::ecs {
 class PhysicsSystem final : public ecs::SystemBase<PhysicsSystem> {
   void OnUpdate(ecs::World &world, float dt) override {
     auto view = world.GetView<RigidBodyComponent, TransformComponent>();
-    view.ForEach([&](auto &rigidBody, auto &transform) {
+    view.Foreach([&](auto &rigidBody, auto &transform) {
       if (LengthSquared(rigidBody.velocity) > kEpsilon)
         transform.SetPosition(transform.local.position +
                               rigidBody.velocity * dt);

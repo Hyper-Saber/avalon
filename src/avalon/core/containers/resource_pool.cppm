@@ -34,6 +34,28 @@ public:
 
   ~ResourcePool() { Clear(); }
 
+  template <std::invocable<T &> Func> void Foreach(Func &&func) {
+    const uint32_t currentSize = m_slots.GetSize();
+    for (uint32_t i = 0; i < currentSize; i++) {
+      Slot &slot = m_slots[i];
+      if (slot.isActive) {
+        T *obj = reinterpret_cast<T *>(slot.data);
+        func(*obj);
+      }
+    }
+  }
+
+  template <std::invocable<const T &> Func> void Foreach(Func &&func) const {
+    const uint32_t currentSize = m_slots.GetSize();
+    for (uint32_t i = 0; i < currentSize; i++) {
+      const Slot &slot = m_slots[i];
+      if (slot.isActive) {
+        const T *obj = reinterpret_cast<T *>(slot.data);
+        func(*obj);
+      }
+    }
+  }
+
   uint32_t GetCapacity() const noexcept { return m_slots.GetCapacity(); }
 
   template <typename... Args> auto Create(Args &&...args) -> avalon::Handle<T> {
@@ -72,7 +94,7 @@ public:
     return ret;
   }
 
-  void Destroy(Handle<T> handle) {
+  void Release(Handle<T> handle) {
     uint32_t index = handle.GetIndex();
     if (index >= m_slots.GetSize())
       return;

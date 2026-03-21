@@ -12,11 +12,14 @@ constexpr avalon::StringView kFullscreenPassName = "FullscreenPass";
 
 export namespace avalon::graphics {
 
-class AVALON_GRAPHICS_API FullscreenPass final : public RenderPass<FullscreenPass> {
+class AVALON_GRAPHICS_API FullscreenPass final
+    : public RenderPass<FullscreenPass> {
 public:
   FullscreenPass(rhi::PipelineHandle pipeline, rhi::RenderPassHandle renderPass,
-             ShaderHandle handle, rhi::Extent2D extent)
-      : m_pipeline(pipeline), m_rendePass(renderPass), m_extent(extent) {}
+                 ShaderHandle handle, rhi::Extent2D extent,
+                 rhi::RenderTargetBinding targets = {})
+      : m_pipeline(pipeline), m_rendePass(renderPass), m_extent(extent),
+        m_targets(targets) {}
 
   void SetClearColor(Color color) override { m_color = color; }
 
@@ -51,7 +54,7 @@ public:
 private:
   void Setup(rhi::RenderPassBeginInfo &outInfo) override {
     outInfo.renderPassHandle = m_rendePass;
-    outInfo.renderTarget = rhi::ERenderTarget::SwapchainBackBuffer;
+    outInfo.targets = m_targets;
 
     outInfo.renderArea.offset = {0, 0};
     outInfo.renderArea.extent = m_extent;
@@ -64,6 +67,7 @@ private:
 
   rhi::PipelineHandle m_pipeline;
   rhi::RenderPassHandle m_rendePass;
+  rhi::RenderTargetBinding m_targets;
   Extent2D m_extent;
   Color m_color = {0, 0, 0.01f, 1};
 };

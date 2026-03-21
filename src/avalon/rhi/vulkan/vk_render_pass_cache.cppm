@@ -1,4 +1,5 @@
 module;
+#include <utility>
 #include <vulkan/vulkan.h>
 
 export module avalon.rhi.vulkan:render_pass_cache;
@@ -24,11 +25,13 @@ public:
     Array<VkAttachmentReference> colorReferences;
     VkAttachmentReference depthReference{};
 
-    for (uint32_t i = 0; i < createInfo.colorAttachments.GetSize(); i++) {
-      const auto &src = createInfo.colorAttachments[i];
+    bool hasDepth = createInfo.depthAttachmentIndex != -1;
+    auto depthAttachmentIndex = createInfo.depthAttachmentIndex;
+    for (uint32_t i = 0; i < createInfo.attachments.GetSize(); i++) {
+      const auto &src = createInfo.attachments[i];
       vkAttachments.PushBack({
-          .format = ToVkFormat(createInfo.colorAttachments[i].format),
-          .samples = ToVkSampleCount(createInfo.colorAttachments[i].sampleCount),
+          .format = ToVkFormat(createInfo.attachments[i].format),
+          .samples = ToVkSampleCount(createInfo.attachments[i].sampleCount),
           .loadOp = ToVkLoadOp(src.loadOp),
           .storeOp = ToVkStoreOp(src.storeOp),
           .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
@@ -36,48 +39,26 @@ public:
           .initialLayout = ToVkImageLayout(src.initialLayout),
           .finalLayout = ToVkImageLayout(src.finalLayout),
       });
-      colorReferences.PushBack({
-          .attachment = i,
-          .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-      });
+      if (i == depthAttachmentIndex) {
+        depthReference = {
+            .attachment =
+                static_cast<uint32_t>(createInfo.depthAttachmentIndex),
+            .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+        };
+      } else
+        colorReferences.PushBack({
+            .attachment = i,
+            .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        });
 
-      Debug("[Vulkan]: Color Attachment {}: "
-            "\n---------------------------------------\nformat: {}\nloadOp: "
+      Debug("[Vulkan]: Attachment {}: "
+            "\n---------------------------------------\nintent: {}\nformat: "
+            "{}\nloadOp: "
             "{}\nstoreOp: {}\ninitialLayout: {}\nfinalLayout: "
             "{}\n---------------------------------------",
-            i, ToView(src.format), ToView(src.loadOp), ToView(src.storeOp),
-            ToView(src.initialLayout), ToView(src.finalLayout));
-    }
-
-    if (createInfo.hasDepth) {
-      uint32_t depthIndex = static_cast<uint32_t>(vkAttachments.GetSize());
-      vkAttachments.PushBack({
-          .format = ToVkFormat(createInfo.depthAttachment.format),
-          .samples = VK_SAMPLE_COUNT_1_BIT,
-          .loadOp = ToVkLoadOp(createInfo.depthAttachment.loadOp),
-          .storeOp = ToVkStoreOp(createInfo.depthAttachment.storeOp),
-          .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-          .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-          .initialLayout =
-              ToVkImageLayout(createInfo.depthAttachment.initialLayout),
-          .finalLayout =
-              ToVkImageLayout(createInfo.depthAttachment.finalLayout),
-      });
-
-      Debug("[Vulkan]: Depth Attachment: "
-            "\n---------------------------------------\nformat: {}\nloadOp: "
-            "{}\nstoreOp: {}\ninitialLayout: {}\nfinalLayout: "
-            "{}\n---------------------------------------",
-            ToView(createInfo.depthAttachment.format),
-            ToView(createInfo.depthAttachment.loadOp),
-            ToView(createInfo.depthAttachment.storeOp),
-            ToView(createInfo.depthAttachment.initialLayout),
-            ToView(createInfo.depthAttachment.finalLayout));
-
-      depthReference = {
-          .attachment = depthIndex,
-          .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-      };
+            src.nameHash.Resolve(), ToView(src.intent), ToView(src.format),
+            ToView(src.loadOp), ToView(src.storeOp), ToView(src.initialLayout),
+            ToView(src.finalLayout));
     }
 
     VkSubpassDescription subpassDesc{
@@ -85,21 +66,10 @@ public:
         .colorAttachmentCount =
             static_cast<uint32_t>(colorReferences.GetSize()),
         .pColorAttachments = colorReferences.GetData(),
-        .pDepthStencilAttachment =
-            createInfo.hasDepth ? &depthReference : nullptr,
+        .pDepthStencilAttachment = hasDepth ? &depthReference : nullptr,
     };
 
-    VkSubpassDependency dependency{
-        .srcSubpass = VK_SUBPASS_EXTERNAL,
-        .dstSubpass = 0,
-        .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
-                        VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-        .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
-                        VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-        .srcAccessMask = 0,
-        .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
-                         VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-    };
+    auto dependency = DeriveDependency(colorReferences.GetSize() > 0, hasDepth);
 
     VkRenderPassCreateInfo vkPassCreateInfo{
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
@@ -131,7 +101,43 @@ public:
     return m_renderPassPool.Resolve(handle);
   }
 
+  template <std::invocable<RenderPassResource &> Func>
+  void Foreach(Func &&func) {
+    m_renderPassPool.Foreach(std::forward<Func>(func));
+  }
+
+  template <std::invocable<const RenderPassResource &> Func>
+  void Foreach(Func &&func) const {
+    m_renderPassPool.Foreach(std::forward<Func>(func));
+  }
+
 private:
+  auto DeriveDependency(bool hasColor, bool hasDepth) -> VkSubpassDependency {
+    VkSubpassDependency dep{
+        .srcSubpass = VK_SUBPASS_EXTERNAL,
+        .dstSubpass = 0,
+        .srcStageMask = 0,
+        .dstStageMask = 0,
+        .srcAccessMask = 0,
+        .dstAccessMask = 0,
+    };
+
+    if (hasColor) {
+      dep.srcStageMask |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+      dep.dstStageMask |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+      dep.dstAccessMask |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    }
+    if (hasDepth) {
+      dep.srcStageMask |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                          VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+      dep.dstStageMask |= VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                          VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+      dep.dstAccessMask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    }
+
+    return dep;
+  }
+
   VkDevice m_device;
   HashMap<HashType, Handle<RenderPassResource>> m_cache;
   mem::ResourcePool<RenderPassResource> m_renderPassPool;

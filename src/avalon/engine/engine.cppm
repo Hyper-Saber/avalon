@@ -38,10 +38,7 @@ public:
     m_renderer = std::move(renderer);
   }
 
-  void SetMainPass(rhi::RenderPassHandle pass) {
-    m_rhi->SetSwapchainRenderPass(pass);
-    m_renderPass = pass;
-  }
+  void SetMainPass(rhi::RenderPassHandle pass) { m_renderPass = pass; }
 
   float GetTotalTime() const { return m_totalTime; }
 

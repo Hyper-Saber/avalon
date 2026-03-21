@@ -29,7 +29,7 @@ struct Color {
   static constexpr Color DarkGray() {
     return {0.25f, 0.25f, 0.25f, 1.0f};
   }
-  static constexpr Color LightGray() {
+   static constexpr Color LightGray() {
     return {0.75f, 0.75f, 0.75f, 1.0f};
   }
 

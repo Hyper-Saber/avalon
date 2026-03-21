@@ -330,6 +330,8 @@ private:
         properties.limits.minUniformBufferOffsetAlignment;
     m_capabilities.limits.minStorageBufferOffsetAlignment =
         properties.limits.minStorageBufferOffsetAlignment;
+    m_capabilities.limits.maxSamplerAnisotroy =
+        properties.limits.maxSamplerAnisotropy;
   }
 
   auto CreateLogicalDevice() -> std::expected<void, ERhiResult> {

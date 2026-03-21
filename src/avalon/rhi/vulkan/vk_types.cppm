@@ -15,22 +15,6 @@ struct DeviceConfig {
   VkPhysicalDeviceFeatures features;
 };
 
-struct RenderPassResource : public mem::AutoDestroyable<RenderPassResource> {
-  const VkDevice device{VK_NULL_HANDLE};
-  const VkRenderPass renderPass{VK_NULL_HANDLE};
-  const RenderPassCreateInfo createInfo;
-
-  static RenderPassResource Null() {
-    return RenderPassResource{VK_NULL_HANDLE, VK_NULL_HANDLE, {}};
-  }
-
-  RenderPassResource(VkDevice device, VkRenderPass renderPass,
-                     RenderPassCreateInfo info)
-      : device(device), renderPass(renderPass), createInfo(info) {}
-
-  ~RenderPassResource() { vkDestroyRenderPass(device, renderPass, nullptr); }
-};
-
 struct DescriptorSetLayoutBindingMap {
   const StringId nameHash;
   const uint32_t index;
@@ -124,16 +108,45 @@ struct TextureResource : public mem::AutoDestroyable<TextureResource> {
   const VkImage image{VK_NULL_HANDLE};
   const VkImageView imageView{VK_NULL_HANDLE};
   const VkDeviceMemory memory{VK_NULL_HANDLE};
+  const TextureCreateInfo info;
 
   TextureResource(VkDevice device, VkImage image, VkImageView imageView,
-                  VkDeviceMemory memory)
-      : device(device), image(image), imageView(imageView), memory(memory) {}
+                  VkDeviceMemory memory, const TextureCreateInfo &info)
+      : device(device), image(image), imageView(imageView), memory(memory),
+        info(info) {}
 
   ~TextureResource() {
     vkDestroyImageView(device, imageView, nullptr);
     vkDestroyImage(device, image, nullptr);
     vkFreeMemory(device, memory, nullptr);
   }
+};
+
+struct SamplerResource : public mem::AutoDestroyable<SamplerResource> {
+  const VkDevice device{VK_NULL_HANDLE};
+  const VkSampler sampler{VK_NULL_HANDLE};
+
+  SamplerResource(VkDevice device, VkSampler sampler)
+      : device(device), sampler(sampler) {}
+
+  ~SamplerResource() { vkDestroySampler(device, sampler, nullptr); }
+};
+
+struct RenderPassResource : public mem::AutoDestroyable<RenderPassResource> {
+  const VkDevice device{VK_NULL_HANDLE};
+  const VkRenderPass renderPass{VK_NULL_HANDLE};
+  const RenderPassCreateInfo createInfo;
+  HashMap<StringId, Handle<TextureResource>> internalTextures;
+
+  static RenderPassResource Null() {
+    return RenderPassResource{VK_NULL_HANDLE, VK_NULL_HANDLE, {}};
+  }
+
+  RenderPassResource(VkDevice device, VkRenderPass renderPass,
+                     RenderPassCreateInfo info)
+      : device(device), renderPass(renderPass), createInfo(info) {}
+
+  ~RenderPassResource() { vkDestroyRenderPass(device, renderPass, nullptr); }
 };
 
 struct FrameBufferResource : public mem::AutoDestroyable<FrameBufferResource> {
@@ -174,6 +187,34 @@ struct QueueFamilyIndices {
   }
 };
 
+struct FrameBufferCreateInfo {
+  RenderPassHandle renderPassHandle;
+  Array<VkImageView> views;
+  uint32_t width;
+  uint32_t height;
+  uint32_t layers = 1;
+  HashType GetHash() const noexcept {
+    HashType hash = Hash::kOffsetBasis;
+
+    hash = Hash::Combine(hash, renderPassHandle.id);
+
+    for (uint32_t i = 0; i < views.GetSize(); ++i) {
+      hash = Hash::Combine(hash, reinterpret_cast<uint64_t>(views[i]));
+    }
+    uint64_t extent = (static_cast<uint64_t>(width) << 32) | height;
+    hash = Hash::Combine(hash, extent);
+    hash = Hash::Combine(hash, static_cast<uint64_t>(layers));
+
+    return hash;
+  }
+
+  bool operator==(const FrameBufferCreateInfo &other) const noexcept {
+    return renderPassHandle == other.renderPassHandle && width == other.width &&
+           height == other.height && layers == other.layers &&
+           views == other.views;
+  }
+};
+
 struct SwapchainSupportDetails {
   VkSurfaceCapabilitiesKHR capabilities;
   avalon::Array<VkSurfaceFormatKHR> surfaceFormats;
@@ -197,13 +238,18 @@ public:
 class IRenderResourceProvider {
 public:
   virtual auto GetRenderPass(RenderPassHandle)
-      -> const RenderPassResource & = 0;
+      -> const RenderPassResource * = 0;
 
-  virtual auto GetFrameBuffer(ERenderTarget) -> const FrameBufferResource & = 0;
-  virtual auto GetPipeline(PipelineHandle) -> const PipelineResource & = 0;
-  virtual auto GetBuffer(BufferHandle) -> const BufferResource & = 0;
+  virtual auto GetFrameBuffer(const RenderPassHandle,
+                              const RenderPassResource &,
+                              const RenderTargetBinding &)
+      -> const FrameBufferResource * = 0;
+  virtual auto GetPipeline(PipelineHandle) -> const PipelineResource * = 0;
+  virtual auto GetBuffer(BufferHandle) -> const BufferResource * = 0;
+  virtual auto GetTexture(TextureHandle) -> const TextureResource * = 0;
+  virtual auto GetSampler(SamplerHandle) -> const SamplerResource * = 0;
   virtual auto GetDescriptorSet(DescriptorSetHandle)
-      -> const DescriptorSetResource & = 0;
+      -> const DescriptorSetResource * = 0;
 };
 
 } // namespace avalon::rhi

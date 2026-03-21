@@ -190,7 +190,7 @@ bool Engine::TryHandleRhiError(rhi::ERhiResult error) {
     auto res = m_rhi->RecreateSwapchain(m_renderPass, width, height);
     m_renderer->OnResize({width, height});
     auto view = m_scene->GetWorld().GetView<ecs::CameraComponent>();
-    view.ForEach([&](ecs::Entity entity, ecs::CameraComponent &camera) {
+    view.Foreach([&](ecs::Entity entity, ecs::CameraComponent &camera) {
       camera.SetAspectRatio(width / static_cast<float>(height));
     });
 

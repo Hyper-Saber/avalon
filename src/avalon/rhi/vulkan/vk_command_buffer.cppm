@@ -49,12 +49,16 @@ public:
       }
     }
 
+    auto renderPassRes =
+        m_resourceProvider.GetRenderPass(info.renderPassHandle);
+
     VkRenderPassBeginInfo beginInfo{
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-        .renderPass =
-            m_resourceProvider.GetRenderPass(info.renderPassHandle).renderPass,
-        .framebuffer =
-            m_resourceProvider.GetFrameBuffer(info.renderTarget).frameBuffer,
+        .renderPass = renderPassRes->renderPass,
+        .framebuffer = m_resourceProvider
+                           .GetFrameBuffer(info.renderPassHandle,
+                                           *renderPassRes, info.targets)
+                           ->frameBuffer,
         .renderArea = {.offset = {info.renderArea.offset.x,
                                   info.renderArea.offset.y},
                        .extent = {info.renderArea.extent.width,
@@ -94,12 +98,12 @@ public:
     if (m_lastBoundPipeline == handle)
       return;
 
-    auto &res = m_resourceProvider.GetPipeline(handle);
-    VkPipeline pipeline = res.pipeline;
+    auto res = m_resourceProvider.GetPipeline(handle);
+    VkPipeline pipeline = res->pipeline;
     vkCmdBindPipeline(
         m_cmd, VkPipelineBindPoint::VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
     m_lastBoundPipeline = handle;
-    m_layout = res.pipelineLayout;
+    m_layout = res->pipelineLayout;
   }
 
   void BindVertexBuffer(uint32_t firstBinding, uint32_t bindingCount,
@@ -116,7 +120,7 @@ public:
     uint32_t actualCount = bindingCount > 16 ? 16 : bindingCount;
 
     for (uint32_t i = 0; i < actualCount; i++) {
-      buffers[i] = m_resourceProvider.GetBuffer(pBuffers[i]).buffer;
+      buffers[i] = m_resourceProvider.GetBuffer(pBuffers[i])->buffer;
     }
 
     vkCmdBindVertexBuffers(m_cmd, firstBinding, actualCount, buffers,
@@ -125,7 +129,7 @@ public:
 
   void BindIndexBuffer(BufferHandle handle, uint64_t offset,
                        EFormat format) override {
-    VkBuffer buffer = m_resourceProvider.GetBuffer(handle).buffer;
+    VkBuffer buffer = m_resourceProvider.GetBuffer(handle)->buffer;
     VkIndexType indexType = VK_INDEX_TYPE_UINT32;
     if (format == EFormat::R16_Uint) {
       indexType = VK_INDEX_TYPE_UINT16;
@@ -143,8 +147,8 @@ public:
     Array<VkDescriptorSet> vkSets;
 
     for (const auto &handle : sets) {
-      auto &setResouce = m_resourceProvider.GetDescriptorSet(handle);
-      vkSets.PushBack(setResouce.descriptorSet);
+      auto setResouce = m_resourceProvider.GetDescriptorSet(handle);
+      vkSets.PushBack(setResouce->descriptorSet);
     }
 
     vkCmdBindDescriptorSets(m_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_layout,
@@ -160,14 +164,14 @@ public:
 
   void UpdateBuffer(BufferHandle handle, uint64_t offset, const void *pData,
                     uint64_t size) override {
-    VkBuffer buffer = m_resourceProvider.GetBuffer(handle).buffer;
+    VkBuffer buffer = m_resourceProvider.GetBuffer(handle)->buffer;
     vkCmdUpdateBuffer(m_cmd, buffer, offset, size, pData);
   }
 
   void CopyBuffer(BufferHandle src, BufferHandle dst,
                   const BufferCopy &region) override {
-    auto srcBuffer = m_resourceProvider.GetBuffer(src).buffer;
-    auto dstBuffer = m_resourceProvider.GetBuffer(dst).buffer;
+    auto srcBuffer = m_resourceProvider.GetBuffer(src)->buffer;
+    auto dstBuffer = m_resourceProvider.GetBuffer(dst)->buffer;
 
     VkBufferCopy vkRegin{
         .srcOffset = region.srcOffset,

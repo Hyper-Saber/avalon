@@ -5,5 +5,5 @@ import :string;
 import :string_registry;
 import :hash;
 namespace avalon {
-String StringId::Resolve() { return ResolveStringId(m_id); }
+String StringId::Resolve() const { return ResolveStringId(m_id); }
 } // namespace avalon

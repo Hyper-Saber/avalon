@@ -23,7 +23,7 @@ public:
     };
 
     auto view = m_world->GetView<ecs::LightComponent>();
-    view.ForEach([&](ecs::Entity entity, ecs::LightComponent &light) {
+    view.Foreach([&](ecs::Entity entity, ecs::LightComponent &light) {
       globals.lightData.color = light.color;
       globals.lightData.dirOrPos = light.directionOrPosition;
       globals.lightData.type =

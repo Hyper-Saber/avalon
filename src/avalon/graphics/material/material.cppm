@@ -98,8 +98,20 @@ public:
 
   auto GetSHader() const { return m_shaderHandle; }
 
-  auto GetPipelineCreateInfo() const -> rhi::PipelineCreateInfo {
+  auto GetPipelineCreateInfo(uint32_t attachmentCount = 1)
+      -> rhi::PipelineCreateInfo {
     auto shader = GetShaderManager().Resolve(m_shaderHandle);
+
+    m_colorBlendStates.Clear();
+    m_colorBlendStates.ResizeUnInitialized(attachmentCount);
+
+    m_colorBlendStates[0] = m_mainBlendState;
+    for (uint32_t i = 1; i < attachmentCount; i++) {
+      m_colorBlendStates[i] = rhi::ColorBlendState{
+          .isEnable = false,
+          .writeMask = rhi::EColorWriteMask::All,
+      };
+    }
 
     rhi::PipelineCreateInfo info{
         .pushConstantRanges = shader->GetPushConstants(),
@@ -109,6 +121,7 @@ public:
                            m_vertexBindings.GetSize()},
         .descriptorSetLayoutBindings = shader->GetDescriptorSetLayouts(),
         .stageInfos = shader->GetStageInfos(),
+        .colorBlendStates = m_colorBlendStates,
     };
 
     return info;
@@ -221,6 +234,9 @@ private:
   Array<rhi::VertexInputAttribute> m_vertexAttributes;
   Array<rhi::VertexBinding> m_vertexBindings;
   VertexLayout m_vertexLayout;
+
+  Array<rhi::ColorBlendState> m_colorBlendStates;
+  rhi::ColorBlendState m_mainBlendState;
 };
 
 using MaterialHandle = Handle<Material>;

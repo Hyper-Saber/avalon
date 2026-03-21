@@ -109,7 +109,7 @@ const T &View<Components...>::Get(Entity entity) const {
 
 template <typename... Components>
 template <typename Func>
-void View<Components...>::ForEach(Func &&func) {
+void View<Components...>::Foreach(Func &&func) {
   for (Entity entity : *this) {
     if constexpr (std::is_invocable_v<Func, Entity, Components &...>) {
       func(entity, Get<Components>(entity)...);

@@ -23,7 +23,6 @@ public:
   virtual uint32_t GetCurrentFrameIndex() const = 0;
   virtual uint32_t GetMaxFrameInFlight() const = 0;
   virtual auto GetCapabilities() const -> DeviceCapabilities = 0;
-  virtual void SetSwapchainRenderPass(RenderPassHandle) = 0;
 
   virtual auto RecreateSwapchain(RenderPassHandle handle, uint32_t width,
                                  uint32_t height) -> ERhiResult = 0;

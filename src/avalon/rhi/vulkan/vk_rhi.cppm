@@ -33,7 +33,6 @@ public:
   uint32_t GetCurrentFrameIndex() const override;
   uint32_t GetMaxFrameInFlight() const override;
   auto GetCapabilities() const -> DeviceCapabilities override;
-  void SetSwapchainRenderPass(RenderPassHandle) override;
 
   auto CreateRenderPass(const RenderPassCreateInfo &info)
       -> RenderPassHandle override;
@@ -59,21 +58,25 @@ public:
   auto BeginFrame() -> ERhiResult override;
   auto EndFrame() -> ERhiResult override;
 
-  auto GetRenderPass(RenderPassHandle) -> const RenderPassResource & override;
-  auto GetFrameBuffer(ERenderTarget) -> const FrameBufferResource & override;
-  auto GetPipeline(PipelineHandle) -> const PipelineResource & override;
-  auto GetBuffer(BufferHandle) -> const BufferResource & override;
+  auto GetRenderPass(RenderPassHandle) -> const RenderPassResource * override;
+  auto GetFrameBuffer(const RenderPassHandle, const RenderPassResource &,
+                      const RenderTargetBinding &)
+      -> const FrameBufferResource * override;
+  auto GetPipeline(PipelineHandle) -> const PipelineResource * override;
+  auto GetBuffer(BufferHandle) -> const BufferResource * override;
+  auto GetTexture(TextureHandle) -> const TextureResource * override;
+  auto GetSampler(SamplerHandle) -> const SamplerResource * override;
   auto GetDescriptorSet(DescriptorSetHandle handle)
-      -> const DescriptorSetResource & override;
+      -> const DescriptorSetResource * override;
 
   void WaitIdle() override;
 
 private:
   auto CreateCommandPools() -> std::expected<void, ERhiResult>;
   auto CreateSyncObjects() -> std::expected<void, ERhiResult>;
-  void CleanupSwapchainFrameBuffers();
-  void CreateSwapchianFrameBuffers(RenderPassHandle handle);
   void CreateCommandBuffer();
+
+  void CreateRenderPassInternalTextures(RenderPassResource &renderPassRes);
 
 private:
   struct FrameSyncObject {
@@ -81,6 +84,8 @@ private:
     VkSemaphore renderFinishedSemaphore{VK_NULL_HANDLE};
     VkFence m_inflightFence;
   };
+
+  HashMap<HashType, Handle<FrameBufferResource>> m_frameBufferCache;
 
   UniquePtr<DeviceContext> m_deviceContext;
   UniquePtr<SwapchainContext> m_swapchainContext;

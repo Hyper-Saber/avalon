@@ -31,7 +31,10 @@ public:
       -> MaterialInstanceHandle {
     if (!handle.IsValid()) {
       AVALON_ASSERT(m_defaultMaterial.IsValid());
-      handle = m_defaultMaterial;
+      if (!m_defaultMaterialInstance.IsValid())
+        m_defaultMaterialInstance =
+            m_materialInstancePool.Create(m_defaultMaterial);
+      return m_defaultMaterialInstance;
     }
     return m_materialInstancePool.Create(handle);
   }
@@ -56,6 +59,7 @@ public:
 
 private:
   MaterialHandle m_defaultMaterial;
+  MaterialInstanceHandle m_defaultMaterialInstance;
   HashMap<StringId, MaterialHandle> m_materials;
 
   mem::ResourcePool<Material> m_materialPool;

@@ -47,7 +47,7 @@ public:
 
     auto view = world.GetView<ecs::RenderComponent, ecs::TransformComponent>();
 
-    view.ForEach([&](auto entity, auto &renderComp, auto &transComp) {
+    view.Foreach([&](auto entity, auto &renderComp, auto &transComp) {
       outPacket.meshHandles.PushBack(renderComp.meshHandle);
       outPacket.materialInstances.PushBack(renderComp.materialInstanceHandle);
       transComp.UpdateWorldMatrix();

@@ -84,28 +84,27 @@ private:
       layoutHash = Hash::Combine(layoutHash, range.GetHash());
     }
 
-    HashType state = 0;
-    state |= (static_cast<HashType>(info.topology) & 0xF);
-    state |= (static_cast<HashType>(info.polygonMode) & 0xF) << 4;
-    state |= (static_cast<HashType>(info.cullMode) & 0xF) << 8;
-    state |= (static_cast<HashType>(info.isDepthTestEnable ? 1ULL : 0ULL) & 0x1)
-             << 12;
-    state |=
-        (static_cast<HashType>(info.isDepthWriteEnable ? 1ULL : 0ULL) & 0x1)
-        << 13;
-    state |= (static_cast<HashType>(info.depthCompareOp) & 0xF) << 14;
+    HashType stateHash = Hash::kOffsetBasis;
+    stateHash = Hash::Combine(stateHash, info.inputAssemblyState.GetHash());
+    stateHash = Hash::Combine(stateHash, info.rasterizationState.GetHash());
+    stateHash = Hash::Combine(stateHash, info.depthStencilState.GetHash());
+    stateHash = Hash::Combine(stateHash, info.multisampleState.GetHash());
+
+    for (const auto &blend : info.colorBlendStates) {
+      stateHash = Hash::Combine(stateHash, blend.GetHash());
+    }
 
     return PipelineKey{.renderPassHash =
                            static_cast<HashType>(info.renderPassHandle.id),
                        .shaderHash = shaderHash,
                        .layoutHash = layoutHash,
-                       .statePacked = state};
+                       .statePacked = stateHash};
   }
 
   auto BuildPipeline(const PipelineCreateInfo &info)
       -> Handle<PipelineResource> {
     auto renderPass =
-        m_resourceProvider.GetRenderPass(info.renderPassHandle).renderPass;
+        m_resourceProvider.GetRenderPass(info.renderPassHandle)->renderPass;
 
     auto builder = PipelineBuilder();
     builder.SetRenderPass(renderPass)

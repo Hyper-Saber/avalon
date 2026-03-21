@@ -22,25 +22,31 @@ public:
   void OnInitialize(scene::Scene &scene, rhi::IRhi &rhi,
                     rhi::Extent2D extent) override {
     rhi::AttachmentDescription colorAttachment{
+        .nameHash = "swapchain"_id,
+        .intent = rhi::EAttachmentIntent::WriteColor,
         .format = rhi.GetSwapchainImageFormat(),
         .loadOp = rhi::EAttachmentLoadOp::Clear,
         .storeOp = rhi::EAttachmentStoreOp::Store,
         .initialLayout = rhi::EResourceLayout::Undefined,
         .finalLayout = rhi::EResourceLayout::Present,
+        .isSwapchain = true,
     };
 
     rhi::AttachmentDescription depthAttachment{
+        .nameHash = "depth"_id,
+        .intent = rhi::EAttachmentIntent::WriteDepth,
         .format = rhi::EFormat::D32_SFLOAT_S8_UINT,
         .loadOp = rhi::EAttachmentLoadOp::Clear,
         .storeOp = rhi::EAttachmentStoreOp::DontCare,
         .initialLayout = rhi::EResourceLayout::Undefined,
         .finalLayout = rhi::EResourceLayout::DepthStencilAttachment,
+        .isAutoResize = true,
     };
 
     rhi::RenderPassCreateInfo passCreateInfo{
-        .colorAttachments = {colorAttachment},
-        .depthAttachment = depthAttachment,
-        .hasDepth = true,
+        .nameHash = "main"_id,
+        .attachments = {colorAttachment, depthAttachment},
+        .depthAttachmentIndex = 1,
     };
 
     auto renderPass = rhi.CreateRenderPass(passCreateInfo);
@@ -89,8 +95,10 @@ public:
     auto meshHandle = renderComp->meshHandle;
     graphics::GetMeshManager().UploadMesh(meshHandle,
                                           material->GetVertexLayout());
-    auto materialInstanceHandle = renderComp->materialInstanceHandle;
+    auto materialInstanceHandle =
+        materialManager.CreateMaterialInstance(materialHandle);
     auto materialInstance = materialManager.Resolve(materialInstanceHandle);
+    renderComp->materialInstanceHandle = materialInstanceHandle;
     materialInstance->SetProperty("mMaterial.baseColor"_id, Color::Red());
     materialInstance->SetProperty("mMaterial.specularColor"_id, Color::Cyan());
     materialInstance->SetProperty("mMaterial.shininess"_id, 0.f);

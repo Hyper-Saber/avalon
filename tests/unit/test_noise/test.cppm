@@ -20,15 +20,28 @@ public:
   void OnInitialize(scene::Scene &scene, rhi::IRhi &rhi,
                     rhi::Extent2D extent) override {
     rhi::AttachmentDescription colorAttachment{
+        .nameHash = "swapchain"_id,
         .format = rhi.GetSwapchainImageFormat(),
         .loadOp = rhi::EAttachmentLoadOp::Clear,
         .storeOp = rhi::EAttachmentStoreOp::Store,
         .initialLayout = rhi::EResourceLayout::Undefined,
         .finalLayout = rhi::EResourceLayout::Present,
+        .isSwapchain = true,
+    };
+
+    rhi::AttachmentDescription captureAttachment{
+        .nameHash = "capture"_id,
+        .intent = rhi::EAttachmentIntent::CaptureSource,
+        .format = rhi::EFormat::B8G8R8A8_SRGB,
+        .loadOp = rhi::EAttachmentLoadOp::DontCare,
+        .storeOp = rhi::EAttachmentStoreOp::Store,
+        .initialLayout = rhi::EResourceLayout::Undefined,
+        .finalLayout = rhi::EResourceLayout::TransferSrc,
+        .isAutoResize = true,
     };
 
     rhi::RenderPassCreateInfo passCreateInfo{
-        .colorAttachments = {colorAttachment},
+        .attachments = {colorAttachment, captureAttachment},
     };
 
     auto renderPass = rhi.CreateRenderPass(passCreateInfo);
@@ -43,15 +56,15 @@ public:
     auto material = materialManager.Resolve(materialHandle);
     materialManager.SetDefaultMaterial(materialHandle);
 
-    auto pipelineCreateInfo = material->GetPipelineCreateInfo();
+    auto pipelineCreateInfo = material->GetPipelineCreateInfo(2);
     pipelineCreateInfo.renderPassHandle = renderPass;
 
     m_pipeline = rhi.CreatePipeline(pipelineCreateInfo);
 
     auto renderer = MakeUnique<graphics::Renderer>(rhi, m_pipeline);
 
-    renderer->AddPass(MakeUnique<graphics::FullscreenPass>(m_pipeline, renderPass,
-                                                       shaderHandle, extent));
+    renderer->AddPass(MakeUnique<graphics::FullscreenPass>(
+        m_pipeline, renderPass, shaderHandle, extent));
 
     Engine::Get().SetRenderer(std::move(renderer));
   }

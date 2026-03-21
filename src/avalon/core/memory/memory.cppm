@@ -48,8 +48,11 @@ public:
   using IsAutoDestroyable = void;
   virtual ~IAutoDestroyable() {
     AVALON_ASSERT(m_lifecycleState == State::Invalidated ||
-                  m_lifecycleState == State::Created);
+                  m_lifecycleState == State::Created ||
+                  m_lifecycleState == State::Ignore);
   }
+
+  void MarkIgnore() { m_lifecycleState = State::Ignore; }
 
 protected:
   friend class LifeCycle;
@@ -57,7 +60,13 @@ protected:
   virtual void Destroy() = 0;
   virtual bool Initialize() { return true; }
 
-  enum class State { Created, Initialized, Invalidated };
+  enum class State {
+    Created,
+    Initialized,
+    Invalidated,
+    Ignore,
+  };
+
   State m_lifecycleState = State::Created;
 
   void MarkInitialized() { m_lifecycleState = State::Initialized; }

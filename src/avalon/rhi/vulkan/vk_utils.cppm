@@ -28,7 +28,7 @@ auto TranslateRequirements(const DeviceRequirement &requirements)
   return config;
 }
 
-auto ToVkFormat(EFormat format) -> VkFormat {
+constexpr auto ToVkFormat(EFormat format) noexcept -> VkFormat {
   switch (format) {
   case EFormat::Undefined:
     return VkFormat::VK_FORMAT_UNDEFINED;
@@ -123,7 +123,8 @@ auto ToVkFormat(EFormat format) -> VkFormat {
   }
 }
 
-auto ToVkLoadOp(EAttachmentLoadOp loadOp) -> VkAttachmentLoadOp {
+constexpr auto ToVkLoadOp(EAttachmentLoadOp loadOp) noexcept
+    -> VkAttachmentLoadOp {
   switch (loadOp) {
   case EAttachmentLoadOp::Load:
     return VK_ATTACHMENT_LOAD_OP_LOAD;
@@ -134,7 +135,8 @@ auto ToVkLoadOp(EAttachmentLoadOp loadOp) -> VkAttachmentLoadOp {
   }
 }
 
-auto ToVkStoreOp(EAttachmentStoreOp storeOp) -> VkAttachmentStoreOp {
+constexpr auto ToVkStoreOp(EAttachmentStoreOp storeOp) noexcept
+    -> VkAttachmentStoreOp {
   switch (storeOp) {
   case EAttachmentStoreOp::Store:
     return VK_ATTACHMENT_STORE_OP_STORE;
@@ -143,7 +145,62 @@ auto ToVkStoreOp(EAttachmentStoreOp storeOp) -> VkAttachmentStoreOp {
   }
 }
 
-auto ToVkImageLayout(EResourceLayout layout) -> VkImageLayout {
+constexpr auto ToVkBlendOp(EBlendOp op) noexcept -> VkBlendOp {
+  switch (op) {
+  case EBlendOp::Add:
+    return VK_BLEND_OP_ADD;
+  case EBlendOp::Subtract:
+    return VK_BLEND_OP_SUBTRACT;
+  case EBlendOp::ReverseSubtract:
+    return VK_BLEND_OP_REVERSE_SUBTRACT;
+  case EBlendOp::Min:
+    return VK_BLEND_OP_MIN;
+  case EBlendOp::Max:
+    return VK_BLEND_OP_MAX;
+  default:
+    AVALON_ASSERT_MSG(false, "Unsupported BlendOp");
+    return VK_BLEND_OP_ADD;
+  }
+}
+
+constexpr auto ToVkBlendFactor(EBlendFactor factor) noexcept -> VkBlendFactor {
+  switch (factor) {
+  case EBlendFactor::Zero:
+    return VK_BLEND_FACTOR_ZERO;
+  case EBlendFactor::One:
+    return VK_BLEND_FACTOR_ONE;
+  case EBlendFactor::SrcColor:
+    return VK_BLEND_FACTOR_SRC_COLOR;
+  case EBlendFactor::OneMinusSrcColor:
+    return VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
+  case EBlendFactor::DstColor:
+    return VK_BLEND_FACTOR_DST_COLOR;
+  case EBlendFactor::OneMinusDstColor:
+    return VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
+  case EBlendFactor::SrcAlpha:
+    return VK_BLEND_FACTOR_SRC_ALPHA;
+  case EBlendFactor::OneMinusSrcAlpha:
+    return VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+  case EBlendFactor::DstAlpha:
+    return VK_BLEND_FACTOR_DST_ALPHA;
+  case EBlendFactor::OneMinusDstAlpha:
+    return VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
+  case EBlendFactor::ConstantColor:
+    return VK_BLEND_FACTOR_CONSTANT_COLOR;
+  case EBlendFactor::OneMinusConstantColor:
+    return VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR;
+  case EBlendFactor::SrcAlphaSaturate:
+    return VK_BLEND_FACTOR_SRC_ALPHA_SATURATE;
+  case EBlendFactor::Src1Color:
+    return VK_BLEND_FACTOR_SRC1_COLOR;
+  default:
+    AVALON_ASSERT_MSG(false, "Unsupported BlendFactor");
+    return VK_BLEND_FACTOR_ONE;
+  }
+}
+
+constexpr auto ToVkImageLayout(EResourceLayout layout) noexcept
+    -> VkImageLayout {
   switch (layout) {
   case EResourceLayout::Undefined:
     return VK_IMAGE_LAYOUT_UNDEFINED;
@@ -162,7 +219,8 @@ auto ToVkImageLayout(EResourceLayout layout) -> VkImageLayout {
   }
 }
 
-auto ToVkPrimitiveTopology(EPrimitiveTopology topology) -> VkPrimitiveTopology {
+constexpr auto ToVkPrimitiveTopology(EPrimitiveTopology topology) noexcept
+    -> VkPrimitiveTopology {
   switch (topology) {
   case EPrimitiveTopology::PointList:
     return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
@@ -173,7 +231,8 @@ auto ToVkPrimitiveTopology(EPrimitiveTopology topology) -> VkPrimitiveTopology {
   }
 }
 
-auto ToVkPolygonMode(EPolygonMode polygonMode) -> VkPolygonMode {
+constexpr auto ToVkPolygonMode(EPolygonMode polygonMode) noexcept
+    -> VkPolygonMode {
   switch (polygonMode) {
   case EPolygonMode::Fill:
     return VK_POLYGON_MODE_FILL;
@@ -185,7 +244,8 @@ auto ToVkPolygonMode(EPolygonMode polygonMode) -> VkPolygonMode {
   }
 }
 
-auto ToVkSampleCount(ESampleCount e) -> VkSampleCountFlagBits {
+constexpr auto ToVkSampleCount(ESampleCount e) noexcept
+    -> VkSampleCountFlagBits {
   switch (e) {
   case ESampleCount::SampleCount1x:
     return VK_SAMPLE_COUNT_1_BIT;
@@ -201,24 +261,59 @@ auto ToVkSampleCount(ESampleCount e) -> VkSampleCountFlagBits {
   }
 }
 
-auto ToVkDepthCompareOp(EDepthCompareOp compareOp) -> VkCompareOp {
+constexpr auto ToVkCompareOp(ECompareOp compareOp) noexcept -> VkCompareOp {
   switch (compareOp) {
-  case EDepthCompareOp::Less:
+  case ECompareOp::Less:
     return VK_COMPARE_OP_LESS;
-  case EDepthCompareOp::LessOrEqual:
+  case ECompareOp::LessOrEqual:
     return VK_COMPARE_OP_LESS_OR_EQUAL;
-  case EDepthCompareOp::Greater:
+  case ECompareOp::Greater:
     return VK_COMPARE_OP_GREATER;
-  case EDepthCompareOp::GreaterOrEqual:
+  case ECompareOp::GreaterOrEqual:
     return VK_COMPARE_OP_GREATER_OR_EQUAL;
-  case EDepthCompareOp::Equal:
+  case ECompareOp::Equal:
     return VK_COMPARE_OP_EQUAL;
-  case EDepthCompareOp::NotEqual:
+  case ECompareOp::NotEqual:
     return VK_COMPARE_OP_NOT_EQUAL;
   }
 }
 
-auto ToVkBufferUsageBits(EBufferUsage usage) -> VkBufferUsageFlagBits {
+constexpr auto ToVkFilter(EFilter e) noexcept {
+  switch (e) {
+  case EFilter::Nearest:
+    return VK_FILTER_NEAREST;
+  case EFilter::Linear:
+    return VK_FILTER_LINEAR;
+  }
+}
+
+constexpr auto ToVkMipmapMode(EMipmapMode e) noexcept {
+  switch (e) {
+  case EMipmapMode::Nearest:
+    return VK_SAMPLER_MIPMAP_MODE_NEAREST;
+  case EMipmapMode::Linear:
+    return VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    break;
+  }
+}
+
+constexpr auto ToVkAddressMode(EAddressMode e) noexcept {
+  switch (e) {
+  case EAddressMode::Repeat:
+    return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  case EAddressMode::MirroredRepeat:
+    return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+  case EAddressMode::ClampToEdge:
+    return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+  case EAddressMode::ClampToBorder:
+    return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+  case EAddressMode::MirrorClampToEdge:
+    return VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE;
+  }
+}
+
+constexpr auto ToVkBufferUsageBits(EBufferUsage usage) noexcept
+    -> VkBufferUsageFlagBits {
   switch (usage) {
   case EBufferUsage::Vertex:
     return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
@@ -239,7 +334,47 @@ auto ToVkBufferUsageBits(EBufferUsage usage) -> VkBufferUsageFlagBits {
   }
 }
 
-auto ToVkBufferUsageFlags(EBufferUsage usage) -> VkBufferUsageFlags {
+constexpr auto ToVkImageUsageFlags(ETextureUsage usage) noexcept
+    -> VkImageUsageFlags {
+  if (usage == ETextureUsage::None) {
+    return 0;
+  }
+
+  VkImageUsageFlags vkUsages = 0;
+
+  if ((usage & ETextureUsage::Sampled) != ETextureUsage::None) {
+    vkUsages |= VK_IMAGE_USAGE_SAMPLED_BIT;
+  }
+
+  if ((usage & ETextureUsage::ColorAttachment) != ETextureUsage::None) {
+    vkUsages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+  }
+
+  if ((usage & ETextureUsage::DepthStencilAttachment) != ETextureUsage::None) {
+    vkUsages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+  }
+
+  if ((usage & ETextureUsage::Storage) != ETextureUsage::None) {
+    vkUsages |= VK_IMAGE_USAGE_STORAGE_BIT;
+  }
+
+  if ((usage & ETextureUsage::TransferSrc) != ETextureUsage::None) {
+    vkUsages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+  }
+
+  if ((usage & (ETextureUsage::ColorAttachment |
+                ETextureUsage::DepthStencilAttachment)) !=
+      ETextureUsage::None) {
+    vkUsages |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+  }
+
+  AVALON_ASSERT_MSG(vkUsages != 0,
+                    "[Vulkan] Image usage mapping resulted in 0 flags!");
+  return vkUsages;
+}
+
+constexpr auto ToVkBufferUsageFlags(EBufferUsage usage) noexcept
+    -> VkBufferUsageFlags {
   AVALON_ASSERT(usage != EBufferUsage::None);
   VkBufferUsageFlags vkUsages = 0;
   if ((usage & EBufferUsage::TransferDst) != EBufferUsage::None) {
@@ -268,7 +403,7 @@ auto ToVkBufferUsageFlags(EBufferUsage usage) -> VkBufferUsageFlags {
   return vkUsages;
 }
 
-auto ToVkMemoryPropertyFlags(EMemoryProperty property)
+constexpr auto ToVkMemoryPropertyFlags(EMemoryProperty property) noexcept
     -> VkMemoryPropertyFlags {
   AVALON_ASSERT(property != EMemoryProperty::None);
 
@@ -287,7 +422,8 @@ auto ToVkMemoryPropertyFlags(EMemoryProperty property)
   return vkFlags;
 }
 
-auto ToVkDescriptorType(EDescriptorType type) -> VkDescriptorType {
+constexpr auto ToVkDescriptorType(EDescriptorType type) noexcept
+    -> VkDescriptorType {
   switch (type) {
   case EDescriptorType::UniformBuffer:
     return VkDescriptorType::VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -317,7 +453,7 @@ auto ToVkDescriptorType(EDescriptorType type) -> VkDescriptorType {
   }
 }
 
-auto ToVkCullMode(ECullMode cullMode) -> VkCullModeFlags {
+constexpr auto ToVkCullMode(ECullMode cullMode) noexcept -> VkCullModeFlags {
   switch (cullMode) {
   case ECullMode::Back:
     return VK_CULL_MODE_BACK_BIT;
@@ -330,7 +466,39 @@ auto ToVkCullMode(ECullMode cullMode) -> VkCullModeFlags {
   }
 }
 
-auto ToVkShaderStageFlags(EShaderStage stage) -> VkShaderStageFlags {
+constexpr auto ToVkColorComponentFlags(EColorWriteMask mask) noexcept
+    -> VkColorComponentFlags {
+
+  if (mask == EColorWriteMask::None) {
+    return 0;
+  }
+
+  VkColorComponentFlags vkFlags = 0;
+
+  if ((static_cast<uint32_t>(mask) &
+       static_cast<uint32_t>(EColorWriteMask::R)) != 0) {
+    vkFlags |= VK_COLOR_COMPONENT_R_BIT;
+  }
+  if ((static_cast<uint32_t>(mask) &
+       static_cast<uint32_t>(EColorWriteMask::G)) != 0) {
+    vkFlags |= VK_COLOR_COMPONENT_G_BIT;
+  }
+  if ((static_cast<uint32_t>(mask) &
+       static_cast<uint32_t>(EColorWriteMask::B)) != 0) {
+    vkFlags |= VK_COLOR_COMPONENT_B_BIT;
+  }
+  if ((static_cast<uint32_t>(mask) &
+       static_cast<uint32_t>(EColorWriteMask::A)) != 0) {
+    vkFlags |= VK_COLOR_COMPONENT_A_BIT;
+  }
+
+  AVALON_ASSERT(vkFlags != 0 || mask == EColorWriteMask::None);
+
+  return vkFlags;
+}
+
+constexpr auto ToVkShaderStageFlags(EShaderStage stage) noexcept
+    -> VkShaderStageFlags {
   AVALON_ASSERT(stage != EShaderStage::None);
   VkShaderStageFlags vkStages = 0;
   if ((stage & EShaderStage::Vertex) != EShaderStage::None) {
@@ -347,7 +515,8 @@ auto ToVkShaderStageFlags(EShaderStage stage) -> VkShaderStageFlags {
   return vkStages;
 }
 
-auto ToVkShaderStageBits(EShaderStage stage) -> VkShaderStageFlagBits {
+constexpr auto ToVkShaderStageBits(EShaderStage stage) noexcept
+    -> VkShaderStageFlagBits {
   switch (stage) {
   case EShaderStage::None:
     return VkShaderStageFlagBits::VK_SHADER_STAGE_MISS_BIT_KHR;
@@ -362,7 +531,34 @@ auto ToVkShaderStageBits(EShaderStage stage) -> VkShaderStageFlagBits {
   }
 }
 
-auto HandleVkError(VkResult result) -> ERhiResult {
+constexpr auto MapIntentToUsage(EAttachmentIntent intent) noexcept
+    -> ETextureUsage {
+  ETextureUsage usage = ETextureUsage::None;
+
+  if ((intent & EAttachmentIntent::ReadOnly) != EAttachmentIntent::None) {
+    usage |= ETextureUsage::Sampled;
+  }
+
+  if ((intent & EAttachmentIntent::WriteColor) != EAttachmentIntent::None) {
+    usage |= ETextureUsage::ColorAttachment;
+  }
+
+  if ((intent & EAttachmentIntent::WriteDepth) != EAttachmentIntent::None) {
+    usage |= ETextureUsage::DepthStencilAttachment;
+  }
+
+  if ((intent & EAttachmentIntent::CaptureSource) != EAttachmentIntent::None) {
+    usage |= ETextureUsage::TransferSrc | ETextureUsage::ColorAttachment;
+  }
+
+  if ((intent & EAttachmentIntent::ComputeStorage) != EAttachmentIntent::None) {
+    usage |= ETextureUsage::Storage;
+  }
+
+  return usage;
+}
+
+constexpr auto HandleVkError(VkResult result) noexcept -> ERhiResult {
   switch (result) {
   case VK_ERROR_DEVICE_LOST:
     return ERhiResult::DeviceLost;
@@ -378,7 +574,7 @@ auto HandleVkError(VkResult result) -> ERhiResult {
   }
 }
 
-StringView ToView(VkResult result) {
+constexpr StringView ToView(VkResult result) noexcept {
   switch (result) {
   case VK_SUCCESS:
     return "VK_SUCCESS";

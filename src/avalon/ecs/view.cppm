@@ -12,7 +12,7 @@ public:
   template <typename T> T &Get(Entity entity);
   template <typename T> T const &Get(Entity entity) const;
 
-  template <typename Func> void ForEach(Func &&func);
+  template <typename Func> void Foreach(Func &&func);
 
   struct Iterator {
     World &world;

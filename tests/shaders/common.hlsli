@@ -11,6 +11,7 @@
 #define uSineTime uSceneGlobals.time.sineTime
 #define uCosineTime uSceneGlobals.time.cosineTime
 #define uDeltaTime uSceneGlobals.time.deltaTime
+#define uResolution uSceneGlobals.resolution
 
 #define PI 3.14159265
 
@@ -34,18 +35,11 @@ struct GlobalTime {
   float deltaTime;
 };
 
-struct Resolution {
-  float width;
-  float height;
-  float invWidth;
-  float invHeight;
-};
-
 struct SceneGlobals {
   Camera camera;
   LightData lightData;
   GlobalTime time;
-  Resolution resolution;
+  float4 resolution;
 };
 
 VK_BINDING(0, 0) ConstantBuffer<SceneGlobals> uSceneGlobals

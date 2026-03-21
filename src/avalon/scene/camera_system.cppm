@@ -10,7 +10,7 @@ export namespace avalon::ecs {
 class AVALON_SCENE_API CameraSystem final : public SystemBase<CameraSystem> {
   void OnUpdate(World &world, float dt) override {
     auto view = world.GetView<CameraComponent>();
-    view.ForEach([&](Entity entity, CameraComponent &camera) {
+    view.Foreach([&](Entity entity, CameraComponent &camera) {
       if (camera.isDirty) {
         if (camera.projectionType == scene::EProjectionType::Perspective) {
           camera.UpdateProjectionMatrix();

@@ -14,7 +14,7 @@ class MoveCubeSystem : public ecs::SystemBase<MoveCubeSystem> {
   void OnUpdate(ecs::World &world, float dt) override {
     auto view = world.GetView<TransformComponent, CubeComponent>();
     auto totalTime = Engine::Get().GetTotalTime();
-    view.ForEach([&](auto &transComp, auto &_) {
+    view.Foreach([&](auto &transComp, auto &_) {
       auto rotation = transComp.GetRotationEuler();
       rotation.x = totalTime * 10;
       rotation.y = totalTime * 10;
@@ -34,7 +34,7 @@ class UpdateLightSystem : public ecs::SystemBase<UpdateLightSystem> {
     float cosA = Cos(angleDelta);
     float sinA = Sin(angleDelta);
 
-    view.ForEach([&](auto &light) {
+    view.Foreach([&](auto &light) {
       if (light.lightType == scene::ELightType::Directional) {
         float x = light.directionOrPosition.x;
         float y = light.directionOrPosition.y;

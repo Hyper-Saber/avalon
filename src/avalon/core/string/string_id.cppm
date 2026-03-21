@@ -44,7 +44,7 @@ public:
 
   HashType GetHash() const noexcept { return m_id; }
 
-  String Resolve();
+  String Resolve() const;
 
 private:
   HashType m_id;

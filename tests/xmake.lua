@@ -16,3 +16,8 @@ target ("test.noise")
     set_kind("binary")
     add_files("unit/test_noise/*.cppm")
     add_deps("avalon.engine", "test.utils")
+
+target ("test.normal")
+    set_kind("binary")
+    add_files("unit/test_normal/*.cppm")
+    add_deps("avalon.engine", "test.utils")

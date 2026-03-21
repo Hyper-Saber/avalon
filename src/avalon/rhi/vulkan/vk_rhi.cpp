@@ -71,8 +71,7 @@ auto VkRhi::Initialize(const DeviceRequirement &requirement,
   if (!result.has_value())
     return result.error();
 
-  m_resourcePool = MakeUnique<ResourcePool>(
-      m_deviceContext->GetDevice(), m_deviceContext->GetPhysicalDevice());
+  m_resourcePool = MakeUnique<ResourcePool>(*m_deviceContext.Get());
   m_pipelineManager =
       MakeUnique<PipelineManager>(m_deviceContext->GetDevice(), *this);
   for (uint32_t i = 0; i < m_maxFrameInFlight; i++) {
@@ -111,46 +110,104 @@ auto VkRhi::GetCapabilities() const -> DeviceCapabilities {
   return m_deviceContext->GetCapabilities();
 }
 
-void VkRhi::SetSwapchainRenderPass(RenderPassHandle handle) {
-  CreateSwapchianFrameBuffers(handle);
-}
-
 auto VkRhi::GetRenderPass(RenderPassHandle handle)
-    -> const RenderPassResource & {
-  return *m_resourcePool->ResolveRenderPass({handle.id});
+    -> const RenderPassResource * {
+  return m_resourcePool->ResolveRenderPass({handle.id});
 }
-auto VkRhi::GetFrameBuffer(ERenderTarget target)
-    -> const FrameBufferResource & {
-  switch (target) {
-  case ERenderTarget::SwapchainBackBuffer:
-    return *m_resourcePool->ResolveFrameBuffer(
-        m_swapchainContext->GetFrameBuffer(m_currentImageIndex));
+
+auto VkRhi::GetFrameBuffer(const RenderPassHandle renderPassHandle,
+                           const RenderPassResource &renderPassRes,
+                           const RenderTargetBinding &targets)
+    -> const FrameBufferResource * {
+
+  Array<VkImageView> finalViews;
+  TextureResource *anyTexture{nullptr};
+  uint32_t extenalCounter = 0;
+  bool isSwapchainPass = false;
+
+  for (const auto &desc : renderPassRes.createInfo.attachments) {
+    if (desc.isSwapchain) {
+      isSwapchainPass = true;
+      finalViews.PushBack(
+          m_swapchainContext->GetImageView(m_currentImageIndex));
+    } else if (desc.isAutoResize) {
+      auto textureHandle = renderPassRes.internalTextures.Get(desc.nameHash);
+      auto res = m_resourcePool->ResolveTexture(*textureHandle);
+      anyTexture = anyTexture == nullptr ? res : anyTexture;
+      finalViews.PushBack(res->imageView);
+    } else {
+      AVALON_ASSERT(extenalCounter < targets.externalAttachments.GetSize());
+      auto textureHandle = targets.externalAttachments[extenalCounter++];
+      auto res = m_resourcePool->ResolveTexture({textureHandle.id});
+      anyTexture = anyTexture == nullptr ? res : anyTexture;
+      finalViews.PushBack(res->imageView);
+    }
   }
+
+  FrameBufferCreateInfo info{
+      .renderPassHandle = renderPassHandle,
+      .views = finalViews,
+  };
+
+  if (anyTexture != nullptr) {
+    info.width = anyTexture->info.width;
+    info.height = anyTexture->info.height;
+    info.layers = anyTexture->info.layers;
+  } else {
+    AVALON_ASSERT_MSG(
+        isSwapchainPass,
+        String::Format("[Vulkan] No texture found! Pass: {}.",
+                       renderPassRes.createInfo.nameHash.Resolve()));
+    auto extent = m_swapchainContext->GetExtent();
+    info.width = extent.width;
+    info.height = extent.height;
+    info.layers = 1;
+  }
+
+  auto handle = m_resourcePool->GetOrCreateFrameBuffer(info);
+  return m_resourcePool->ResolveFrameBuffer(handle);
 }
 
-auto VkRhi::GetPipeline(PipelineHandle handle) -> const PipelineResource & {
-  return *m_pipelineManager->Resolve({handle.id});
+auto VkRhi::GetPipeline(PipelineHandle handle) -> const PipelineResource * {
+  return m_pipelineManager->Resolve({handle.id});
 }
 
-auto VkRhi::GetBuffer(BufferHandle handle) -> const BufferResource & {
-  return *m_resourcePool->ResolveBuffer({handle.id});
+auto VkRhi::GetBuffer(BufferHandle handle) -> const BufferResource * {
+  return m_resourcePool->ResolveBuffer({handle.id});
+}
+
+auto VkRhi::GetTexture(TextureHandle handle) -> const TextureResource * {
+  return m_resourcePool->ResolveTexture({handle.id});
+}
+
+auto VkRhi::GetSampler(SamplerHandle handle) -> const SamplerResource * {
+  return m_resourcePool->ResolveSampler({handle.id});
 }
 
 auto VkRhi::GetDescriptorSet(DescriptorSetHandle handle)
-    -> const DescriptorSetResource & {
-  return *m_descriptorAllocators[m_currentFrame]->Resolve({handle.id});
+    -> const DescriptorSetResource * {
+  return m_descriptorAllocators[m_currentFrame]->Resolve({handle.id});
 }
 
 auto VkRhi::RecreateSwapchain(RenderPassHandle handle, uint32_t width,
                               uint32_t height) -> ERhiResult {
   vkDeviceWaitIdle(m_deviceContext->GetDevice());
-  CleanupSwapchainFrameBuffers();
   auto result = m_swapchainContext->RecreateSwapchain(width, height);
   if (!result) {
     return result.error();
   }
 
-  CreateSwapchianFrameBuffers(handle);
+  m_resourcePool->ForeachRenderPass([&](RenderPassResource &renderPassRes) {
+    bool hasInternalTexture = renderPassRes.internalTextures.GetSize();
+    if (hasInternalTexture) {
+      for (auto &entry : renderPassRes.internalTextures)
+        m_resourcePool->ReleaseTexture(entry.GetValue());
+
+      renderPassRes.internalTextures.Clear();
+
+      CreateRenderPassInternalTextures(renderPassRes);
+    }
+  });
 
   return ERhiResult::Success;
 }
@@ -177,7 +234,39 @@ auto VkRhi::CreatePipeline(const PipelineCreateInfo &info) -> PipelineHandle {
 
 auto VkRhi::CreateRenderPass(const RenderPassCreateInfo &info)
     -> RenderPassHandle {
-  return {m_resourcePool->CreateRenderPass(info).id};
+
+  auto renderPassHandle = m_resourcePool->CreateRenderPass(info);
+  auto renderPassRes = m_resourcePool->ResolveRenderPass(renderPassHandle);
+
+  CreateRenderPassInternalTextures(*renderPassRes);
+
+  return {renderPassHandle.id};
+}
+
+void VkRhi::CreateRenderPassInternalTextures(
+    RenderPassResource &renderPassRes) {
+  auto info = renderPassRes.createInfo;
+  auto extent = m_swapchainContext->GetExtent();
+
+  bool foundSwapchain = false;
+  for (auto &attachment : info.attachments) {
+    if (attachment.isSwapchain) {
+      AVALON_ASSERT_MSG(!foundSwapchain,
+                        "[Vulkan] Only one swapchain attachment allowed!");
+      foundSwapchain = true;
+    }
+    if (!attachment.isSwapchain && attachment.isAutoResize) {
+      TextureCreateInfo info{
+          .width = extent.width,
+          .height = extent.height,
+          .format = attachment.format,
+          .usage = MapIntentToUsage(attachment.intent),
+      };
+
+      auto textureHandle = m_resourcePool->CreateTexture(info);
+      renderPassRes.internalTextures.Insert(attachment.nameHash, textureHandle);
+    }
+  }
 }
 
 void VkRhi::CreateCommandBuffer() {
@@ -395,34 +484,6 @@ auto VkRhi::CreateCommandPools() -> std::expected<void, ERhiResult> {
   }
 
   return {};
-}
-
-void VkRhi::CleanupSwapchainFrameBuffers() {
-  auto frameBuffers = m_swapchainContext->GetFrameBuffers();
-  for (auto &fb : frameBuffers) {
-    m_resourcePool->ReleaseFrameBuffer({fb.id});
-  }
-}
-
-void VkRhi::CreateSwapchianFrameBuffers(RenderPassHandle handle) {
-  auto extent = m_swapchainContext->GetExtent();
-  auto renderPassRes = m_resourcePool->ResolveRenderPass({handle.id});
-  VkImageView depthView{VK_NULL_HANDLE};
-  if (renderPassRes->createInfo.hasDepth) {
-    TextureCreateInfo info{
-        .width = extent.width,
-        .height = extent.height,
-        .format = renderPassRes->createInfo.depthAttachment.format,
-    };
-
-    auto handle = m_resourcePool->CreateTexture(info);
-    depthView = m_resourcePool->ResolveTexture(handle)->imageView;
-  }
-
-  auto frameBuffers = m_resourcePool->CreateSwapchainFrameBuffers(
-      handle, m_swapchainContext->GetImageViews(), depthView, extent.width,
-      extent.height, 1);
-  m_swapchainContext->SetFrameBuffers(std::move(frameBuffers));
 }
 
 auto VkRhi::CreateSyncObjects() -> std::expected<void, ERhiResult> {

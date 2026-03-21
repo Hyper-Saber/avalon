@@ -23,8 +23,8 @@ public:
       : m_device(device), m_resourceProvider(provider), m_allocator(allocator),
         m_setIndex(setIndex) {
 
-    auto &pipelineResource = m_resourceProvider.GetPipeline({pipelineHandle});
-    auto &maps = pipelineResource.descSetLayoutMaps;
+    auto pipelineResource = m_resourceProvider.GetPipeline({pipelineHandle});
+    auto &maps = pipelineResource->descSetLayoutMaps;
     if (maps.GetSize() != 0 && setIndex < maps.GetSize()) {
       m_meta = &maps[setIndex];
       m_isValid = true;
@@ -46,7 +46,7 @@ public:
     }
 
     VkDescriptorBufferInfo bufferInfo{
-        .buffer = m_resourceProvider.GetBuffer(info.buffer).buffer,
+        .buffer = m_resourceProvider.GetBuffer(info.buffer)->buffer,
         .offset = info.offset,
         .range = info.range,
     };
@@ -63,22 +63,32 @@ public:
 
   auto WriteTexture(StringId id, TextureHandle texture, SamplerHandle sampler)
       -> IDescriptorWriter & override {
-    // VkDescriptorImageInfo info{
-    //     .sampler = sampler,
-    //     .imageView = imageView,
-    //     .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-    // };
-    // m_imageInfos.push_back(info);
-    //
-    // VkWriteDescriptorSet write{
-    //     .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-    //     .dstBinding = binding,
-    //     .descriptorCount = 1,
-    //     .descriptorType = type,
-    //     .pImageInfo = &m_imageInfos.back(),
-    // };
-    // m_writes.PushBack(write);
-    // return *this;
+    auto binding = m_meta->Get(id);
+    if (!binding) {
+      Error("[Vulkan]: Id [{}] not found in descriptor set layout!",
+            id.Resolve());
+      return *this;
+    }
+
+    auto textureRes = m_resourceProvider.GetTexture(texture);
+    auto samplerRes = m_resourceProvider.GetSampler(sampler);
+    VkDescriptorImageInfo info{
+        .sampler = samplerRes->sampler,
+        .imageView = textureRes->imageView,
+        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+    };
+    m_imageInfos.push_back(info);
+
+    VkWriteDescriptorSet write{
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .dstBinding = binding->binding,
+        .descriptorCount = 1,
+        .descriptorType = binding->descriptorType,
+        .pImageInfo = &m_imageInfos.back(),
+    };
+    m_writes.PushBack(write);
+
+    return *this;
   }
 
   auto Build() -> DescriptorSetHandle override {

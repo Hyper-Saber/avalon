@@ -233,6 +233,30 @@ constexpr StringView ToView(EDescriptorType e) {
     return "AccelerationStructure";
   }
 }
+constexpr StringView ToView(EAttachmentIntent e) {
+  if (e == EAttachmentIntent::None) {
+    return "None";
+  }
+
+  if (e == EAttachmentIntent::WriteColor) {
+    return "WriteColor";
+  }
+  if (e == EAttachmentIntent::WriteDepth) {
+    return "WriteDepth";
+  }
+  if (e == EAttachmentIntent::CaptureSource) {
+    return "CaptureSource";
+  }
+  if (e == EAttachmentIntent::ComputeStorage) {
+    return "ComputeStorage";
+  }
+  if (e == EAttachmentIntent::ReadOnly) {
+    return "ReadOnly";
+  }
+
+  // 处理复杂或非常规组合
+  return "Composite Intent";
+}
 
 constexpr StringView ToView(ERhiResult e) {
   switch (e) {

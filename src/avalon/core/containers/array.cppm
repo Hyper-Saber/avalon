@@ -105,6 +105,34 @@ public:
     requires(!std::is_copy_constructible_v<T>)
   = delete;
 
+  bool operator==(const Array &other) const noexcept {
+    if (m_size != other.m_size) {
+      return false;
+    }
+
+    if (m_data == other.m_data) {
+      return true;
+    }
+
+    if constexpr (std::is_trivially_copyable_v<T> && std::is_integral_v<T> ||
+                  std::is_pointer_v<T>) {
+      if (m_size == 0)
+        return true;
+      return std::memcmp(m_data, other.m_data, m_size * sizeof(T)) == 0;
+    } else {
+      for (size_t i = 0; i < m_size; ++i) {
+        if (!(m_data[i] == other.m_data[i])) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  bool operator!=(const Array &other) const noexcept {
+    return !(*this == other);
+  }
+
   void PushBack(const T &value) {
     if (m_size == m_capacity)
       Grow(m_capacity == 0 ? kInitialCapacity : m_capacity * 2);

@@ -27,26 +27,13 @@ public:
 
   auto GetSwapchain() const noexcept -> VkSwapchainKHR { return m_swapchain; }
   auto GetImageFormat() const noexcept -> VkFormat { return m_imageFormat; }
-  auto GetImageViews() const noexcept -> const Array<VkImageView> & {
-    return m_imageViews;
+  auto GetImageView(uint32_t index) const noexcept -> VkImageView {
+    return m_imageViews[index];
   }
 
   auto GetImageCount() const noexcept -> size_t { return m_images.GetSize(); }
 
   auto GetExtent() const noexcept -> VkExtent2D { return m_extent; }
-  auto GetFrameBuffer(uint32_t index) const noexcept
-      -> Handle<FrameBufferResource> {
-    return m_frameBuffers[index];
-  }
-  auto GetFrameBuffers() const noexcept
-      -> const Array<Handle<FrameBufferResource>> & {
-    return m_frameBuffers;
-  }
-
-  void
-  SetFrameBuffers(Array<Handle<FrameBufferResource>> frameBuffers) noexcept {
-    m_frameBuffers = std::move(frameBuffers);
-  }
 
   auto RecreateSwapchain(uint32_t width, uint32_t height)
       -> std::expected<void, ERhiResult> {
@@ -231,7 +218,6 @@ private:
   VkSwapchainKHR m_swapchain{VK_NULL_HANDLE};
   Array<VkImage> m_images;
   Array<VkImageView> m_imageViews;
-  Array<Handle<FrameBufferResource>> m_frameBuffers;
   VkFormat m_imageFormat;
   VkExtent2D m_extent;
 };

@@ -1,13 +1,13 @@
 module;
-export module avalon.scene:camera_system;
+export module avalon.scene:update_camera_projection_system;
 
 import avalon.core;
 import avalon.ecs;
 import :types;
 import :components;
 
-export namespace avalon::ecs {
-class AVALON_SCENE_API CameraSystem final : public SystemBase<CameraSystem> {
+namespace avalon::ecs {
+class UpdateCameraProjectionSystem final : public SystemBase<UpdateCameraProjectionSystem> {
   void OnUpdate(World &world, float dt) override {
     auto view = world.GetView<CameraComponent>();
     view.Foreach([&](Entity entity, CameraComponent &camera) {

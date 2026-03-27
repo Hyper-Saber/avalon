@@ -2,6 +2,7 @@ module;
 #include <bit>
 #include <cstdint>
 #include <cstring>
+#include <optional>
 #include <type_traits>
 
 export module avalon.rhi:types;
@@ -10,6 +11,17 @@ import avalon.core;
 
 export namespace avalon::rhi {
 
+constexpr uint32_t kInternalSetCount = 2;
+
+constexpr uint32_t kBindlessSet = 0;
+constexpr uint32_t kMaterialsBinding = 0;
+constexpr uint32_t kTexturesBinding = 1;
+constexpr uint32_t kSamplersBinding = 2;
+constexpr uint32_t kSceneGlobalsSet = 1;
+constexpr uint32_t kSceneGlobalsBinding = 0;
+
+constexpr uint32_t kMaxMaterialCount = 65535;
+
 using BufferHandle = Handle<class BufferTag>;
 using TextureHandle = Handle<class TextureTag>;
 using SamplerHandle = Handle<class SamplerTag>;
@@ -17,6 +29,8 @@ using PipelineHandle = Handle<class PipelineTag>;
 using RenderPassHandle = Handle<class RenderPassTag>;
 using FrameBufferHandle = Handle<class FramebufferTag>;
 using DescriptorSetHandle = Handle<class DescriptorSetTag>;
+
+constexpr TextureHandle kSwapchainColorHandle = TextureHandle::Internal();
 
 enum class EFormat {
   Undefined,
@@ -80,11 +94,34 @@ enum class EVertexSemantic {
 };
 
 enum class EShaderStage : uint32_t {
-  None,
+  None = 0,
+
   Vertex = 1 << 0,
-  Fragment = 1 << 1,
-  Compute = 1 << 2,
-  All = Vertex | Fragment | Compute
+  TessControl = 1 << 1,
+  TessEvaluation = 1 << 2,
+  Geometry = 1 << 3,
+  Fragment = 1 << 4,
+
+  Compute = 1 << 5,
+
+  Task = 1 << 6,
+  Mesh = 1 << 7,
+
+  RayGen = 1 << 8,
+  RayAnyHit = 1 << 9,
+  RayClosestHit = 1 << 10,
+  RayMiss = 1 << 11,
+  RayIntersection = 1 << 12,
+  Callable = 1 << 13,
+
+  AllGraphics = Vertex | TessControl | TessEvaluation | Geometry | Fragment,
+
+  AllMesh = Task | Mesh | Fragment,
+
+  AllRayTracing =
+      RayGen | RayAnyHit | RayClosestHit | RayMiss | RayIntersection | Callable,
+
+  All = 0x7FFFFFFF
 };
 
 enum class EShaderFeatureLevel : uint32_t {
@@ -108,18 +145,40 @@ enum class ECompareOp : uint32_t {
   Greater,
   GreaterOrEqual,
   Equal,
-  NotEqual
+  NotEqual,
+  Always,
 };
 
-enum class EBufferUsage : uint32_t {
+enum class EResourceLayout {
+  Undefined,
+  ColorAttachment,
+  DepthStencilAttachment,
+  ShaderReadOnly,
+  Present,
+  TransferSrc,
+  TransferDst,
+  General,
+};
+
+enum class EResourceUsage : uint32_t {
   None = 0,
-  Vertex = 1 << 0,
-  Index = 1 << 1,
-  Uniform = 1 << 2,
-  Storage = 1 << 3,
-  Indirect = 1 << 4,
-  TransferSrc = 1 << 5,
-  TransferDst = 1 << 6
+  VertexBuffer = 1 << 0,
+  IndexBuffer = 1 << 1,
+  IndirectBuffer = 1 << 2,
+  UniformBuffer = 1 << 3,
+
+  StorageBuffer = 1 << 4,
+
+  ReadOnly = 1 << 5,
+  ReadWrite = 1 << 6,
+
+  ColorAttachment = 1 << 7,
+  DepthStencilAttachment = 1 << 8,
+
+  TransferSrc = 1 << 9,
+  TransferDst = 1 << 10,
+
+  Present = 1 << 11
 };
 
 enum class EDescriptorType : uint32_t {
@@ -147,31 +206,12 @@ enum class EMemoryProperty : uint32_t {
   All = DeviceLocal | HostVisible | HostCoherent,
 };
 
-enum class EResourceLayout {
-  Undefined,
-  ColorAttachment,
-  DepthStencilAttachment,
-  ShaderReadOnly,
-  Present,
-  TransferSrc,
-  TransferDst,
-};
-
 enum class ESampleCount {
   SampleCount1x,
   SampleCount2x,
   SampleCount4x,
   SampleCount8x,
   SampleCount16x,
-};
-
-enum class ETextureUsage : uint32_t {
-  None = 0,
-  Sampled = 1 << 0,
-  ColorAttachment = 1 << 1,
-  DepthStencilAttachment = 1 << 2,
-  Storage = 1 << 3,
-  TransferSrc = 1 << 4,
 };
 
 enum class EAttachmentIntent : uint32_t {
@@ -255,17 +295,74 @@ enum class EColorWriteMask : uint32_t {
   All = R | G | B | A,
 };
 
+enum class EAccess : uint32_t {
+  None = 0,
+  ColorRead = 1 << 0,
+  ColorWrite = 1 << 1,
+  DepthStencilRead = 1 << 2,
+  DepthStencilWrite = 1 << 3,
+  ShaderRead = 1 << 4,
+  ShaderWrite = 1 << 5,
+  TransferRead = 1 << 6,
+  TransferWrite = 1 << 7,
+  MemoryRead = 1 << 8,
+  MemoryWrite = 1 << 9,
+
+  IndirectCommandRead = 1 << 10,
+  IndexRead = 1 << 11,
+  VertexAttributeRead = 1 << 12,
+  UniformRead = 1 << 13,
+};
+
+enum class EPipelineStage : uint64_t {
+  None = 0,
+
+  TopOfPipe = 1ULL << 0,
+  BottomOfPipe = 1ULL << 1,
+
+  DrawIndirect = 1ULL << 2,
+  VertexInput = 1ULL << 3,
+
+  VertexShader = 1ULL << 4,
+  TessControlShader = 1ULL << 5,
+  TessEvaluationShader = 1ULL << 6,
+  GeometryShader = 1ULL << 7,
+  FragmentShader = 1ULL << 8,
+  ComputeShader = 1ULL << 9,
+
+  EarlyFragmentTests = 1ULL << 10,
+  LateFragmentTests = 1ULL << 11,
+  ColorAttachmentOutput = 1ULL << 12,
+
+  Transfer = 1ULL << 13,
+  Clear = 1ULL << 14,
+
+  Host = 1ULL << 15,
+
+  AllGraphics = 1ULL << 16,
+  AllCommands = 1ULL << 17,
+
+  RayTracingShader = 1ULL << 18,
+};
+
 template <> struct EnableBitmaskOperators<EColorWriteMask> : std::true_type {};
-template <> struct EnableBitmaskOperators<EBufferUsage> : std::true_type {};
+template <> struct EnableBitmaskOperators<EResourceUsage> : std::true_type {};
 template <> struct EnableBitmaskOperators<EShaderStage> : std::true_type {};
 template <> struct EnableBitmaskOperators<EMemoryProperty> : std::true_type {};
-template <> struct EnableBitmaskOperators<ETextureUsage> : std::true_type {};
 template <>
 struct EnableBitmaskOperators<EAttachmentIntent> : std::true_type {};
+template <> struct EnableBitmaskOperators<EAccess> : std::true_type {};
+template <> struct EnableBitmaskOperators<EPipelineStage> : std::true_type {};
 
-struct RenderTargetBinding {
-  int32_t swapchainSlot = 0;
-  Array<TextureHandle> externalAttachments;
+//---------------------------------------------------------------------------------------------------------------------
+
+constexpr uint32_t kMaxTextureSlots = 7;
+
+struct alignas(16) StandardPushConstant {
+  Matrix4x4 model;
+  Matrix4x4 normalMatrix;
+  uint32_t materialIndex = 0;
+  uint32_t textureSlots[kMaxTextureSlots];
 };
 
 struct DeviceCapabilities {
@@ -286,77 +383,6 @@ struct QueueRequirement {
 struct DeviceRequirement {
   QueueRequirement queueRequirement;
   Array<ERenderCapability> requiredCapabilities;
-};
-
-struct AttachmentDescription {
-  StringId nameHash;
-  EAttachmentIntent intent;
-  EFormat format;
-  ESampleCount sampleCount = ESampleCount::SampleCount1x;
-  EAttachmentLoadOp loadOp;
-  EAttachmentStoreOp storeOp;
-  EResourceLayout initialLayout;
-  EResourceLayout finalLayout;
-
-  bool isAutoResize;
-  bool isSwapchain;
-
-  HashType GetHash() const noexcept {
-    uint64_t packed = 0;
-
-    packed |= (static_cast<uint64_t>(format) & 0xFFFFULL);
-
-    packed |= (static_cast<uint64_t>(sampleCount) & 0x0FULL) << 16;
-
-    packed |= (static_cast<uint64_t>(loadOp) & 0x07ULL) << 20;
-    packed |= (static_cast<uint64_t>(storeOp) & 0x07ULL) << 23;
-    packed |= (static_cast<uint64_t>(initialLayout) & 0x1FULL) << 26;
-    packed |= (static_cast<uint64_t>(finalLayout) & 0x1FULL) << 31;
-
-    if (isSwapchain)
-      packed |= (1ULL << 36);
-
-    if (isAutoResize)
-      packed |= (1ULL << 37);
-
-    return Hash::Combine(Hash::kOffsetBasis, packed);
-  }
-
-  bool operator==(const AttachmentDescription &rhs) const noexcept {
-    return isSwapchain == rhs.isSwapchain && isAutoResize == rhs.isAutoResize &&
-           format == rhs.format && sampleCount == rhs.sampleCount &&
-           loadOp == rhs.loadOp && storeOp == rhs.storeOp &&
-           initialLayout == rhs.initialLayout && finalLayout == rhs.finalLayout;
-  }
-};
-
-struct RenderPassCreateInfo {
-  StringId nameHash;
-  Array<AttachmentDescription> attachments;
-  int32_t depthAttachmentIndex = -1;
-  uint32_t samples = 1;
-
-  HashType GetHash() const noexcept {
-    HashType h = Hash::kOffsetBasis;
-
-    for (const auto &att : attachments) {
-      h = Hash::Combine(h, att.GetHash());
-    }
-    uint64_t states = 0;
-    states |= (static_cast<uint64_t>(samples) & 0xFF);
-    states |= (static_cast<uint64_t>(depthAttachmentIndex) << 32);
-
-    h = Hash::Combine(h, states);
-    return h;
-  }
-
-  bool operator==(const RenderPassCreateInfo &other) const noexcept {
-    if (samples != other.samples ||
-        depthAttachmentIndex != other.depthAttachmentIndex) {
-      return false;
-    }
-    return attachments == other.attachments;
-  }
 };
 
 struct SamplerCreateInfo {
@@ -412,11 +438,12 @@ struct SamplerCreateInfo {
 
 struct BufferCreateInfo {
   uint64_t size;
-  EBufferUsage usage;
+  EResourceUsage usage;
   EMemoryProperty memoryProperty;
 };
 
 struct TextureCreateInfo {
+  StringId nameHash;
   uint32_t width = 1;
   uint32_t height = 1;
   uint32_t depth = 1;
@@ -424,7 +451,9 @@ struct TextureCreateInfo {
   uint32_t mipLevels = 1;
 
   EFormat format = EFormat::B8G8R8A8_SRGB;
-  ETextureUsage usage = ETextureUsage::ColorAttachment | ETextureUsage::Sampled;
+  EResourceUsage usage =
+      EResourceUsage::ColorAttachment | EResourceUsage::ReadOnly;
+  ESampleCount sampleCount = ESampleCount::SampleCount1x;
 };
 
 struct VertexBinding {
@@ -525,27 +554,6 @@ struct DescriptorSetLayoutBinding {
   }
 };
 
-struct PushConstantRange {
-  EShaderStage visibleStages;
-  uint32_t offset;
-  uint32_t size;
-
-  HashType GetHash() const noexcept {
-    uint64_t packed = 0;
-
-    packed |= (static_cast<uint64_t>(visibleStages) & 0x0FFFULL);
-    packed |= (static_cast<uint64_t>(offset) & 0x0FFFULL) << 12;
-    packed |= (static_cast<uint64_t>(size) & 0x0FFFULL) << 24;
-
-    return Hash::Combine(Hash::kOffsetBasis, packed);
-  }
-
-  bool operator==(const PushConstantRange &other) const noexcept {
-    return visibleStages == other.visibleStages && offset == other.offset &&
-           size == other.size;
-  }
-};
-
 struct BufferWriteInfo {
   BufferHandle buffer;
   uint64_t offset = 0;
@@ -570,6 +578,8 @@ struct InputAssemblyState {
     return topology == other.topology &&
            primitiveRestartEnable == other.primitiveRestartEnable;
   }
+
+  String ToString() const;
 };
 
 struct RasterizationState {
@@ -594,13 +604,37 @@ struct RasterizationState {
            frontFace == other.frontFace && lineWidth == other.lineWidth &&
            depthBiasEnable == other.depthBiasEnable;
   }
+
+  String ToString() const;
+};
+
+struct StencilFaceState {
+  EStencilOp failOp = EStencilOp::Keep;
+  EStencilOp passOp = EStencilOp::Keep;
+  EStencilOp depthFailOp = EStencilOp::Keep;
+  ECompareOp compareOp = ECompareOp::Always;
+  uint32_t compareMask = 0xFF;
+  uint32_t writeMask = 0xFF;
+  uint32_t reference = 0;
+
+  uint64_t Pack() const noexcept {
+    uint64_t p = 0;
+    p |= (static_cast<uint64_t>(failOp) & 0x7);
+    p |= (static_cast<uint64_t>(passOp) & 0x7) << 3;
+    p |= (static_cast<uint64_t>(depthFailOp) & 0x7) << 6;
+    p |= (static_cast<uint64_t>(compareOp) & 0xF) << 9;
+    return p;
+  }
 };
 
 struct DepthStencilState {
   bool isDepthTestEnable = true;
   bool isDepthWriteEnable = true;
-  ECompareOp depthCompareOp = ECompareOp::Less;
+  ECompareOp depthCompareOp = ECompareOp::Greater;
+
   bool isStencilTestEnable = false;
+  StencilFaceState front{};
+  StencilFaceState back{};
 
   HashType GetHash() const noexcept {
     uint64_t packed = 0;
@@ -609,15 +643,35 @@ struct DepthStencilState {
     packed |= (static_cast<uint64_t>(depthCompareOp) & 0xFULL) << 2;
     packed |= (isStencilTestEnable ? 1ULL : 0ULL) << 6;
 
-    return Hash::Combine(Hash::kOffsetBasis, packed);
+    HashType h = Hash::Combine(Hash::kOffsetBasis, packed);
+    if (isStencilTestEnable) {
+      h = Hash::Combine(h, front.Pack());
+      h = Hash::Combine(h, front.compareMask);
+      h = Hash::Combine(h, front.writeMask);
+      h = Hash::Combine(h, front.reference);
+
+      h = Hash::Combine(h, back.Pack());
+      h = Hash::Combine(h, back.compareMask);
+      h = Hash::Combine(h, back.writeMask);
+      h = Hash::Combine(h, back.reference);
+    }
+    return h;
   }
 
   bool operator==(const DepthStencilState &other) const noexcept {
-    return isDepthTestEnable == other.isDepthTestEnable &&
-           isDepthWriteEnable == other.isDepthWriteEnable &&
-           depthCompareOp == other.depthCompareOp &&
-           isStencilTestEnable == other.isStencilTestEnable;
+    bool basic = isDepthTestEnable == other.isDepthTestEnable &&
+                 isDepthWriteEnable == other.isDepthWriteEnable &&
+                 depthCompareOp == other.depthCompareOp &&
+                 isStencilTestEnable == other.isStencilTestEnable;
+
+    if (!basic || !isStencilTestEnable)
+      return basic;
+
+    return memcmp(&front, &other.front, sizeof(StencilFaceState)) == 0 &&
+           memcmp(&back, &other.back, sizeof(StencilFaceState)) == 0;
   }
+
+  String ToString() const;
 };
 
 struct MultisampleState {
@@ -684,18 +738,56 @@ struct ColorBlendState {
   }
 };
 
+struct PipelineRenderingInfo {
+  Array<EFormat> colorAttachmentFormats;
+  EFormat depthAttachmentFormat = EFormat::Undefined;
+  EFormat stencilAttachmentFormat = EFormat::Undefined;
+  uint32_t viewMask = 0;
+
+  void Clear() { *this = PipelineRenderingInfo{}; }
+
+  HashType GetHash() const noexcept {
+    uint64_t packed = 0;
+    packed |=
+        (static_cast<uint64_t>(depthAttachmentFormat) & 0x3FFULL); // bits 0-9
+    packed |= (static_cast<uint64_t>(stencilAttachmentFormat) & 0x3FFULL)
+              << 10; // bits 10-19
+    packed |= (static_cast<uint64_t>(viewMask) & 0xFFFFFFULL)
+              << 20; // bits 20-43
+
+    HashType hash = Hash::Combine(Hash::kOffsetBasis, packed);
+
+    for (const auto &format : colorAttachmentFormats) {
+      hash = Hash::Combine(hash, static_cast<uint64_t>(format));
+    }
+
+    return hash;
+  }
+
+  bool operator==(const PipelineRenderingInfo &other) const noexcept {
+    return viewMask == other.viewMask &&
+           depthAttachmentFormat == other.depthAttachmentFormat &&
+           stencilAttachmentFormat == other.stencilAttachmentFormat &&
+           colorAttachmentFormats == other.colorAttachmentFormats;
+  }
+};
+
 struct PipelineCreateInfo {
-  RenderPassHandle renderPassHandle;
-  Span<const PushConstantRange> pushConstantRanges;
+  PipelineRenderingInfo renderingInfo;
+
   Span<const VertexInputAttribute> vertexInputAttributes;
   Span<const VertexBinding> vertexBindings;
+
   Span<const DescriptorSetLayoutBinding> descriptorSetLayoutBindings;
+
   Span<const ShaderStageInfo> stageInfos;
   InputAssemblyState inputAssemblyState;
   RasterizationState rasterizationState;
   MultisampleState multisampleState;
   DepthStencilState depthStencilState;
   Span<const ColorBlendState> colorBlendStates;
+
+  HashType GetHash() const noexcept;
 };
 
 struct RingAllocation {
@@ -705,18 +797,34 @@ struct RingAllocation {
 };
 
 struct Offset2D {
-  int32_t x;
-  int32_t y;
+  int32_t x = 0;
+  int32_t y = 0;
+  auto operator<=>(const Offset2D &) const = default;
 };
 
 struct Extent2D {
-  uint32_t width;
-  uint32_t height;
+  uint32_t width = 0;
+  uint32_t height = 0;
+
+  Extent2D operator*(float a) {
+    return {static_cast<uint32_t>(a * width),
+            static_cast<uint32_t>(a * height)};
+  }
+
+  bool IsValid() { return width != 0 && height != 0; }
+
+  auto operator<=>(const Extent2D &) const = default;
 };
 
 struct Rect2D {
-  Offset2D offset;
-  Extent2D extent;
+  Offset2D offset{};
+  Extent2D extent{};
+
+  auto operator<=>(const Rect2D &) const = default;
+
+  bool IsValid() {
+    return extent.width - offset.x > 0 && extent.height - offset.y > 0;
+  }
 };
 
 struct Viewport {
@@ -729,19 +837,32 @@ struct Viewport {
 };
 
 struct DepthStencil {
-  float depth;
-  uint32_t stencil;
+  float depth = 0;
+  uint32_t stencil = 0;
 };
 
 struct ClearValue {
-  struct ColorValue {
-    float r, g, b, a;
-  };
   union {
-    ColorValue color;
+    Color color{};
     DepthStencil depthStencil;
   };
   bool isDepth = false;
+
+  ClearValue() : color{0, 0, 0, 0}, isDepth(false) {}
+
+  static ClearValue Black() {
+    ClearValue v;
+    v.color = {0.0f, 0.0f, 0.0f, 1.0f};
+    v.isDepth = false;
+    return v;
+  }
+
+  static ClearValue FromColor(Color color) {
+    ClearValue v;
+    v.color = {color.r, color.g, color.b, color.a};
+    v.isDepth = false;
+    return v;
+  }
 
   static ClearValue Color(float r, float g, float b, float a = 1.0f) {
     ClearValue v;
@@ -750,7 +871,7 @@ struct ClearValue {
     return v;
   }
 
-  static ClearValue DepthStencil(float d = 1.0f, uint32_t s = 0) {
+  static ClearValue DepthStencil(float d = 0.0f, uint32_t s = 0) {
     ClearValue v;
     v.depthStencil = {d, s};
     v.isDepth = true;
@@ -758,18 +879,69 @@ struct ClearValue {
   }
 };
 
-struct RenderPassBeginInfo {
-  RenderPassHandle renderPassHandle;
-  RenderTargetBinding targets;
-  Rect2D renderArea;
+struct ColorAttachmentInfo {
+  TextureHandle texture;
+  EAttachmentLoadOp loadOp = EAttachmentLoadOp::Clear;
+  EAttachmentStoreOp storeOp = EAttachmentStoreOp::Store;
+  Color clearColor{0.0f, 0.0f, 0.0f, 1.0f};
+  EResourceLayout layout = EResourceLayout::ColorAttachment;
+};
 
-  Array<ClearValue> clearValues;
+struct DepthStencilAttachmentInfo {
+  TextureHandle texture;
+  EAttachmentLoadOp loadOp = EAttachmentLoadOp::Clear;
+  EAttachmentStoreOp storeOp = EAttachmentStoreOp::Store;
+  float clearDepth = 1.0f;
+  uint32_t clearStencil = 0;
+};
+
+struct RenderingInfo {
+  Rect2D renderArea;
+  uint32_t layerCount{1};
+  Array<ColorAttachmentInfo> colorAttachments;
+  std::optional<DepthStencilAttachmentInfo> depthStencil;
 };
 
 struct BufferCopy {
   uint64_t srcOffset = 0;
   uint64_t dstOffset = 0;
   uint64_t size = 0;
+};
+
+struct ImageBarrier {
+  TextureHandle texture;
+  EResourceLayout oldLayout;
+  EResourceLayout newLayout;
+  EAccess srcAccess;
+  EAccess dstAccess;
+  EPipelineStage srcStage;
+  EPipelineStage dstStage;
+
+  uint32_t baseMipLevel = 0;
+  uint32_t levelCount = 1;
+  uint32_t baseArrayLayer = 0;
+  uint32_t layerCount = 1;
+};
+
+struct ImageCopyRegion {
+  Extent2D extent;
+  Offset2D srcOffset{0, 0};
+  Offset2D dstOffset{0, 0};
+  uint32_t srcMipLevel = 0;
+  uint32_t dstMipLevel = 0;
+  uint32_t srcLayer = 0;
+  uint32_t dstLayer = 0;
+};
+
+struct StaticSamplers {
+  SamplerHandle linearClamp;
+  SamplerHandle pointClamp;
+};
+
+struct ResourceState {
+  EResourceUsage currentUsage = rhi::EResourceUsage::None;
+  EResourceLayout currentLayout = rhi::EResourceLayout::Undefined;
+  EPipelineStage lastWriteStage = rhi::EPipelineStage::None;
 };
 
 enum class ERhiResult {

@@ -1,27 +1,22 @@
 module;
+#include <concepts>
 export module avalon.graphics:render_pass;
 
 import avalon.core;
 import avalon.rhi;
-import :render_packet_extractor;
+import :renderer_types;
+import :render_context;
 
 export namespace avalon::graphics {
-
-struct RenderContext {
-  rhi::IRhi &rhi;
-  rhi::ICommandBuffer &cmd;
-  rhi::BufferHandle uboHandle;
-  DescriptorSetHandle globalSet;
-};
 
 class IRenderPass : public NonCopyable, public mem::IAutoDestroyable {
 public:
   virtual ~IRenderPass() = default;
-  virtual void SetClearColor(Color) = 0;
-  virtual void OnResize(const rhi::Extent2D &extent) = 0;
-  virtual void Setup(rhi::RenderPassBeginInfo &info) = 0;
-  virtual void Execute(RenderContext &context, RenderPacket &packet) = 0;
-  virtual StringView GetName() const = 0;
+
+  virtual void Setup(class RenderGraphBuilder &builder) = 0;
+  virtual void OnCompile(rhi::IRhi &rhi) = 0;
+
+  virtual void Execute(rhi::ICommandBuffer &cmd, RenderContext &context) = 0;
 };
 
 template <typename T> class RenderPass : public IRenderPass {
@@ -33,5 +28,8 @@ public:
     alloc.Deallocate(pDerived, 1);
   }
 };
+
+template <typename T>
+concept TRenderPass = std::derived_from<T, IRenderPass>;
 
 } // namespace avalon::graphics

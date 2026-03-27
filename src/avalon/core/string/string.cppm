@@ -110,6 +110,22 @@ public:
     return String(s);
   }
 
+  StringView GetFinalNameView() const noexcept {
+    const size_t size = GetSize();
+    if (size == 0)
+      return StringView();
+
+    const char *data = GetData();
+
+    for (size_t i = size; i > 0; --i) {
+      if (data[i - 1] == '.') {
+        return StringView(data + i, size - i);
+      }
+    }
+
+    return StringView(data, size);
+  }
+
 private:
   static constexpr size_t kSSOCapacity = 30;
 

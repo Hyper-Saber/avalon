@@ -20,7 +20,7 @@ public:
   virtual uint32_t Release() = 0;
 };
 
-template <typename T> class RefCounted : public IRefCounted {
+template <typename T> class RefCounted : public virtual IRefCounted {
 public:
   virtual ~RefCounted() = default;
 

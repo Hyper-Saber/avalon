@@ -37,7 +37,8 @@ target "avalon.rhi"
     add_deps("avalon.core")
 
 target "avalon.window"
-    set_kind "static"
+    set_kind "shared"
+    add_avalon_api_rules("avalon.rhi")
     add_files("window/window.cppm", {public = true})
     add_deps("avalon.core")
 
@@ -61,7 +62,7 @@ target "avalon.rhi.vulkan"
 target "avalon.window.glfw"
     set_kind "shared"
     add_avalon_api_rules("avalon.window.glfw")
-    add_deps("avalon.core")
+    add_deps("avalon.core", "avalon.window")
     add_window_backend("glfw")
     if is_plat("linux") then
         add_defines "GLFW_EXPOSE_NATIVE_X11"
@@ -95,7 +96,8 @@ target "avalon.graphics"
 target "avalon.scene"
     set_kind "shared"
     add_avalon_api_rules("avalon.scene")
-    add_files ("scene/*.cppm", {public = true})
+    add_files ("scene/**.cppm", {public = true})
+    add_files ("scene/**.cpp")
     add_deps("avalon.core", "avalon.ecs", "avalon.graphics", "avalon.rhi")
 
 

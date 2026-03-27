@@ -1,4 +1,5 @@
 module;
+#include <debug/assert.hpp>
 #include <dxcapi.h>
 #include <spirv_reflect.h>
 
@@ -33,6 +34,111 @@ void ExtractVertexInputs(SpvReflectShaderModule *pModule,
   }
 }
 
+void ExtractPushConstant(SpvReflectShaderModule *pModule,
+                         ReflectionData &reflectionData) {
+  uint32_t blockCount = 0;
+  SpvReflectResult result =
+      spvReflectEnumeratePushConstantBlocks(pModule, &blockCount, nullptr);
+  if (result != SPV_REFLECT_RESULT_SUCCESS || blockCount == 0)
+    return;
+
+  Array<SpvReflectBlockVariable *> pBlocks(blockCount);
+  spvReflectEnumeratePushConstantBlocks(pModule, &blockCount,
+                                        pBlocks.GetData());
+
+  for (uint32_t i = 0; i < blockCount; i++) {
+    const SpvReflectBlockVariable &rootBlock = *pBlocks[i];
+
+    AVALON_ASSERT_MSG(
+        rootBlock.size == sizeof(StandardPushConstant),
+        "PushConstant block size is not equal to sizeof(StanardPushConstant)!");
+    uint32_t slot = 0;
+    for (uint32_t j = 0; j < rootBlock.member_count; j++) {
+      const auto &member = rootBlock.members[j];
+
+      if (StringView(member.name).IsStartWith("u")) {
+        ShaderCustomPushConstantTextureSlot pushConstant;
+        pushConstant.nameHash = StringId(member.name);
+        pushConstant.textureSlot = slot++;
+
+        reflectionData.pushConstantMembers.PushBack(pushConstant);
+      }
+    }
+  }
+}
+
+void AddBufferMember(const SpvReflectBlockVariable &spvMember,
+                     const String &fullName, uint32_t binding,
+                     uint32_t absoluteOffset, ReflectionData &reflectionData,
+                     ShaderDescriptorBinding &descBinding) {
+
+  descBinding.memberCount++;
+  descBinding.bufferSize += spvMember.size;
+
+  ShaderBufferMember bufferMember;
+
+  bufferMember.nameHash = StringId(fullName);
+  bufferMember.offset = absoluteOffset;
+  bufferMember.size = spvMember.size;
+  bufferMember.bindingPoint = binding;
+  bufferMember.arrayStride = spvMember.array.stride;
+  bufferMember.format = SpvTypeToEFormat(spvMember.type_description);
+  bufferMember.defaultValueOffset = kNoDefaultValue;
+  reflectionData.bufferMembers.PushBack(bufferMember);
+
+  // Debug("[Shader Reflection] Member: {}, Offset: {}, Size: {}, Format: {}",
+  //       fullName, bufferMember.offset, bufferMember.size,
+  //       ToView(bufferMember.format));
+}
+
+void ProcessStructMembers(const SpvReflectBlockVariable &block,
+                          const String &prefix, uint32_t binding,
+                          ReflectionData &reflectionData,
+                          ShaderDescriptorBinding &descBinding,
+                          uint32_t baseOffset) {
+
+  auto isArray = [](const SpvReflectBlockVariable &var) {
+    return var.array.dims_count > 0;
+  };
+
+  auto isStruct = [](const SpvReflectBlockVariable &var) {
+    return var.member_count > 0;
+  };
+
+  for (uint32_t i = 0; i < block.member_count; i++) {
+    const auto &member = block.members[i];
+    if (member.name && StringView(member.name).Contains("padding"))
+      continue;
+
+    if (isArray(member)) {
+      uint32_t elementStride = member.array.stride;
+      for (uint32_t elementIdx = 0; elementIdx < member.array.dims[0];
+           elementIdx++) {
+        String arrayElementName =
+            String::Format("{}.{}[{}]", prefix, member.name, elementIdx);
+        uint32_t elementOffset =
+            baseOffset + member.offset + (elementIdx * elementStride);
+
+        if (isStruct(member)) {
+          ProcessStructMembers(member, arrayElementName.GetData(), binding,
+                               reflectionData, descBinding, elementOffset);
+        } else {
+          AddBufferMember(member, arrayElementName, binding, elementOffset,
+                          reflectionData, descBinding);
+        }
+      }
+    } else if (isStruct(member)) {
+      uint32_t absoluteOffset = baseOffset + member.offset;
+      ProcessStructMembers(member, prefix, binding, reflectionData, descBinding,
+                           absoluteOffset);
+    } else {
+      uint32_t absoluteOffset = baseOffset + member.offset;
+      AddBufferMember(member, String::Format("{}.{}", prefix, member.name),
+                      binding, absoluteOffset, reflectionData, descBinding);
+    }
+  }
+}
+
 void ExtractDescriptorBindings(SpvReflectShaderModule *module,
                                ReflectionData &reflectionData,
                                EShaderStage stage) {
@@ -43,6 +149,8 @@ void ExtractDescriptorBindings(SpvReflectShaderModule *module,
   spvReflectEnumerateDescriptorSets(module, &count, sets.data());
 
   for (auto *set : sets) {
+    if (set->set != kMaterialsBinding)
+      continue;
     for (uint32_t i = 0; i < set->binding_count; i++) {
       SpvReflectDescriptorBinding *pSpvReflDescBinding = set->bindings[i];
       auto type = pSpvReflDescBinding->descriptor_type;
@@ -60,102 +168,93 @@ void ExtractDescriptorBindings(SpvReflectShaderModule *module,
       };
 
       switch (type) {
+      // --- 纯采样器 (无资源状态) ---
       case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER:
         descBinding.type = EDescriptorType::Sampler;
-        descBinding.usage = EBufferUsage::None;
+        descBinding.usage = EResourceUsage::None;
         break;
+
+      // --- (Image Based) ---
       case SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
-        descBinding.type = EDescriptorType::CombinedImageSampler;
-        descBinding.usage = EBufferUsage::None;
-        break;
       case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
-        descBinding.type = EDescriptorType::SampledImage;
-        descBinding.usage = EBufferUsage::None;
+        descBinding.type =
+            (type == SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+                ? EDescriptorType::CombinedImageSampler
+                : EDescriptorType::SampledImage;
+        descBinding.usage = EResourceUsage::ReadOnly;
         break;
+
       case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_IMAGE:
         descBinding.type = EDescriptorType::StorageImage;
-        descBinding.usage = EBufferUsage::None;
+        descBinding.usage =
+            EResourceUsage::ReadWrite | EResourceUsage::TransferDst;
         break;
-      case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
-        descBinding.type = EDescriptorType::UniformTexelBuffer;
-        descBinding.usage = EBufferUsage::Uniform | EBufferUsage::TransferDst;
-        break;
-      case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
-        descBinding.type = EDescriptorType::StorageTexelBuffer;
-        descBinding.usage = EBufferUsage::Storage | EBufferUsage::TransferDst;
-        break;
-      case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
-        descBinding.type =
-            StringView(pSpvReflDescBinding->name).IsStartWith("u")
-                ? EDescriptorType::UniformBuffer
-                : EDescriptorType::UniformBufferDynamic;
-        descBinding.usage = EBufferUsage::Uniform | EBufferUsage::TransferDst;
-        break;
-      case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER:
-        descBinding.type = EDescriptorType::StorageBuffer;
-        descBinding.usage = EBufferUsage::Storage | EBufferUsage::TransferDst;
-        break;
-      case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
-        descBinding.type = EDescriptorType::UniformBufferDynamic;
-        descBinding.usage = EBufferUsage::Uniform | EBufferUsage::TransferDst;
-        break;
-      case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
-        descBinding.type = EDescriptorType::StorageBuffer;
-        descBinding.usage = EBufferUsage::Storage | EBufferUsage::TransferDst;
-        break;
+
       case SPV_REFLECT_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
         descBinding.type = EDescriptorType::InputAttachment;
-        descBinding.usage = EBufferUsage::None;
+        descBinding.usage = EResourceUsage::ReadOnly;
         break;
+
+      // --- (Buffer Based) ---
+      case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+      case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
+        descBinding.type = EDescriptorType::UniformBufferDynamic;
+        descBinding.usage =
+            EResourceUsage::UniformBuffer | EResourceUsage::TransferDst;
+        break;
+
+      case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+      case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
+        descBinding.type =
+            (type == SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC)
+                ? EDescriptorType::StorageBufferDynamic
+                : EDescriptorType::StorageBuffer;
+        descBinding.usage =
+            EResourceUsage::ReadWrite | EResourceUsage::TransferDst;
+        break;
+
+      // --- Texel Buffer 类 (硬件是 Buffer，访问语义是 Image) ---
+      case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
+        descBinding.type = EDescriptorType::UniformTexelBuffer;
+        descBinding.usage =
+            EResourceUsage::ReadOnly | EResourceUsage::TransferDst;
+        break;
+
+      case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
+        descBinding.type = EDescriptorType::StorageTexelBuffer;
+        descBinding.usage =
+            EResourceUsage::ReadWrite | EResourceUsage::TransferDst;
+        break;
+
+      // --- 光线追踪 ---
       case SPV_REFLECT_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR:
         descBinding.type = EDescriptorType::AccelerationStructure;
-        descBinding.usage = EBufferUsage::None;
+        descBinding.usage = EResourceUsage::ReadOnly;
         break;
       }
 
-      if (pSpvReflDescBinding->descriptor_type ==
-              SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
-          pSpvReflDescBinding->descriptor_type ==
-              SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER) {
-        descBinding.bufferSize = pSpvReflDescBinding->block.size;
-        descBinding.memberCount = pSpvReflDescBinding->block.member_count;
+      auto isBuffer = [](SpvReflectDescriptorType t) {
+        return t == SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
+               t == SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC ||
+               t == SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER ||
+               t == SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+      };
 
-        for (uint32_t j = 0; j < pSpvReflDescBinding->block.member_count; j++) {
-          const auto &spvReflMember = pSpvReflDescBinding->block.members[j];
-          auto memberName = String::Format("{}.{}", pSpvReflDescBinding->name,
-                                           spvReflMember.name);
-          ShaderBufferMember bufferMember{
-              .nameHash = StringId(memberName),
-              .offset = spvReflMember.offset,
-              .size = spvReflMember.size,
-              .bindingPoint = pSpvReflDescBinding->binding,
-              .arrayStride = spvReflMember.array.stride,
-              .format = SpvTypeToEFormat(spvReflMember.type_description),
-              .defaultValueOffset = kNoDefaultValue};
-          reflectionData.bufferMembers.PushBack(bufferMember);
+      if (isBuffer(pSpvReflDescBinding->descriptor_type)) {
+        descBinding.memberCount = 0;
+
+        const char *blockName = pSpvReflDescBinding->name;
+        if (!blockName || strlen(blockName) == 0) {
+          blockName = pSpvReflDescBinding->block.type_description->type_name;
         }
+
+        ProcessStructMembers(pSpvReflDescBinding->block, blockName,
+                             pSpvReflDescBinding->binding, reflectionData,
+                             descBinding, 0);
       }
 
       reflectionData.descBindings.PushBack(descBinding);
     }
-  }
-}
-
-void ExtractPushConstantRanges(SpvReflectShaderModule *module,
-                               ReflectionData &reflectionData,
-                               EShaderStage stage) {
-  uint32_t count = 0;
-  spvReflectEnumeratePushConstantBlocks(module, &count, nullptr);
-  std::vector<SpvReflectBlockVariable *> blocks(count);
-  spvReflectEnumeratePushConstantBlocks(module, &count, blocks.data());
-
-  for (auto *block : blocks) {
-    ShaderPushConstant range{
-        .visibleStages = stage,
-        .offset = block->offset,
-        .size = block->size,
-    };
-    reflectionData.pushConstantRanges.PushBack(range);
   }
 }
 
@@ -170,12 +269,12 @@ auto ReflectShader(EShaderStage stage, const void *data, size_t size)
     return reflectionData;
   }
 
-  if (stage == EShaderStage::Vertex)
+  if (stage == EShaderStage::Vertex) {
     ExtractVertexInputs(&module, reflectionData);
+    ExtractPushConstant(&module, reflectionData);
+  }
 
   ExtractDescriptorBindings(&module, reflectionData, stage);
-
-  ExtractPushConstantRanges(&module, reflectionData, stage);
 
   spvReflectDestroyShaderModule(&module);
   return reflectionData;
@@ -289,6 +388,7 @@ public:
       }
 
       AddArg(L"-fspv-reflect");
+      AddArg(L"-fspv-preserve-bindings");
       AddArg(L"-fvk-use-dx-layout");
       AddArg(L"-Zpc");
       AddArg(L"-Fi");

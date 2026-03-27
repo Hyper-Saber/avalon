@@ -28,6 +28,9 @@ public:
   rhi::RenderBackend rhi;
 
   GlobalTime globalTime;
+  uint32_t currentFrame = 0;
+
+  void Clear() { this->~EngineContext(); }
 
   template <TAutoDestroyable T>
   auto GetService(EEngineService service) const noexcept -> T & {

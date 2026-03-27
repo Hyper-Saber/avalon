@@ -55,6 +55,21 @@ public:
     return std::memcmp(m_pData, other.m_pData, m_size) == 0;
   }
 
+  constexpr bool Contains(const StringView &sub) const noexcept {
+    if (sub.IsEmpty())
+      return true;
+    if (sub.m_size > m_size)
+      return false;
+
+    return std::string_view(m_pData, m_size)
+               .find(std::string_view(sub.m_pData, sub.m_size)) !=
+           std::string_view::npos;
+  }
+
+  constexpr bool Contains(const char *pStr) const noexcept {
+    return Contains(StringView(pStr));
+  }
+
   constexpr bool IsStartWith(const StringView &prefix) const noexcept {
     if (prefix.IsEmpty())
       return true;

@@ -216,6 +216,8 @@ constexpr auto ToVkImageLayout(EResourceLayout layout) noexcept
     return VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
   case EResourceLayout::TransferDst:
     return VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+  case EResourceLayout::General:
+    return VK_IMAGE_LAYOUT_GENERAL;
   }
 }
 
@@ -275,6 +277,8 @@ constexpr auto ToVkCompareOp(ECompareOp compareOp) noexcept -> VkCompareOp {
     return VK_COMPARE_OP_EQUAL;
   case ECompareOp::NotEqual:
     return VK_COMPARE_OP_NOT_EQUAL;
+  case ECompareOp::Always:
+    return VK_COMPARE_OP_ALWAYS;
   }
 }
 
@@ -312,94 +316,112 @@ constexpr auto ToVkAddressMode(EAddressMode e) noexcept {
   }
 }
 
-constexpr auto ToVkBufferUsageBits(EBufferUsage usage) noexcept
-    -> VkBufferUsageFlagBits {
-  switch (usage) {
-  case EBufferUsage::Vertex:
-    return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-  case EBufferUsage::Uniform:
-    return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-  case EBufferUsage::Index:
-    return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-  case EBufferUsage::Storage:
-    return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-  case EBufferUsage::Indirect:
-    return VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
-  case EBufferUsage::TransferSrc:
-    return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-  case EBufferUsage::TransferDst:
-    return VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-  case EBufferUsage::None:
-    return VK_BUFFER_USAGE_FLAG_BITS_MAX_ENUM;
-  }
-}
-
-constexpr auto ToVkImageUsageFlags(ETextureUsage usage) noexcept
+// constexpr auto ToVkBufferUsageBits(EResourceUsage usage) noexcept
+//     -> VkBufferUsageFlagBits {
+//   switch (usage) {
+//   case EResourceUsage::Vertex:
+//     return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+//   case EResourceUsage::Uniform:
+//     return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+//   case EResourceUsage::Index:
+//     return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+//   case EResourceUsage::Storage:
+//     return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+//   case EResourceUsage::Indirect:
+//     return VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+//   case EResourceUsage::TransferSrc:
+//     return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+//   case EResourceUsage::TransferDst:
+//     return VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+//   case EResourceUsage::None:
+//     return VK_BUFFER_USAGE_FLAG_BITS_MAX_ENUM;
+//   }
+// }
+//
+constexpr auto ToVkImageUsageFlags(EResourceUsage usage) noexcept
     -> VkImageUsageFlags {
-  if (usage == ETextureUsage::None) {
+  if (usage == EResourceUsage::None) {
     return 0;
   }
 
+  constexpr EResourceUsage bufferOnly =
+      EResourceUsage::VertexBuffer | EResourceUsage::IndexBuffer |
+      EResourceUsage::IndirectBuffer | EResourceUsage::UniformBuffer;
+  AVALON_ASSERT_MSG(
+      !HasFlag(usage, bufferOnly),
+      "[Vulkan]: Buffer-only usage flags detected in Image mapping!");
+
   VkImageUsageFlags vkUsages = 0;
 
-  if ((usage & ETextureUsage::Sampled) != ETextureUsage::None) {
-    vkUsages |= VK_IMAGE_USAGE_SAMPLED_BIT;
-  }
-
-  if ((usage & ETextureUsage::ColorAttachment) != ETextureUsage::None) {
-    vkUsages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-  }
-
-  if ((usage & ETextureUsage::DepthStencilAttachment) != ETextureUsage::None) {
-    vkUsages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-  }
-
-  if ((usage & ETextureUsage::Storage) != ETextureUsage::None) {
-    vkUsages |= VK_IMAGE_USAGE_STORAGE_BIT;
-  }
-
-  if ((usage & ETextureUsage::TransferSrc) != ETextureUsage::None) {
+  if (HasFlag(usage, EResourceUsage::TransferSrc))
     vkUsages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-  }
+  if (HasFlag(usage, EResourceUsage::TransferDst))
+    vkUsages |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
-  if ((usage & (ETextureUsage::ColorAttachment |
-                ETextureUsage::DepthStencilAttachment)) !=
-      ETextureUsage::None) {
+  if (HasFlag(usage, EResourceUsage::ColorAttachment)) {
+    vkUsages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     vkUsages |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
   }
 
-  AVALON_ASSERT_MSG(vkUsages != 0,
-                    "[Vulkan] Image usage mapping resulted in 0 flags!");
+  if (HasFlag(usage, EResourceUsage::DepthStencilAttachment)) {
+    vkUsages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    vkUsages |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+  }
+
+  if (HasFlag(usage, EResourceUsage::ReadOnly)) {
+    vkUsages |= VK_IMAGE_USAGE_SAMPLED_BIT;
+  }
+
+  if (HasFlag(usage, EResourceUsage::ReadWrite)) {
+    vkUsages |= VK_IMAGE_USAGE_STORAGE_BIT;
+  }
+
+  if (HasFlag(usage, EResourceUsage::Present)) {
+    vkUsages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+  }
+
+  AVALON_ASSERT_MSG(vkUsages != 0, "[Vulkan]: Calculated ImageUsageFlags is "
+                                   "empty. Check EResourceUsage mapping.");
   return vkUsages;
 }
 
-constexpr auto ToVkBufferUsageFlags(EBufferUsage usage) noexcept
+constexpr auto ToVkBufferUsageFlags(EResourceUsage usage) noexcept
     -> VkBufferUsageFlags {
-  AVALON_ASSERT(usage != EBufferUsage::None);
-  VkBufferUsageFlags vkUsages = 0;
-  if ((usage & EBufferUsage::TransferDst) != EBufferUsage::None) {
-    vkUsages |= VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-  }
-  if ((usage & EBufferUsage::TransferSrc) != EBufferUsage::None) {
-    vkUsages |= VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-  }
-  if ((usage & EBufferUsage::Storage) != EBufferUsage::None) {
-    vkUsages |= VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-  }
-  if ((usage & EBufferUsage::Index) != EBufferUsage::None) {
-    vkUsages |= VkBufferUsageFlagBits::VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-  }
-  if ((usage & EBufferUsage::Uniform) != EBufferUsage::None) {
-    vkUsages |= VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-  }
-  if ((usage & EBufferUsage::Vertex) != EBufferUsage::None) {
-    vkUsages |= VkBufferUsageFlagBits::VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-  }
-  if ((usage & EBufferUsage::Indirect) != EBufferUsage::None) {
-    vkUsages |= VkBufferUsageFlagBits::VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
-  }
+  AVALON_ASSERT(usage != EResourceUsage::None);
 
-  AVALON_ASSERT(vkUsages != 0);
+  constexpr EResourceUsage textureOnly =
+      EResourceUsage::ColorAttachment | EResourceUsage::DepthStencilAttachment |
+      EResourceUsage::Present;
+
+  AVALON_ASSERT_MSG(!HasFlag(usage, textureOnly),
+                    "[Vulkan]: Texture-only usage flags detected for Buffer!");
+
+  VkBufferUsageFlags vkUsages = 0;
+
+  if (HasFlag(usage, EResourceUsage::TransferDst))
+    vkUsages |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+  if (HasFlag(usage, EResourceUsage::TransferSrc))
+    vkUsages |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+
+  if (HasFlag(usage, EResourceUsage::VertexBuffer))
+    vkUsages |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+  if (HasFlag(usage, EResourceUsage::IndexBuffer))
+    vkUsages |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+  if (HasFlag(usage, EResourceUsage::IndirectBuffer))
+    vkUsages |= VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+
+  if (HasFlag(usage, EResourceUsage::UniformBuffer))
+    vkUsages |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+
+  constexpr EResourceUsage storageMask = EResourceUsage::StorageBuffer |
+                                         EResourceUsage::ReadOnly |
+                                         EResourceUsage::ReadWrite;
+
+  if (HasFlag(usage, storageMask))
+    vkUsages |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+
+  AVALON_ASSERT_MSG(vkUsages != 0, "[Vulkan]: Calculated BufferUsageFlags is "
+                                   "empty. Check EResourceUsage mapping.");
   return vkUsages;
 }
 
@@ -499,63 +521,186 @@ constexpr auto ToVkColorComponentFlags(EColorWriteMask mask) noexcept
 
 constexpr auto ToVkShaderStageFlags(EShaderStage stage) noexcept
     -> VkShaderStageFlags {
-  AVALON_ASSERT(stage != EShaderStage::None);
-  VkShaderStageFlags vkStages = 0;
-  if ((stage & EShaderStage::Vertex) != EShaderStage::None) {
-    vkStages |= VkShaderStageFlagBits::VK_SHADER_STAGE_VERTEX_BIT;
-  }
-  if ((stage & EShaderStage::Fragment) != EShaderStage::None) {
-    vkStages |= VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
-  }
-  if ((stage & EShaderStage::Compute) != EShaderStage::None) {
-    vkStages |= vkStages |= VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT;
+  if (stage == EShaderStage::All) {
+    return VK_SHADER_STAGE_ALL;
   }
 
-  AVALON_ASSERT(vkStages != 0);
+  VkShaderStageFlags vkStages = 0;
+  auto s = static_cast<uint32_t>(stage);
+
+  if (s & static_cast<uint32_t>(EShaderStage::Vertex))
+    vkStages |= VK_SHADER_STAGE_VERTEX_BIT;
+  if (s & static_cast<uint32_t>(EShaderStage::TessControl))
+    vkStages |= VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+  if (s & static_cast<uint32_t>(EShaderStage::TessEvaluation))
+    vkStages |= VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+  if (s & static_cast<uint32_t>(EShaderStage::Geometry))
+    vkStages |= VK_SHADER_STAGE_GEOMETRY_BIT;
+  if (s & static_cast<uint32_t>(EShaderStage::Fragment))
+    vkStages |= VK_SHADER_STAGE_FRAGMENT_BIT;
+
+  if (s & static_cast<uint32_t>(EShaderStage::Compute))
+    vkStages |= VK_SHADER_STAGE_COMPUTE_BIT;
+
+  if (s & static_cast<uint32_t>(EShaderStage::Task))
+    vkStages |= VK_SHADER_STAGE_TASK_BIT_EXT;
+  if (s & static_cast<uint32_t>(EShaderStage::Mesh))
+    vkStages |= VK_SHADER_STAGE_MESH_BIT_EXT;
+
+  if (s & static_cast<uint32_t>(EShaderStage::RayGen))
+    vkStages |= VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+  if (s & static_cast<uint32_t>(EShaderStage::RayAnyHit))
+    vkStages |= VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
+  if (s & static_cast<uint32_t>(EShaderStage::RayClosestHit))
+    vkStages |= VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+  if (s & static_cast<uint32_t>(EShaderStage::RayMiss))
+    vkStages |= VK_SHADER_STAGE_MISS_BIT_KHR;
+  if (s & static_cast<uint32_t>(EShaderStage::RayIntersection))
+    vkStages |= VK_SHADER_STAGE_INTERSECTION_BIT_KHR;
+  if (s & static_cast<uint32_t>(EShaderStage::Callable))
+    vkStages |= VK_SHADER_STAGE_CALLABLE_BIT_KHR;
+
+  AVALON_ASSERT(vkStages != 0 && "Shader stage conversion resulted in 0. Did "
+                                 "you pass EShaderStage::None?");
   return vkStages;
 }
 
-constexpr auto ToVkShaderStageBits(EShaderStage stage) noexcept
+constexpr auto ToVkShaderStageBit(EShaderStage stage) noexcept
     -> VkShaderStageFlagBits {
+  auto s = static_cast<uint32_t>(stage);
+  AVALON_ASSERT(s != 0 && (s & (s - 1)) == 0 &&
+                "ToVkShaderStageBit expects a single stage bit, not a mask!");
+
   switch (stage) {
-  case EShaderStage::None:
-    return VkShaderStageFlagBits::VK_SHADER_STAGE_MISS_BIT_KHR;
   case EShaderStage::Vertex:
-    return VkShaderStageFlagBits::VK_SHADER_STAGE_VERTEX_BIT;
+    return VK_SHADER_STAGE_VERTEX_BIT;
+  case EShaderStage::TessControl:
+    return VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+  case EShaderStage::TessEvaluation:
+    return VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+  case EShaderStage::Geometry:
+    return VK_SHADER_STAGE_GEOMETRY_BIT;
   case EShaderStage::Fragment:
-    return VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
+    return VK_SHADER_STAGE_FRAGMENT_BIT;
   case EShaderStage::Compute:
-    return VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT;
-  case EShaderStage::All:
-    return VkShaderStageFlagBits::VK_SHADER_STAGE_ALL;
+    return VK_SHADER_STAGE_COMPUTE_BIT;
+  case EShaderStage::Task:
+    return VK_SHADER_STAGE_TASK_BIT_EXT;
+  case EShaderStage::Mesh:
+    return VK_SHADER_STAGE_MESH_BIT_EXT;
+  case EShaderStage::RayGen:
+    return VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+  case EShaderStage::RayAnyHit:
+    return VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
+  case EShaderStage::RayClosestHit:
+    return VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+  case EShaderStage::RayMiss:
+    return VK_SHADER_STAGE_MISS_BIT_KHR;
+  case EShaderStage::RayIntersection:
+    return VK_SHADER_STAGE_INTERSECTION_BIT_KHR;
+  case EShaderStage::Callable:
+    return VK_SHADER_STAGE_CALLABLE_BIT_KHR;
+  default:
+    AVALON_ASSERT(false && "Invalid or unsupported shader stage bit.");
+    return VK_SHADER_STAGE_VERTEX_BIT;
   }
 }
 
-constexpr auto MapIntentToUsage(EAttachmentIntent intent) noexcept
-    -> ETextureUsage {
-  ETextureUsage usage = ETextureUsage::None;
+constexpr auto ToVkAccessFlags(EAccess access) noexcept -> VkAccessFlags2 {
+  if (access == EAccess::None)
+    return VK_ACCESS_2_NONE;
 
-  if ((intent & EAttachmentIntent::ReadOnly) != EAttachmentIntent::None) {
-    usage |= ETextureUsage::Sampled;
-  }
+  VkAccessFlags2 flags = 0;
 
-  if ((intent & EAttachmentIntent::WriteColor) != EAttachmentIntent::None) {
-    usage |= ETextureUsage::ColorAttachment;
-  }
+  if (HasFlag(access, EAccess::ColorRead))
+    flags |= VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT;
+  if (HasFlag(access, EAccess::ColorWrite))
+    flags |= VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
 
-  if ((intent & EAttachmentIntent::WriteDepth) != EAttachmentIntent::None) {
-    usage |= ETextureUsage::DepthStencilAttachment;
-  }
+  if (HasFlag(access, EAccess::DepthStencilRead))
+    flags |= VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+  if (HasFlag(access, EAccess::DepthStencilWrite))
+    flags |= VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
-  if ((intent & EAttachmentIntent::CaptureSource) != EAttachmentIntent::None) {
-    usage |= ETextureUsage::TransferSrc | ETextureUsage::ColorAttachment;
-  }
+  if (HasFlag(access, EAccess::ShaderRead))
+    flags |= VK_ACCESS_2_SHADER_READ_BIT;
+  if (HasFlag(access, EAccess::ShaderWrite))
+    flags |= VK_ACCESS_2_SHADER_WRITE_BIT;
 
-  if ((intent & EAttachmentIntent::ComputeStorage) != EAttachmentIntent::None) {
-    usage |= ETextureUsage::Storage;
-  }
+  if (HasFlag(access, EAccess::TransferRead))
+    flags |= VK_ACCESS_2_TRANSFER_READ_BIT;
+  if (HasFlag(access, EAccess::TransferWrite))
+    flags |= VK_ACCESS_2_TRANSFER_WRITE_BIT;
 
-  return usage;
+  if (HasFlag(access, EAccess::MemoryRead))
+    flags |= VK_ACCESS_2_MEMORY_READ_BIT;
+  if (HasFlag(access, EAccess::MemoryWrite))
+    flags |= VK_ACCESS_2_MEMORY_WRITE_BIT;
+
+  if (HasFlag(access, EAccess::IndirectCommandRead))
+    flags |= VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT;
+  if (HasFlag(access, EAccess::IndexRead))
+    flags |= VK_ACCESS_2_INDEX_READ_BIT;
+  if (HasFlag(access, EAccess::VertexAttributeRead))
+    flags |= VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
+  if (HasFlag(access, EAccess::UniformRead))
+    flags |= VK_ACCESS_2_UNIFORM_READ_BIT;
+
+  return flags;
+}
+
+constexpr auto ToVkPipelineStageFlags(EPipelineStage stage) noexcept
+    -> VkPipelineStageFlags2 {
+
+  if (stage == EPipelineStage::None)
+    return VK_PIPELINE_STAGE_2_NONE;
+
+  VkPipelineStageFlags2 flags = 0;
+
+  if (HasFlag(stage, EPipelineStage::TopOfPipe))
+    flags |= VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
+  if (HasFlag(stage, EPipelineStage::BottomOfPipe))
+    flags |= VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT;
+  if (HasFlag(stage, EPipelineStage::DrawIndirect))
+    flags |= VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT;
+  if (HasFlag(stage, EPipelineStage::VertexInput))
+    flags |= VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT;
+
+  if (HasFlag(stage, EPipelineStage::VertexShader))
+    flags |= VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT;
+  if (HasFlag(stage, EPipelineStage::TessControlShader))
+    flags |= VK_PIPELINE_STAGE_2_TESSELLATION_CONTROL_SHADER_BIT;
+  if (HasFlag(stage, EPipelineStage::TessEvaluationShader))
+    flags |= VK_PIPELINE_STAGE_2_TESSELLATION_EVALUATION_SHADER_BIT;
+  if (HasFlag(stage, EPipelineStage::GeometryShader))
+    flags |= VK_PIPELINE_STAGE_2_GEOMETRY_SHADER_BIT;
+  if (HasFlag(stage, EPipelineStage::FragmentShader))
+    flags |= VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+  if (HasFlag(stage, EPipelineStage::ComputeShader))
+    flags |= VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+  if (HasFlag(stage, EPipelineStage::RayTracingShader))
+    flags |= VK_PIPELINE_STAGE_2_RAY_TRACING_SHADER_BIT_KHR;
+
+  if (HasFlag(stage, EPipelineStage::EarlyFragmentTests))
+    flags |= VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT;
+  if (HasFlag(stage, EPipelineStage::LateFragmentTests))
+    flags |= VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+  if (HasFlag(stage, EPipelineStage::ColorAttachmentOutput))
+    flags |= VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+
+  if (HasFlag(stage, EPipelineStage::Transfer))
+    flags |= VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+  if (HasFlag(stage, EPipelineStage::Clear))
+    flags |= VK_PIPELINE_STAGE_2_CLEAR_BIT;
+  if (HasFlag(stage, EPipelineStage::Host))
+    flags |= VK_PIPELINE_STAGE_2_HOST_BIT;
+
+  if (HasFlag(stage, EPipelineStage::AllGraphics))
+    flags |= VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
+  if (HasFlag(stage, EPipelineStage::AllCommands))
+    flags |= VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+
+  return flags;
 }
 
 constexpr auto HandleVkError(VkResult result) noexcept -> ERhiResult {

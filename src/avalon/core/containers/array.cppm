@@ -2,6 +2,7 @@ module;
 #include <algorithm>
 #include <cstddef>
 #include <cstring>
+#include <debug/assert.hpp>
 
 export module avalon.core:containers.array;
 import :memory;
@@ -133,6 +134,72 @@ public:
     return !(*this == other);
   }
 
+  Iterator Erase(Iterator it) {
+    size_t index = static_cast<size_t>(it - begin());
+    AVALON_ASSERT(index < m_size);
+
+    mem::LifeCycle::Deinstantiate<T>(&m_data[index]);
+
+    if (index < m_size - 1) {
+      if constexpr (std::is_trivially_copyable_v<T>) {
+        std::memmove(&m_data[index], &m_data[index + 1],
+                     (m_size - index - 1) * sizeof(T));
+      } else {
+        for (size_t i = index; i < m_size - 1; ++i) {
+          mem::LifeCycle::Instantiate<T>(&m_data[i], std::move(m_data[i + 1]));
+          mem::LifeCycle::Deinstantiate<T>(&m_data[i + 1]);
+        }
+      }
+    }
+
+    m_size--;
+    return m_data + index;
+  }
+
+  void RemoveAtSwap(size_t index) {
+    AVALON_ASSERT(index < m_size);
+
+    if (index != m_size - 1) {
+      mem::LifeCycle::Deinstantiate<T>(&m_data[index]);
+      mem::LifeCycle::Instantiate<T>(&m_data[index],
+                                     std::move(m_data[m_size - 1]));
+    }
+
+    mem::LifeCycle::Deinstantiate<T>(&m_data[m_size - 1]);
+    m_size--;
+  }
+
+  Iterator Erase(Iterator first, Iterator last) {
+    if (first == last)
+      return first;
+
+    size_t firstIdx = static_cast<size_t>(first - begin());
+    size_t lastIdx = static_cast<size_t>(last - begin());
+    size_t count = lastIdx - firstIdx;
+
+    AVALON_ASSERT(lastIdx <= m_size);
+
+    for (size_t i = firstIdx; i < lastIdx; ++i) {
+      mem::LifeCycle::Deinstantiate<T>(&m_data[i]);
+    }
+
+    if (lastIdx < m_size) {
+      if constexpr (std::is_trivially_copyable_v<T>) {
+        std::memmove(&m_data[firstIdx], &m_data[lastIdx],
+                     (m_size - lastIdx) * sizeof(T));
+      } else {
+        for (size_t i = 0; i < (m_size - lastIdx); ++i) {
+          mem::LifeCycle::Instantiate<T>(&m_data[firstIdx + i],
+                                         std::move(m_data[lastIdx + i]));
+          mem::LifeCycle::Deinstantiate<T>(&m_data[lastIdx + i]);
+        }
+      }
+    }
+
+    m_size -= count;
+    return m_data + firstIdx;
+  }
+
   void PushBack(const T &value) {
     if (m_size == m_capacity)
       Grow(m_capacity == 0 ? kInitialCapacity : m_capacity * 2);
@@ -170,6 +237,28 @@ public:
     T *ptr = mem::LifeCycle::Instantiate<T>(&m_data[m_size++],
                                             std::forward<Args>(args)...);
     return *ptr;
+  }
+
+  template <typename F> size_t RemoveIf(F &&predicate) {
+    if (m_size == 0)
+      return 0;
+
+    size_t writeIndex = 0;
+    const size_t oldSize = m_size;
+
+    for (size_t readIndex = 0; readIndex < m_size; readIndex++) {
+      if (!predicate(m_data[readIndex])) {
+        if (readIndex != writeIndex) {
+          m_data[writeIndex] = std::move(m_data[readIndex]);
+        }
+        writeIndex++;
+      } else {
+        mem::LifeCycle::Deinstantiate<T>(&m_data[readIndex]);
+      }
+    }
+
+    m_size = writeIndex;
+    return oldSize - m_size;
   }
 
   void Resize(size_t newSize) {

@@ -42,9 +42,9 @@ public:
   constexpr explicit operator HashType() const noexcept { return m_id; }
   constexpr bool IsValid() const noexcept { return m_id != 0; }
 
-  HashType GetHash() const noexcept { return m_id; }
-
   String Resolve() const;
+
+  constexpr HashType GetHash() const noexcept { return m_id; }
 
 private:
   HashType m_id;

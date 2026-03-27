@@ -1,5 +1,6 @@
 module;
 #include <cstdint>
+#include <cstdint>
 export module avalon.rhi:utils;
 import :types;
 
@@ -88,6 +89,142 @@ constexpr uint32_t GetFormatSize(EFormat format) {
   }
 
   return kInvalidFormatSize;
+}
+
+constexpr bool IsBufferDescriptor(EDescriptorType type) noexcept {
+  switch (type) {
+  case EDescriptorType::UniformBuffer:
+  case EDescriptorType::StorageBuffer:
+  case EDescriptorType::UniformBufferDynamic:
+  case EDescriptorType::StorageBufferDynamic:
+    return true;
+  default:
+    return false;
+  }
+}
+
+constexpr bool IsTexureDescriptor(EDescriptorType type) noexcept {
+  switch (type) {
+  case EDescriptorType::SampledImage:
+  case EDescriptorType::StorageImage:
+    return true;
+  default:
+    return false;
+  }
+}
+
+constexpr EResourceLayout MapUsageToLayout(EResourceUsage usage) noexcept {
+  using enum EResourceUsage;
+  if (usage == None)
+    return EResourceLayout::Undefined;
+
+  if (HasFlag(usage, Present))
+    return EResourceLayout::Present;
+
+  if (HasFlag(usage, DepthStencilAttachment))
+    return EResourceLayout::DepthStencilAttachment;
+
+  if (HasFlag(usage, ColorAttachment))
+    return EResourceLayout::ColorAttachment;
+
+  if (HasFlag(usage, TransferSrc))
+    return EResourceLayout::TransferSrc;
+  if (HasFlag(usage, TransferDst))
+    return EResourceLayout::TransferDst;
+
+  if (HasFlag(usage, ReadWrite))
+    return EResourceLayout::General;
+
+  if (HasFlag(usage, ReadOnly))
+    return EResourceLayout::ShaderReadOnly;
+
+  return EResourceLayout::Undefined;
+}
+
+constexpr bool IsWriteUsage(EResourceUsage usage) noexcept {
+  using enum EResourceUsage;
+  const EResourceUsage writeMask =
+      ReadWrite | ColorAttachment | DepthStencilAttachment | TransferDst;
+  return HasFlag(usage, writeMask);
+}
+
+constexpr EAccess MapUsageToAccess(EResourceUsage usage) noexcept {
+  using enum EResourceUsage;
+
+  if (usage == None)
+    return EAccess::None;
+
+  EAccess access = EAccess::None;
+
+  if (HasFlag(usage, VertexBuffer))
+    access |= EAccess::MemoryRead;
+  if (HasFlag(usage, IndexBuffer))
+    access |= EAccess::MemoryRead;
+  if (HasFlag(usage, IndirectBuffer))
+    access |= EAccess::MemoryRead;
+
+  if (HasFlag(usage, UniformBuffer))
+    access |= EAccess::ShaderRead;
+  if (HasFlag(usage, ReadOnly))
+    access |= EAccess::ShaderRead;
+  if (HasFlag(usage, ReadWrite))
+    access |= (EAccess::ShaderRead | EAccess::ShaderWrite);
+
+  if (HasFlag(usage, ColorAttachment)) {
+    access |= (EAccess::ColorRead | EAccess::ColorWrite);
+  }
+  if (HasFlag(usage, DepthStencilAttachment)) {
+    access |= (EAccess::DepthStencilRead | EAccess::DepthStencilWrite);
+  }
+
+  if (HasFlag(usage, TransferSrc))
+    access |= EAccess::TransferRead;
+  if (HasFlag(usage, TransferDst))
+    access |= EAccess::TransferWrite;
+
+  if (HasFlag(usage, Present))
+    access |= EAccess::None;
+
+  return access;
+}
+
+constexpr EPipelineStage MapUsageToStage(EResourceUsage usage) noexcept {
+  using enum EResourceUsage;
+
+  if (usage == None)
+    return EPipelineStage::None;
+
+  EPipelineStage stage = EPipelineStage::None;
+
+  if (HasFlag(usage, IndirectBuffer))
+    stage |= EPipelineStage::DrawIndirect;
+
+  if (HasFlag(usage, VertexBuffer | IndexBuffer))
+    stage |= EPipelineStage::VertexInput;
+
+  if (HasFlag(usage, UniformBuffer | ReadOnly | ReadWrite)) {
+    stage |= (EPipelineStage::VertexShader | EPipelineStage::FragmentShader |
+              EPipelineStage::ComputeShader);
+  }
+
+  if (HasFlag(usage, ColorAttachment)) {
+    stage |= EPipelineStage::ColorAttachmentOutput;
+  }
+
+  if (HasFlag(usage, DepthStencilAttachment)) {
+    stage |= (EPipelineStage::EarlyFragmentTests |
+              EPipelineStage::LateFragmentTests);
+  }
+
+  if (HasFlag(usage, TransferSrc | TransferDst)) {
+    stage |= EPipelineStage::Transfer;
+  }
+
+  if (HasFlag(usage, Present)) {
+    stage |= EPipelineStage::BottomOfPipe;
+  }
+
+  return stage;
 }
 
 constexpr StringView ToView(EFormat format) {
@@ -197,12 +334,29 @@ constexpr StringView ToView(EFormat format) {
   }
 }
 
-bool IsDepthFormat(EFormat format) {
+constexpr bool IsDepthFormat(EFormat format) {
   return format == EFormat::D32_SFLOAT || format == EFormat::D32_SFLOAT_S8_UINT;
 }
 
 bool HasStencilComponent(EFormat format) {
   return format == EFormat::D32_SFLOAT_S8_UINT;
+}
+
+constexpr StringView ToView(ESampleCount e) {
+  switch (e) {
+  case ESampleCount::SampleCount1x:
+    return "1x";
+  case ESampleCount::SampleCount2x:
+    return "2x";
+  case ESampleCount::SampleCount4x:
+    return "4x";
+  case ESampleCount::SampleCount8x:
+    return "8x";
+  case ESampleCount::SampleCount16x:
+    return "16x";
+  default:
+    return "Unknown";
+  }
 }
 
 constexpr StringView ToView(EDescriptorType e) {
@@ -233,6 +387,7 @@ constexpr StringView ToView(EDescriptorType e) {
     return "AccelerationStructure";
   }
 }
+
 constexpr StringView ToView(EAttachmentIntent e) {
   if (e == EAttachmentIntent::None) {
     return "None";
@@ -322,20 +477,35 @@ constexpr StringView ToView(EAttachmentLoadOp op) {
   }
 }
 
-constexpr StringView ToView(ETextureUsage usage) {
+constexpr StringView ToView(EResourceUsage usage) {
   switch (usage) {
-  case ETextureUsage::None:
+  case EResourceUsage::None:
     return "None";
-  case ETextureUsage::Sampled:
-    return "Sampled";
-  case ETextureUsage::ColorAttachment:
+  case EResourceUsage::VertexBuffer:
+    return "VertexBuffer";
+  case EResourceUsage::IndexBuffer:
+    return "IndexBuffer";
+  case EResourceUsage::IndirectBuffer:
+    return "IndirectBuffer";
+  case EResourceUsage::UniformBuffer:
+    return "UniformBuffer";
+  case EResourceUsage::StorageBuffer:
+    return "StorageBuffer";
+  case EResourceUsage::ReadOnly:
+    return "ReadOnly";
+  case EResourceUsage::ReadWrite:
+    return "ReadWrite";
+  case EResourceUsage::ColorAttachment:
     return "ColorAttachment";
-  case ETextureUsage::DepthStencilAttachment:
+  case EResourceUsage::DepthStencilAttachment:
     return "DepthStencilAttachment";
-  case ETextureUsage::Storage:
-    return "Storage";
-  case ETextureUsage::TransferSrc:
+  case EResourceUsage::TransferSrc:
     return "TransferSrc";
+  case EResourceUsage::TransferDst:
+    return "TransferDst";
+  case EResourceUsage::Present:
+    return "Present";
+    break;
   }
 }
 
@@ -365,8 +535,98 @@ constexpr StringView ToView(EResourceLayout e) {
     return "TransferSrc";
   case EResourceLayout::TransferDst:
     return "TransferDst";
+  case EResourceLayout::General:
+    return "General";
+  }
+}
+constexpr StringView ToView(EPrimitiveTopology e) noexcept {
+  switch (e) {
+  case EPrimitiveTopology::PointList:
+    return "PointList";
+  case EPrimitiveTopology::LineList:
+    return "LineList";
+  case EPrimitiveTopology::TriangleList:
+    return "TriangleList";
+  }
+  return "Unknown";
+}
+
+constexpr StringView ToView(EPolygonMode e) noexcept {
+  switch (e) {
+  case EPolygonMode::Fill:
+    return "Fill";
+  case EPolygonMode::Line:
+    return "Line";
+  case EPolygonMode::Point:
+    return "Point";
+  }
+  return "Unknown";
+}
+
+constexpr StringView ToView(ECullMode e) noexcept {
+  switch (e) {
+  case ECullMode::Back:
+    return "Back";
+  case ECullMode::Front:
+    return "Front";
+  case ECullMode::FrontAndBack:
+    return "FrontAndBack";
+  case ECullMode::None:
+    return "None";
+  }
+  return "Unknown";
+}
+
+constexpr StringView ToView(ECompareOp e) noexcept {
+  switch (e) {
+  case ECompareOp::Less:
+    return "Less";
+  case ECompareOp::LessOrEqual:
+    return "LessOrEqual";
+  case ECompareOp::Greater:
+    return "Greater";
+  case ECompareOp::GreaterOrEqual:
+    return "GreaterOrEqual";
+  case ECompareOp::Equal:
+    return "Equal";
+  case ECompareOp::NotEqual:
+    return "NotEqual";
+  case ECompareOp::Always:
+    return "Always";
+  }
+  return "Unknown";
+}
+
+constexpr StringView ToView(EFrontFace e) noexcept {
+  switch (e) {
+  case EFrontFace::Clockwise:
+    return "Clockwise";
+  case EFrontFace::CounterClockwise:
+    return "CounterClockwise";
     break;
   }
 }
 
+String InputAssemblyState::ToString() const {
+  return String::Format(
+      "InputAssemblyState{{topology = {}, primitiveRestartEnable = {}}}",
+      ToView(topology), primitiveRestartEnable);
+}
+
+String RasterizationState::ToString() const {
+  return String::Format(
+      "RasterizationState{{polygonMode = {}, cullMode = {}, frontFace = {}, "
+      "lineWidth = {}, depthBiasEnable = {}}}",
+      ToView(polygonMode), ToView(cullMode), ToView(frontFace), lineWidth,
+      depthBiasEnable);
+}
+
+String DepthStencilState::ToString() const {
+  return String::Format(
+      "DepthStencilState{{isDepthTestEnable = {}, isDepthWriteEnable = {}, "
+      "depthCompareOp = {}, isStencilTestEnable = {}}}",
+      isDepthTestEnable, isDepthWriteEnable, ToView(depthCompareOp),
+      isStencilTestEnable);
+}
 } // namespace avalon::rhi
+

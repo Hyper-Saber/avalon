@@ -7,19 +7,13 @@ export module avalon.rhi.vulkan:resource_pool;
 import avalon.core;
 
 import :types;
-import :render_pass_cache;
-import :frame_buffer_cache;
+import :utils;
 
 namespace avalon::rhi {
 class ResourcePool final : public NonCopyable,
                            public mem::AutoDestroyable<ResourcePool> {
 public:
-  explicit ResourcePool(IDeviceContext &context) : m_deviceContext(context) {
-    m_renderPassCache =
-        MakeUnique<RenderPassCache>(m_deviceContext.GetDevice());
-    m_frameBufferCache =
-        MakeUnique<FrameBufferCache>(m_deviceContext.GetDevice());
-  }
+  explicit ResourcePool(IDeviceContext &context) : m_deviceContext(context) {}
 
   auto CreateBuffer(const BufferCreateInfo &info) -> Handle<BufferResource> {
     VkBufferCreateInfo createInfo{
@@ -91,13 +85,11 @@ public:
     return handle;
   }
 
-  auto GetOrCreateFrameBuffer(const FrameBufferCreateInfo &createInfo)
-      -> Handle<FrameBufferResource> {
-
-    auto pass = m_renderPassCache->Resolve({createInfo.renderPassHandle.id})
-                    ->renderPass;
-
-    return m_frameBufferCache->GetOrCreateFrameBuffer(pass, createInfo);
+  auto ImportExternalTexture(VkDevice device, VkImage image, VkImageView view,
+                             TextureCreateInfo info, bool isSwapchainTexture)
+      -> Handle<TextureResource> {
+    return m_texturePool.Create(m_deviceContext.GetDevice(), image, view,
+                                VK_NULL_HANDLE, info, isSwapchainTexture);
   }
 
   auto CreateTexture(const TextureCreateInfo &info) -> Handle<TextureResource> {
@@ -202,7 +194,7 @@ public:
 
     return m_texturePool.Create(m_deviceContext.GetDevice(), image, view,
                                 pMemory, info);
-  } // namespace avalon::rhi
+  }
 
   auto CreateSampler(const SamplerCreateInfo &info) -> Handle<SamplerResource> {
     auto hash = info.GetHash();
@@ -243,21 +235,8 @@ public:
     return handle;
   }
 
-  auto CreateRenderPass(const RenderPassCreateInfo &info)
-      -> Handle<RenderPassResource> {
-    return m_renderPassCache->GetOrCreateRenderPass(info);
-  }
-
-  auto ResolveRenderPass(Handle<RenderPassResource> handle) {
-    return m_renderPassCache->Resolve(handle);
-  }
-
   auto ResolveBuffer(Handle<BufferResource> handle) {
     return m_bufferPool.Resolve(handle);
-  }
-
-  auto ResolveFrameBuffer(Handle<FrameBufferResource> handle) {
-    return m_frameBufferCache->Resolve(handle);
   }
 
   auto ResolveTexture(Handle<TextureResource> handle) {
@@ -273,20 +252,6 @@ public:
   }
   void ReleaseTexture(Handle<TextureResource> handle) {
     m_texturePool.Release(handle);
-  }
-
-  void ReleaseFrameBuffer(Handle<FrameBufferResource> handle) {
-    m_frameBufferCache->Release(handle);
-  }
-
-  template <std::invocable<RenderPassResource &> Func>
-  void ForeachRenderPass(Func &&func) {
-    m_renderPassCache->Foreach(std::forward<Func>(func));
-  }
-
-  template <std::invocable<const RenderPassResource &> Func>
-  void ForeachRenderPass(Func &&func) const {
-    m_renderPassCache->Foreach(std::forward<Func>(func));
   }
 
 private:
@@ -313,8 +278,6 @@ private:
   mem::ResourcePool<BufferResource> m_bufferPool;
   mem::ResourcePool<TextureResource> m_texturePool;
   mem::ResourcePool<SamplerResource> m_samplerPool;
-  UniquePtr<RenderPassCache> m_renderPassCache;
-  UniquePtr<FrameBufferCache> m_frameBufferCache;
 
   HashMap<HashType, Handle<SamplerResource>> m_samplerCache;
 

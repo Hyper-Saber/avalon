@@ -13,8 +13,8 @@ class AVALON_RHI_API RingBufferPool final
     : public mem::AutoDestroyable<RingBufferPool>,
       public NonCopyable {
 public:
-  RingBufferPool(IRhi &rhi, EBufferUsage usage, EMemoryProperty memoryProperty,
-                 size_t segmentSize)
+  RingBufferPool(IRhi &rhi, EResourceUsage usage,
+                 EMemoryProperty memoryProperty, size_t segmentSize)
       : m_rhi(rhi), m_usage(usage), m_memoryProperty(memoryProperty),
         m_segmentSize(segmentSize) {}
 
@@ -79,7 +79,7 @@ public:
 
 private:
   IRhi &m_rhi;
-  EBufferUsage m_usage;
+  EResourceUsage m_usage;
   EMemoryProperty m_memoryProperty;
   size_t m_segmentSize;
   size_t m_alignedSegmentSize;

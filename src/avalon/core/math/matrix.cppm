@@ -4,6 +4,7 @@ module;
 export module avalon.core:math.matrix;
 
 import :string;
+import :math.vector;
 
 export namespace avalon {
 
@@ -22,6 +23,31 @@ struct alignas(16) Matrix4x4 {
              {m30, m31, m32, m33}} {}
 
   static const Matrix4x4 Identity;
+
+  float *operator[](uint32_t index) { return data[index]; }
+
+  const float *operator[](uint32_t index) const { return data[index]; }
+
+  Vec3 GetRight() const { return GetColumn(0); }
+  Vec3 GetLeft() const { return -GetColumn(0); }
+  Vec3 GetUp() const { return GetColumn(1); }
+  Vec3 GetDown() const { return -GetColumn(1); }
+  Vec3 GetForward() const { return -GetColumn(2); }
+  Vec3 GetBack() const { return GetColumn(2); }
+
+  void GetBasis(Vec3 &outRight, Vec3 &outUp, Vec3 &outForward) const {
+    outRight = GetColumn(0);
+    outUp = GetColumn(1);
+    outForward = -GetColumn(2);
+  }
+
+  Vec3 GetTranslation() const {
+    return Vec3{data[3][0], data[3][1], data[3][2]};
+  }
+
+  Vec3 GetColumn(uint32_t col) const {
+    return Vec3{data[col][0], data[col][1], data[col][2]};
+  }
 
   Matrix4x4 operator*(const Matrix4x4 &b) const {
     Matrix4x4 res;

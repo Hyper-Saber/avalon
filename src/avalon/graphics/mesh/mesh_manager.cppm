@@ -126,15 +126,15 @@ public:
     AVALON_ASSERT(sizeof(data.indices[0]) == GetFormatSize(iFormat));
 
     BufferCreateInfo vInfo{.size = vBufferSize,
-                           .usage =
-                               EBufferUsage::Vertex | EBufferUsage::TransferDst,
+                           .usage = EResourceUsage::VertexBuffer |
+                                    EResourceUsage::TransferDst,
                            .memoryProperty = EMemoryProperty::DeviceLocal};
 
     auto vHandle = m_rhi.CreateBuffer(vInfo);
 
     BufferCreateInfo iInfo{.size = iBufferSize,
-                           .usage =
-                               EBufferUsage::Index | EBufferUsage::TransferDst,
+                           .usage = EResourceUsage::IndexBuffer |
+                                    EResourceUsage::TransferDst,
                            .memoryProperty = EMemoryProperty::DeviceLocal};
 
     auto iHandle = m_rhi.CreateBuffer(iInfo);
@@ -142,7 +142,7 @@ public:
     const size_t totalStagingSize = vBufferSize + iBufferSize;
     BufferHandle stagingHandle = m_rhi.CreateBuffer({
         .size = totalStagingSize,
-        .usage = EBufferUsage::TransferSrc,
+        .usage = EResourceUsage::TransferSrc,
         .memoryProperty =
             EMemoryProperty::HostVisible | EMemoryProperty::HostCoherent,
     });
@@ -150,6 +150,7 @@ public:
     auto pMapped = static_cast<uint8_t *>(m_rhi.MapMemory(stagingHandle));
     InterleaveVertexData(data, layout, pMapped);
     std::memcpy(pMapped + vBufferSize, data.indices.GetData(), iBufferSize);
+
     m_rhi.UnmapMemory(stagingHandle);
 
     m_rhi.ExcuteOnce(rhi::EQueueType::Transfer, [&](auto cmd) {

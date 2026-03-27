@@ -43,13 +43,13 @@ public:
 
 private:
   struct PipelineKey {
-    HashType renderPassHash;
+    HashType renderingHash;
     HashType shaderHash;
     HashType layoutHash;
     HashType statePacked;
 
     bool operator==(const PipelineKey &other) const {
-      return renderPassHash == other.renderPassHash &&
+      return renderingHash == other.renderingHash &&
              shaderHash == other.shaderHash && layoutHash == other.layoutHash &&
              statePacked == other.statePacked;
     }
@@ -58,7 +58,7 @@ private:
   struct PipelineKeyHasher {
     auto operator()(const PipelineKey &key) const -> HashType {
       HashType hash = Hash::kOffsetBasis;
-      hash = Hash::Combine(hash, key.renderPassHash);
+      hash = Hash::Combine(hash, key.renderingHash);
       hash = Hash::Combine(hash, key.shaderHash);
       hash = Hash::Combine(hash, key.layoutHash);
       return Hash::Combine(hash, key.statePacked);
@@ -66,10 +66,24 @@ private:
   };
 
   auto CreateInfoToKey(const PipelineCreateInfo &info) -> PipelineKey {
-    HashType shaderHash = Hash::kOffsetBasis;
-    for (const auto &stages : info.stageInfos) {
-      shaderHash = Hash::Combine(shaderHash, stages.GetHash());
+    HashType renderingHash = Hash::kOffsetBasis;
+    for (const auto &format : info.renderingInfo.colorAttachmentFormats) {
+      renderingHash =
+          Hash::Combine(renderingHash, static_cast<HashType>(format));
     }
+    renderingHash = Hash::Combine(
+        renderingHash,
+        static_cast<HashType>(info.renderingInfo.depthAttachmentFormat));
+    renderingHash = Hash::Combine(
+        renderingHash,
+        static_cast<HashType>(info.renderingInfo.stencilAttachmentFormat));
+    renderingHash = Hash::Combine(renderingHash, info.renderingInfo.viewMask);
+
+    HashType shaderHash = Hash::kOffsetBasis;
+    for (const auto &stage : info.stageInfos) {
+      shaderHash = Hash::Combine(shaderHash, stage.GetHash());
+    }
+
     HashType layoutHash = Hash::kOffsetBasis;
     for (const auto &binding : info.vertexBindings) {
       layoutHash = Hash::Combine(layoutHash, binding.GetHash());
@@ -79,9 +93,6 @@ private:
     }
     for (const auto &setLayoutBinding : info.descriptorSetLayoutBindings) {
       layoutHash = Hash::Combine(layoutHash, setLayoutBinding.GetHash());
-    }
-    for (const auto &range : info.pushConstantRanges) {
-      layoutHash = Hash::Combine(layoutHash, range.GetHash());
     }
 
     HashType stateHash = Hash::kOffsetBasis;
@@ -94,8 +105,7 @@ private:
       stateHash = Hash::Combine(stateHash, blend.GetHash());
     }
 
-    return PipelineKey{.renderPassHash =
-                           static_cast<HashType>(info.renderPassHandle.id),
+    return PipelineKey{.renderingHash = renderingHash,
                        .shaderHash = shaderHash,
                        .layoutHash = layoutHash,
                        .statePacked = stateHash};
@@ -103,74 +113,91 @@ private:
 
   auto BuildPipeline(const PipelineCreateInfo &info)
       -> Handle<PipelineResource> {
-    auto renderPass =
-        m_resourceProvider.GetRenderPass(info.renderPassHandle)->renderPass;
 
     auto builder = PipelineBuilder();
-    builder.SetRenderPass(renderPass)
-        .LoadStates(info)
-        .SetVertexInput(info.vertexBindings, info.vertexInputAttributes);
+    builder.LoadStates(info).SetVertexInput(info.vertexBindings,
+                                            info.vertexInputAttributes);
 
     for (const auto &stageInfo : info.stageInfos) {
       auto module = m_shaderModuleCache->GetOrCreateShaderModule(stageInfo);
       builder.AddShaderStage(stageInfo.stage, stageInfo.entryName, module);
     }
 
-    Array<VkDescriptorSetLayout> vkSetLayouts;
     Array<DescriptorSetLayoutMeta> meta;
-    uint32_t startIdx = 0;
-    uint32_t set = info.descriptorSetLayoutBindings.IsEmpty()
-                       ? 0
-                       : info.descriptorSetLayoutBindings[0].set;
-    auto total = info.descriptorSetLayoutBindings.GetSize();
-    for (uint32_t i = 0; i <= total; ++i) {
-      bool isEnd = (i == total);
-      if (isEnd || info.descriptorSetLayoutBindings[i].set != set) {
-        auto subSpan =
-            info.descriptorSetLayoutBindings.Subspan(startIdx, i - startIdx);
-        if (!subSpan.IsEmpty()) {
-          while (vkSetLayouts.GetSize() < set) {
-            vkSetLayouts.PushBack(VK_NULL_HANDLE);
+
+    auto bindlessLayout = m_resourceProvider.GetBindlessSetLayout();
+    auto globalSetLayout = m_resourceProvider.GetSceneGlobalSetLayout();
+    AVALON_ASSERT(bindlessLayout != VK_NULL_HANDLE &&
+                  globalSetLayout != VK_NULL_HANDLE);
+    Array<VkDescriptorSetLayout> vkSetLayouts(kInternalSetCount);
+    vkSetLayouts[kBindlessSet] = bindlessLayout;
+    vkSetLayouts[kSceneGlobalsSet] = globalSetLayout;
+
+    if (!info.descriptorSetLayoutBindings.IsEmpty()) {
+      uint32_t startIdx = 0;
+      uint32_t currentSet = info.descriptorSetLayoutBindings[0].set;
+
+      AVALON_ASSERT_MSG(
+          currentSet >= kInternalSetCount,
+          String::Format("[Vulkan]: Set {} is reserved for internal usage! ",
+                         currentSet));
+
+      auto total = info.descriptorSetLayoutBindings.GetSize();
+      for (uint32_t i = 0; i <= total; ++i) {
+        bool isEnd = (i == total);
+        if (isEnd || info.descriptorSetLayoutBindings[i].set != currentSet) {
+          auto subSpan =
+              info.descriptorSetLayoutBindings.Subspan(startIdx, i - startIdx);
+
+          if (!subSpan.IsEmpty()) {
+            while (vkSetLayouts.GetSize() < currentSet) {
+              vkSetLayouts.PushBack(
+                  m_descriptorSetLayoutCache->GetEmptyLayout());
+            }
+
+            Span<const VkDescriptorSetLayoutBinding> vkBindings;
+            auto setLayout =
+                m_descriptorSetLayoutCache->GetOrCreate(subSpan, vkBindings);
+            if (setLayout == VK_NULL_HANDLE)
+              return {};
+
+            vkSetLayouts.PushBack(setLayout);
+            meta.PushBack(
+                DescriptorSetLayoutMeta(subSpan, vkBindings, setLayout));
           }
 
-          Span<const VkDescriptorSetLayoutBinding> vkBindings;
-          auto setLayout =
-              m_descriptorSetLayoutCache->GetOrCreate(subSpan, vkBindings);
-          if (setLayout == VK_NULL_HANDLE)
-            return {};
-          vkSetLayouts.PushBack(setLayout);
-          meta.PushBack(
-              DescriptorSetLayoutMeta(subSpan, vkBindings, setLayout));
+          if (isEnd)
+            break;
+          currentSet = info.descriptorSetLayoutBindings[i].set;
+          startIdx = i;
         }
-        if (isEnd) {
-          break;
-        }
-
-        AVALON_ASSERT(info.descriptorSetLayoutBindings[i].set > set);
-
-        set = info.descriptorSetLayoutBindings[i].set;
-        startIdx = i;
       }
     }
 
-    uint32_t i = 0;
-    Array<VkPushConstantRange> ranges(info.pushConstantRanges.GetSize());
-    for (const auto &range : info.pushConstantRanges) {
-      ranges[i] = {
-          .stageFlags = ToVkShaderStageFlags(range.visibleStages),
-          .offset = range.offset,
-          .size = range.size,
-      };
-    }
+    Array<VkPushConstantRange> vkRanges;
+    vkRanges.PushBack({
+        .stageFlags = VK_SHADER_STAGE_ALL,
+        .offset = 0,
+        .size = sizeof(StandardPushConstant),
+    });
 
-    VkPushConstantRange range;
     auto layout =
-        m_pipelineLayoutCache->GetOrCreateLayout(vkSetLayouts, ranges);
+        m_pipelineLayoutCache->GetOrCreateLayout(vkSetLayouts, vkRanges);
+
     auto pipeline = builder.Build(m_device, layout);
     if (pipeline == VK_NULL_HANDLE)
       return {};
 
-    return m_pipelinePool.Create(m_device, pipeline, layout, std::move(meta));
+    auto handle =
+        m_pipelinePool.Create(m_device, pipeline, layout, std::move(meta));
+
+    Debug("[Vulkan]: Pipeline created! \n Id: {}, \n InputAssemblyState: \n{} "
+          "\n RasterizationState: \n{} \n DepthStencilState: \n{}\n ",
+          handle.id, info.inputAssemblyState.ToString().GetData(),
+          info.rasterizationState.ToString().GetData(),
+          info.depthStencilState.ToString().GetData());
+
+    return handle;
   }
 
   VkDevice m_device;

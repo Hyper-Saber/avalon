@@ -1,35 +1,26 @@
 module;
 #include <algorithm>
 #include <cstdint>
-#include <cstring>
 #include <debug/assert.hpp>
+
 export module avalon.graphics:material;
+
 import avalon.shader;
 import avalon.core;
 import avalon.rhi;
 import :mesh;
-import :context;
 
 export namespace avalon::graphics {
 
-struct UniformBufferState {
-  StringId nameHash;
+struct PropertyState {
   uint32_t bindingPoint;
-  size_t bufferOffset;
-  size_t size;
-  bool isDirty = true;
-
-  UniformBufferState(StringId nameHash, uint32_t bindingPoint, size_t offset,
-                     size_t size)
-      : nameHash(nameHash), bindingPoint(bindingPoint), bufferOffset(offset),
-        size(size) {}
+  uint32_t bufferOffset;
+  uint32_t size;
 };
 
-struct PropertyMapping {
-  StringId nameHash;
-  uint32_t bufferIndex;
-  uint32_t memberOffset;
-  uint32_t size;
+struct TextureState {
+  uint32_t pushConstantTextureSlot;
+  rhi::TextureHandle handle;
 };
 
 class AVALON_GRAPHICS_API Material final
@@ -40,131 +31,141 @@ public:
   bool Initialize() {
     auto shader = GetShaderManager().Resolve(m_shaderHandle);
     if (!shader) {
-      Error("[Graphics]: Failed to initialize material!");
+      Error("[Graphics]: Failed to resolve shader for material!");
       return false;
     }
-
-    auto alignment =
-        GraphicsContext::Get()
-            .deviceCapabilities.limits.minUniformBufferOffsetAlignment;
-
-    auto bindings = shader->GetDescriptorMetaData();
-
-    size_t currentOffset = 0;
-    for (const auto &binding : bindings) {
-      if (binding.set == 0)
-        continue;
-      switch (binding.type) {
-      case rhi::EDescriptorType::UniformBuffer:
-      case rhi::EDescriptorType::UniformBufferDynamic: {
-        currentOffset = mem::AlignUp(currentOffset, alignment);
-        m_uniformBufferStates.PushBack(
-            UniformBufferState(binding.nameHash, binding.bindingPoint,
-                               currentOffset, binding.bufferSize));
-        currentOffset += binding.bufferSize;
-        break;
-      }
-      default:
-        break;
-      }
-    }
-
-    m_dataBlob = CreateEmptyBlob(currentOffset);
-
     InitializePropertyLayout(shader);
+    InitializeTextureLayout(shader);
     BuildVertexInputState(shader);
     return true;
   }
 
+  auto GetPropertyLayout() const noexcept
+      -> const HashMap<StringId, PropertyState> & {
+    return m_propertyMap;
+  }
+
+  auto GetTextureLayout() const noexcept
+      -> const HashMap<StringId, TextureState> & {
+    return m_textureMap;
+  }
+
+  auto GetPipeline(const rhi::PipelineRenderingInfo &renderingInfo) const
+      -> rhi::PipelineHandle {
+    auto hash = renderingInfo.GetHash();
+    if (auto pCached = m_pipelines.Get(hash)) {
+      return *pCached;
+    }
+    return rhi::PipelineHandle::Invalid();
+  }
+
+  auto GetVertexLayout() const noexcept -> const VertexLayout & {
+    return m_cachedVertexLayout;
+  }
+
+  auto GetDataBlob() const noexcept -> const IBlob & { return *m_dataBlob; }
+
+  auto GetDefaultPipeline() const { return m_defaultPipeline; }
+
+  auto GetOrCreatePipeline(rhi::IRhi &rhi,
+                           const rhi::PipelineRenderingInfo &renderingInfo)
+      -> rhi::PipelineHandle {
+    auto hash = renderingInfo.GetHash();
+    if (auto pCached = m_pipelines.Get(hash)) {
+      return *pCached;
+    }
+
+    auto pipelineCI = GetPipelineCreateInfo(renderingInfo);
+    auto pipeline = rhi.GetOrCreatePipeline(pipelineCI);
+
+    if (pipeline.IsValid()) {
+      m_pipelines.Insert(hash, pipeline);
+    }
+
+    if (!m_defaultPipeline.IsValid())
+      m_defaultPipeline = pipeline;
+    return pipeline;
+  }
+
+  void SetTexture(StringId nameHash, rhi::TextureHandle handle) {
+    auto texture = m_textureMap.Get(nameHash);
+    texture->handle = handle;
+  }
+
   template <typename T> void SetProperty(StringId nameHash, const T &value) {
-    for (const auto &mapping : m_propertyLayout) {
-      if (mapping.nameHash == nameHash) {
-        UpdateInternal(mapping, value);
-        return;
-      }
+    auto buffer = m_propertyMap.Get(nameHash);
+    if (!buffer) {
+      Error("[Material]: Property {} not exsit!", nameHash.Resolve());
+      return;
     }
-    AVALON_ASSERT(false);
+    m_dataBlob->Write(&value, buffer->bufferOffset, buffer->size);
   }
 
-  auto GetInitialBufferStates() const -> const Array<UniformBufferState> & {
-    return m_uniformBufferStates;
+  void EnableDepthTest() { m_depthState.isDepthTestEnable = true; }
+  void EnableDepthWrite() { m_depthState.isDepthWriteEnable = true; }
+  void EnableStencilTest() { m_depthState.isStencilTestEnable = true; }
+  void DisableDepthTest() { m_depthState.isDepthTestEnable = false; }
+  void DisableDepthWrite() { m_depthState.isDepthWriteEnable = false; }
+  void DisableStencilTest() { m_depthState.isStencilTestEnable = false; }
+  void SetDepthComplieOp(rhi::ECompareOp op) {
+    m_depthState.depthCompareOp = op;
+  }
+  void SetCullMode(rhi::ECullMode cullMode) {
+    m_rasterState.cullMode = cullMode;
   }
 
-  auto GetDataBlob() const -> const IBlob & { return *m_dataBlob.Get(); }
-
-  auto GetPropertyLayout() const -> const Array<PropertyMapping> & {
-    return m_propertyLayout;
-  }
-
-  auto GetSHader() const { return m_shaderHandle; }
-
-  auto GetPipelineCreateInfo(uint32_t attachmentCount = 1)
-      -> rhi::PipelineCreateInfo {
-    auto shader = GetShaderManager().Resolve(m_shaderHandle);
-
-    m_colorBlendStates.Clear();
-    m_colorBlendStates.ResizeUnInitialized(attachmentCount);
-
-    m_colorBlendStates[0] = m_mainBlendState;
-    for (uint32_t i = 1; i < attachmentCount; i++) {
-      m_colorBlendStates[i] = rhi::ColorBlendState{
-          .isEnable = false,
-          .writeMask = rhi::EColorWriteMask::All,
-      };
-    }
-
-    rhi::PipelineCreateInfo info{
-        .pushConstantRanges = shader->GetPushConstants(),
-        .vertexInputAttributes = {m_vertexAttributes.GetData(),
-                                  m_vertexAttributes.GetSize()},
-        .vertexBindings = {m_vertexBindings.GetData(),
-                           m_vertexBindings.GetSize()},
-        .descriptorSetLayoutBindings = shader->GetDescriptorSetLayouts(),
-        .stageInfos = shader->GetStageInfos(),
-        .colorBlendStates = m_colorBlendStates,
-    };
-
-    return info;
-  }
-
-  auto GetVertexLayout() const -> const VertexLayout & {
-    return m_vertexLayout;
-  }
+  auto GetShader() const { return m_shaderHandle; }
 
 private:
-  template <typename T>
-  void UpdateInternal(const PropertyMapping &mapping, const T &value) {
-    AVALON_ASSERT_MSG(sizeof(T) == mapping.size, "Property size mismatch!");
+  auto GetPipelineCreateInfo(const rhi::PipelineRenderingInfo &renderingInfo)
+      -> rhi::PipelineCreateInfo {
+    auto shader = GetShaderManager().Resolve(m_shaderHandle);
+    uint32_t attachmentCount = renderingInfo.colorAttachmentFormats.GetSize();
 
-    auto &state = m_uniformBufferStates[mapping.bufferIndex];
+    m_colorBlendStates.Clear();
+    m_colorBlendStates.Resize(attachmentCount);
 
-    state.isDirty = m_dataBlob->Write(
-        &value, state.bufferOffset + mapping.memberOffset, mapping.size);
+    if (attachmentCount > 0) {
+      m_colorBlendStates[0] = m_mainBlendState;
+    }
+
+    return rhi::PipelineCreateInfo{
+        .renderingInfo = renderingInfo,
+        .vertexInputAttributes = m_vertexAttributes,
+        .vertexBindings = m_vertexBindings,
+        .descriptorSetLayoutBindings = shader->GetDescriptorSetLayouts(),
+        .stageInfos = shader->GetStageInfos(),
+        .inputAssemblyState = m_inputAssembly,
+        .rasterizationState = m_rasterState,
+        .multisampleState = m_multisampleState,
+        .depthStencilState = m_depthState,
+        .colorBlendStates = m_colorBlendStates,
+    };
   }
 
   void InitializePropertyLayout(const Shader *shader) {
     auto members = shader->GetBufferMembers();
-    m_propertyLayout.Reserve(m_uniformBufferStates.GetSize());
-
     for (const auto &member : members) {
-      for (uint32_t i = 0; i < m_uniformBufferStates.GetSize(); i++) {
-        if (m_uniformBufferStates[i].bindingPoint == member.bindingPoint) {
-          m_propertyLayout.PushBack({
-              .nameHash = member.nameHash,
-              .bufferIndex = i,
-              .memberOffset = member.offset,
-              .size = member.size,
-          });
-          break;
-        }
-      }
+      Debug("[Material] Property: {}", member.nameHash.Resolve());
+      m_propertyMap.Insert(member.nameHash,
+                           {.bindingPoint = member.bindingPoint,
+                            .bufferOffset = member.offset,
+                            .size = member.size});
+    }
+    m_dataBlob = CreateEmptyBlob(sizeof(StandardMaterialData));
+  }
+
+  void InitializeTextureLayout(const Shader *shader) {
+    auto members = shader->GetPushConstants();
+    for (const auto &member : members) {
+      m_textureMap.Insert(member.nameHash,
+                          {.pushConstantTextureSlot = member.textureSlot});
     }
   }
 
   void BuildVertexInputState(const Shader *shader) {
     auto attributes = shader->GetInputAttributes();
-
-    m_vertexAttributes.Reserve(attributes.GetSize());
+    m_vertexAttributes.Clear();
     uint32_t currentOffset = 0;
     for (const auto &attr : attributes) {
       m_vertexAttributes.PushBack({
@@ -174,71 +175,43 @@ private:
           .semantic = attr.semantic,
           .offset = currentOffset,
       });
-      auto size = rhi::GetFormatSize(attr.format);
-      AVALON_ASSERT(size != rhi::kInvalidFormatSize);
-      currentOffset += size;
+      currentOffset += rhi::GetFormatSize(attr.format);
     }
 
-    m_vertexBindings.PushBack({
-        .binding = 0,
-        .stride = currentOffset,
-        .isInstanceData = false,
-    });
+    m_vertexBindings.Clear();
+    m_vertexBindings.PushBack(
+        {.binding = 0, .stride = currentOffset, .isInstanceData = false});
 
     std::sort(m_vertexAttributes.begin(), m_vertexAttributes.end(),
               [](auto &a, auto &b) { return a.location < b.location; });
 
-    m_vertexLayout.attributes = {m_vertexAttributes.GetData(),
-                                 m_vertexAttributes.GetSize()};
-    m_vertexLayout.stride = ComputeStride();
-  }
-
-  uint32_t ComputeStride() {
-    uint32_t stride = 0;
-    auto attributes = m_vertexAttributes;
-    for (const auto &attr : attributes) {
-      stride += GetFormatSize(attr.format);
-    }
-
-    if constexpr (debug::kIsDebug) {
-      uint32_t actualStride = 0;
-      for (const auto &attr : attributes) {
-        switch (attr.semantic) {
-        case EVertexSemantic::Position:
-          actualStride += sizeof(Vec3);
-          break;
-        case EVertexSemantic::TexCoord:
-          actualStride += sizeof(Vec2);
-          break;
-        case EVertexSemantic::Color:
-          actualStride += sizeof(Vec3);
-          break;
-        case EVertexSemantic::Normal:
-          actualStride += sizeof(Vec3);
-          break;
-        default:
-          break;
-        }
-      }
-
-      AVALON_ASSERT(actualStride == stride);
-    }
-
-    return stride;
+    m_cachedVertexLayout.stride = currentOffset;
+    m_cachedVertexLayout.attributes = Span<const rhi::VertexInputAttribute>(
+        m_vertexAttributes.GetData(), m_vertexAttributes.GetSize());
   }
 
   ShaderHandle m_shaderHandle;
+  rhi::DescriptorSetHandle m_descriptorSet;
+
+  rhi::InputAssemblyState m_inputAssembly{};
+  rhi::RasterizationState m_rasterState{};
+  rhi::DepthStencilState m_depthState{};
+
+  rhi::MultisampleState m_multisampleState{};
+  rhi::ColorBlendState m_mainBlendState{};
+
   BlobPtr m_dataBlob;
-  Array<UniformBufferState> m_uniformBufferStates;
-  Array<PropertyMapping> m_propertyLayout;
+  HashMap<StringId, PropertyState> m_propertyMap;
+  HashMap<StringId, TextureState> m_textureMap;
+
   Array<rhi::VertexInputAttribute> m_vertexAttributes;
   Array<rhi::VertexBinding> m_vertexBindings;
-  VertexLayout m_vertexLayout;
-
   Array<rhi::ColorBlendState> m_colorBlendStates;
-  rhi::ColorBlendState m_mainBlendState;
-};
 
-using MaterialHandle = Handle<Material>;
+  HashMap<HashType, rhi::PipelineHandle> m_pipelines;
+  rhi::PipelineHandle m_defaultPipeline;
+
+  VertexLayout m_cachedVertexLayout{};
+};
 
 } // namespace avalon::graphics

@@ -76,10 +76,10 @@ public:
    * 作用：触发析构 (~T)，但不执行物理内存归还 (No Deallocate)。
    */
   template <typename T> static void Deinstantiate(T *instance) {
-    if (!instance) return;
+    if (!instance)
+      return;
     if constexpr (TAutoDestroyable<T>) {
-      if (
-          instance->m_lifecycleState == IAutoDestroyable::State::Initialized) {
+      if (instance->m_lifecycleState == IAutoDestroyable::State::Initialized) {
         instance->MarkInvalidated();
         instance->~T();
       }

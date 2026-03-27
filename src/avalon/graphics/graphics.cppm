@@ -1,5 +1,4 @@
 export module avalon.graphics;
-export import :context;
 export import :material;
 export import :material_instance;
 export import :material_manager;
@@ -7,8 +6,10 @@ export import :utils;
 export import :mesh;
 export import :mesh_manager;
 export import :components;
+export import :render_context;
+export import :render_graph_builder;
+export import :render_pipeline;
+export import :forward_pipeline;
 export import :render_pass;
-export import :opaque_pass;
-export import :fullscreen_pass;
 export import :renderer;
 export import :types;

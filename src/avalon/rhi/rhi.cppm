@@ -13,28 +13,45 @@ export namespace avalon::rhi {
 
 class IRhi : public IPlugin {
 public:
+  inline static DeviceCapabilities capabilities;
+
   virtual auto Initialize(const DeviceRequirement &requriement,
                           const window::NativeWindowInfo &windowInfo = {},
                           uint32_t width = 0, uint32_t height = 0)
       -> ERhiResult = 0;
 
+  virtual auto GetUBOPool() const -> class RingBufferPool & = 0;
+  virtual auto GetBindlessManager() const -> class IBindlessManager & = 0;
+
+  virtual void UpdateMaterialBuffer(size_t offset, const void *data,
+                                    size_t size) = 0;
+
+  virtual auto GetStaticSamplers() const -> const StaticSamplers & = 0;
   virtual auto GetSwapchainImageFormat() const -> EFormat = 0;
+  virtual auto GetSwapchainExtent() const -> Extent2D = 0;
+  virtual auto GetCurrentPresentTexture() -> TextureHandle = 0;
   virtual auto GetMainCommandBuffer() const -> ICommandBuffer * = 0;
   virtual uint32_t GetCurrentFrameIndex() const = 0;
   virtual uint32_t GetMaxFrameInFlight() const = 0;
+  virtual auto GetDefaultTexture() const -> TextureHandle = 0;
   virtual auto GetCapabilities() const -> DeviceCapabilities = 0;
+  virtual auto GetTextureCreateInfo(TextureHandle) const
+      -> TextureCreateInfo = 0;
 
-  virtual auto RecreateSwapchain(RenderPassHandle handle, uint32_t width,
-                                 uint32_t height) -> ERhiResult = 0;
+  virtual auto RecreateSwapchain(uint32_t width, uint32_t height)
+      -> ERhiResult = 0;
 
-  virtual auto CreateRenderPass(const RenderPassCreateInfo &info)
-      -> RenderPassHandle = 0;
-  virtual auto CreatePipeline(const PipelineCreateInfo &info)
+  virtual auto GetOrCreatePipeline(const PipelineCreateInfo &info)
       -> PipelineHandle = 0;
 
   virtual auto CreateBuffer(const BufferCreateInfo &info) -> BufferHandle = 0;
   virtual void ReleaseBuffer(BufferHandle handle) = 0;
 
+  virtual auto CreateTexture(const TextureCreateInfo &info)
+      -> TextureHandle = 0;
+  virtual void ReleaseTexture(TextureHandle handle) = 0;
+
+  virtual auto GetSceneGlobalSetWriter() -> IDescriptorWriter & = 0;
   virtual auto CreateDescriptorWriter(PipelineHandle handle, uint32_t set)
       -> IDescriptorWriter & = 0;
 
@@ -45,7 +62,7 @@ public:
   virtual auto MapMemory(BufferHandle handle) -> void * = 0;
   virtual void UnmapMemory(BufferHandle handle) = 0;
 
-  virtual void Submit(ICommandBuffer *cmd) = 0;
+  virtual void Submit(ICommandBuffer &cmd) = 0;
   virtual auto BeginFrame() -> ERhiResult = 0;
   virtual auto EndFrame() -> ERhiResult = 0;
 

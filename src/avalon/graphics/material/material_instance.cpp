@@ -1,4 +1,6 @@
 module;
+#include <cstdint>
+#include <debug/assert.hpp>
 #include <utility>
 module avalon.graphics;
 
@@ -7,17 +9,13 @@ import :material_instance;
 
 namespace avalon::graphics {
 
-auto MaterialInstance::GetPropertyLayout() const noexcept
-    -> const Array<PropertyMapping> & {
-  auto material = GetMaterialManager().Resolve(m_materialHandle);
-  return material->GetPropertyLayout();
-}
-
-MaterialInstance::MaterialInstance(MaterialHandle handle)
+MaterialInstance::MaterialInstance(MaterialHandle handle, uint32_t index)
     : m_materialHandle(handle) {
   auto material = GetMaterialManager().Resolve(m_materialHandle);
-  auto &buffers = material->GetInitialBufferStates();
-  m_instanceBuffers = buffers;
+  AVALON_ASSERT(material);
+  m_gpuIndex = index;
+  m_propertyMap = material->GetPropertyLayout();
+  m_textureMap = material->GetTextureLayout();
 
   auto &blob = material->GetDataBlob();
   auto data = Array<std::byte>(blob.ConstAs<std::byte>(), blob.GetSize());

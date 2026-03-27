@@ -1,4 +1,4 @@
-export module avalon.ecs:components;
+export module avalon.ecs:transform_component;
 import avalon.core;
 export namespace avalon::ecs {
 struct TransformComponent {
@@ -29,7 +29,6 @@ struct TransformComponent {
   Vec3 GetRotationEuler() const { return local.rotation.ToEuler(); }
 
   Vec3 GetWorldPosition() {
-    UpdateWorldMatrix();
     return Vec3{worldMatrix.data[3][0], worldMatrix.data[3][1],
                 worldMatrix.data[3][2]};
   }

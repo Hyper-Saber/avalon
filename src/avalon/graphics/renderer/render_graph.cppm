@@ -10,13 +10,18 @@ import avalon.rhi;
 import :renderer_types;
 import :render_pass;
 import :virtual_resource_manager;
+import :utils;
 
 namespace avalon::graphics {
 
 class RenderGraph final : public NonCopyable {
 public:
   explicit RenderGraph(rhi::IRhi &rhi, VirtualResourceManager &manager)
-      : m_rhi(rhi), m_resourceManager(manager) {}
+      : m_rhi(rhi), m_resourceManager(manager) {
+    auto &mm = GetMaterialManager();
+    m_dummyPipline =
+        mm.Resolve(mm.GetDefaultOpaque())->GetOrCreatePipeline(rhi, {});
+  }
 
   auto ImportExternalTexture(StringId name, rhi::TextureHandle physicalHandle,
                              VirtualTextureDesc desc) -> VirtualResourceHandle {
@@ -24,9 +29,6 @@ public:
         m_resourceManager.ImportExternalTexture(name, physicalHandle, desc);
     auto handle = m_resourceManager.GetVirtualResource(index);
     m_resourceManager.RefineUsage(handle, desc.usage);
-
-    auto layout = MapUsageToLayout(desc.usage);
-    m_layoutTracker.Insert(handle, layout);
 
     return handle;
   }
@@ -123,32 +125,18 @@ public:
 
     for (auto &nodeIndex : m_executionQueue) {
       auto &node = m_nodes[nodeIndex];
-
-      for (auto &request : node.inputs) {
-        request.finalLayout = MapUsageToLayout(request.usage);
-        m_layoutTracker.Insert(request.handle, request.finalLayout);
-      }
-
-      rhi::Extent2D lastExtent;
-      for (auto &request : node.outputs) {
-        auto *prevLayoutPtr = m_layoutTracker.Get(request.handle);
-        request.initialLayout = EResourceLayout::Undefined;
-        if (request.loadOp == EAttachmentLoadOp::Load &&
-            prevLayoutPtr != nullptr) {
-          request.initialLayout = *prevLayoutPtr;
-        }
-
-        request.finalLayout = MapUsageToLayout(request.usage);
-        m_layoutTracker.Insert(request.handle, request.finalLayout);
-      }
       node.pass->OnCompile(m_rhi);
     }
   }
 
-  void Execute(rhi::ICommandBuffer &cmd, RenderContext &context) {
+  void Render(rhi::ICommandBuffer &cmd, RenderContext &context) {
+    HashMap<rhi::EResourceUsage, rhi::TextureHandle> finalPendingUsages;
+
+    bool isGlobalSetBinded = false;
+
     for (uint32_t nodeIdx : m_executionQueue) {
       auto &node = m_nodes[nodeIdx];
-
+      context.pipelineRenderingInfo.Clear();
       rhi::RenderingInfo renderingInfo{.renderArea = node.renderArea,
                                        .layerCount = 1};
 
@@ -157,7 +145,12 @@ public:
         if (!physicalHandle.IsValid())
           continue;
 
-        cmd.Transition(physicalHandle, output.usage);
+        auto fixedUsage = output.usage;
+        if (fixedUsage == rhi::EResourceUsage::Present) {
+          fixedUsage = rhi::EResourceUsage::ColorAttachment;
+          finalPendingUsages.Insert(output.usage, physicalHandle);
+        }
+        cmd.Transition(physicalHandle, fixedUsage);
 
         auto resDesc = m_resourceManager.GetResourceDesc(output.handle);
 
@@ -168,14 +161,18 @@ public:
               .storeOp = output.storeOp,
               .clearDepth = output.clearValue.depthStencil.depth,
               .clearStencil = output.clearValue.depthStencil.stencil};
-          context.renderingInfo.depthAttachmentFormat = resDesc.format;
+          context.pipelineRenderingInfo.depthAttachmentFormat = resDesc.format;
+          if (HasStencilComponent(resDesc.format))
+            context.pipelineRenderingInfo.stencilAttachmentFormat =
+                resDesc.format;
         } else {
           renderingInfo.colorAttachments.PushBack(
               {.texture = physicalHandle,
                .loadOp = output.loadOp,
                .storeOp = output.storeOp,
                .clearColor = output.clearValue.color});
-          context.renderingInfo.colorAttachmentFormats.PushBack(resDesc.format);
+          context.pipelineRenderingInfo.colorAttachmentFormats.PushBack(
+              resDesc.format);
         }
       }
 
@@ -187,15 +184,32 @@ public:
       }
 
       cmd.BeginRendering(renderingInfo);
+      if (!isGlobalSetBinded) {
+        cmd.BindPipeline(m_dummyPipline);
+        cmd.BindBindlessSet();
+        cmd.BindDescriptorSet(kSceneGlobalsSet, {&context.sceneGlobalsSet, 1},
+                              {&context.sceneGlobalsSetDynamicOffset, 1});
+        isGlobalSetBinded = true;
+      }
+      Viewport port{
+          .x = static_cast<float>(node.renderArea.offset.x),
+          .y = static_cast<float>(node.renderArea.offset.y),
+          .width = static_cast<float>(node.renderArea.extent.width),
+          .height = static_cast<float>(node.renderArea.extent.height),
+          .minDepth = 1.0f,
+          .maxDepth = 0.0f,
+      };
+
+      cmd.SetViewport(port);
+      cmd.SetScissor(node.renderArea);
       node.pass->Execute(cmd, context);
+      for (auto &entry : finalPendingUsages) {
+        auto usage = entry.GetKey();
+        auto handle = entry.GetValue();
+        cmd.Transition(handle, usage);
+      }
       cmd.EndRendering();
     }
-  }
-
-  void Clear() {
-    m_nodes.Clear();
-    m_executionQueue.Clear();
-    m_resourceManager.ResetPool();
   }
 
   friend class RenderGraphBuilder;
@@ -208,8 +222,6 @@ private:
     rhi::EAttachmentLoadOp loadOp = rhi::EAttachmentLoadOp::DontCare;
     rhi::EAttachmentStoreOp storeOp = rhi::EAttachmentStoreOp::DontCare;
     rhi::ClearValue clearValue;
-    rhi::EResourceLayout initialLayout;
-    rhi::EResourceLayout finalLayout;
   };
 
   struct PassNode {
@@ -265,6 +277,7 @@ private:
   HashMap<IRenderPass *, uint32_t> m_nodeIndices;
 
   HashMap<StringId, VirtualTextureDesc> m_textureDescs;
-  HashMap<VirtualResourceHandle, EResourceLayout> m_layoutTracker;
+
+  rhi::PipelineHandle m_dummyPipline;
 };
 } // namespace avalon::graphics

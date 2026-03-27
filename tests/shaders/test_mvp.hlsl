@@ -1,5 +1,6 @@
 #include "common.hlsli"
-VK_PUSH_CONSTANT ModelData push;
+
+VK_PUSH_CONSTANT StandardPushConstants push;
 
 struct VSInput {
   VK_LOCATION(0) float3 position : POSITION;
@@ -13,7 +14,7 @@ struct VSOutput {
 
 VSOutput VsMain(VSInput input) {
   VSOutput output;
-  float4 worldPos = mul(push.model, float4(input.position, 1.0f));
+  float4 worldPos = mul(mModel, float4(input.position, 1.0f));
   float4 viewPos = mul(uCamera.view, worldPos);
   output.clipPos = mul(uCamera.projection, viewPos);
   output.color = input.color;

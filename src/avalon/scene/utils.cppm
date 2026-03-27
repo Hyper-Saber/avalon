@@ -12,11 +12,16 @@ public:
                               graphics::EPrimitiveType type) {
     auto entity = world.CreateEntity();
     auto meshHandle = graphics::GetMeshManager().GetDefaultMesh(type);
+    auto materialHandle = graphics::GetMaterialManager().GetDefaultOpaque();
     auto materialInstanceHandle =
-        graphics::GetMaterialManager().CreateMaterialInstance();
+        graphics::GetMaterialManager().GetDefaultOpaqueInstance();
+
+    auto meshData = graphics::GetMeshManager().Resolve(meshHandle)->GetData();
+
+    auto aabb = graphics::MeshData::ComputeFullAABB(meshData);
     world
-        .AddComponent<ecs::RenderComponent>(entity, meshHandle,
-                                            materialInstanceHandle)
+        .AddComponent<ecs::RenderComponent>(entity, meshHandle, materialHandle,
+                                            materialInstanceHandle, aabb)
         .AddComponent<ecs::TransformComponent>(entity);
 
     return entity;

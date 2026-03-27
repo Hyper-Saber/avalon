@@ -26,7 +26,7 @@ class MoveCubeSystem : public ecs::SystemBase<MoveCubeSystem> {
 
 class UpdateLightSystem : public ecs::SystemBase<UpdateLightSystem> {
   void OnUpdate(ecs::World &world, float dt) override {
-    auto view = world.GetView<ecs::LightComponent>();
+    auto view = world.GetView<ecs::LightComponent, ecs::TransformComponent>();
 
     float rotationSpeed = 45.0f;
     float angleDelta = ToRadians(rotationSpeed * dt);
@@ -34,26 +34,7 @@ class UpdateLightSystem : public ecs::SystemBase<UpdateLightSystem> {
     float cosA = Cos(angleDelta);
     float sinA = Sin(angleDelta);
 
-    view.Foreach([&](auto &light) {
-      if (light.lightType == scene::ELightType::Directional) {
-        float x = light.directionOrPosition.x;
-        float y = light.directionOrPosition.y;
-
-        float newX = x * cosA - y * sinA;
-        float newY = x * sinA + y * cosA;
-
-        light.directionOrPosition.x = newX;
-        light.directionOrPosition.y = newY;
-
-        Vec3 dir =
-            Normalize({light.directionOrPosition.x, light.directionOrPosition.y,
-                       light.directionOrPosition.z});
-
-        light.directionOrPosition.x = dir.x;
-        light.directionOrPosition.y = dir.y;
-        light.directionOrPosition.z = dir.z;
-      }
-    });
+    view.Foreach([&](auto &light, auto &transform) {});
   }
 };
 } // namespace avalon::ecs

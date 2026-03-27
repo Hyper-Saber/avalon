@@ -27,8 +27,15 @@ public:
 
   auto GetSwapchain() const noexcept -> VkSwapchainKHR { return m_swapchain; }
   auto GetImageFormat() const noexcept -> VkFormat { return m_imageFormat; }
+  auto GetImages() const noexcept -> const Array<VkImage> & { return m_images; }
+  auto GetImageViews() const noexcept -> const Array<VkImageView> & {
+    return m_imageViews;
+  }
   auto GetImageView(uint32_t index) const noexcept -> VkImageView {
     return m_imageViews[index];
+  }
+  auto GetImage(uint32_t index) const noexcept -> VkImage {
+    return m_images[index];
   }
 
   auto GetImageCount() const noexcept -> size_t { return m_images.GetSize(); }
@@ -38,8 +45,6 @@ public:
   auto RecreateSwapchain(uint32_t width, uint32_t height)
       -> std::expected<void, ERhiResult> {
     vkDeviceWaitIdle(m_deviceContext.GetDevice());
-
-    CleanupSwapchainResources();
 
     return CreateSwapchain(width, height);
   }
@@ -124,10 +129,6 @@ private:
         return std::unexpected(ERhiResult::SwapchainOutOfDate);
       }
       m_imageViews[i++] = view;
-      FrameBufferCreateInfo info{
-          .width = m_extent.width,
-          .height = m_extent.height,
-      };
     }
 
     Debug("[Vulkan]: Swapchain created.");
@@ -176,15 +177,8 @@ private:
   }
 
   void CleanupSwapchain() {
-    CleanupSwapchainResources();
     if (m_swapchain != VK_NULL_HANDLE)
       vkDestroySwapchainKHR(m_deviceContext.GetDevice(), m_swapchain, nullptr);
-  }
-
-  void CleanupSwapchainResources() {
-    for (const auto view : m_imageViews) {
-      vkDestroyImageView(m_deviceContext.GetDevice(), view, nullptr);
-    }
   }
 
   auto CreateImageView(VkImage image, VkFormat format,

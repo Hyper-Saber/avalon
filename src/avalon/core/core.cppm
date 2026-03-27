@@ -4,6 +4,7 @@ export import :constants;
 export import :context;
 export import :containers.array;
 export import :containers.hash_map;
+export import :containers.hash_set;
 export import :debug;
 export import :hash;
 export import :handle;

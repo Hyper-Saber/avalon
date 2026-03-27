@@ -5,3 +5,5 @@ export import :types;
 export import :utils;
 export import :descriptor_writer;
 export import :ring_buffer;
+export import :state_tracker;
+export import :bindless_manager;

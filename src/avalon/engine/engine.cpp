@@ -1,9 +1,9 @@
 module;
 #include <chrono>
-#include <cmath>
 #include <cstdint>
 #include <debug/assert.hpp>
 #include <expected>
+#include <thread>
 
 module avalon.engine;
 
@@ -18,12 +18,15 @@ import :application;
 namespace avalon {
 
 void Engine::Clear() {
-  m_scene.Reset();
-  m_userApp.Reset();
   m_rhi->WaitIdle();
+  m_userApp.Reset();
+  m_scene.Reset();
   m_renderer.Reset();
+  GetContext().Clear();
   m_rhi.Reset();
   m_window.Reset();
+
+  m_defaultPipeline.Put();
 }
 
 Engine &Engine::Get() {
@@ -82,6 +85,10 @@ auto Engine::Initialize(const EngineConfig &config,
     return std::unexpected(EStatusCode::PluginInitializeError);
   }
 
+  m_renderer = graphics::CreateRenderer(*m_rhi.Get());
+  m_defaultPipeline = MakeShared<graphics::ForwardPipeline>(*m_rhi.Get());
+  m_renderer->SetPipeline(m_defaultPipeline.Get());
+
   GetContext().RegisterService<graphics::ShaderManager>(
       EEngineService::ShaderManager, *m_rhi.Get());
   GetContext().RegisterService<graphics::MeshManager>(
@@ -89,7 +96,19 @@ auto Engine::Initialize(const EngineConfig &config,
   GetContext().RegisterService<graphics::MaterialManager>(
       EEngineService::MaterialManager);
 
-  graphics::GraphicsContext::Get().Initialize(*m_rhi.Get());
+  auto shaderHandle = graphics::GetShaderManager().GetOrCreateShader(
+      Path(vfs::kShaderFolderVirtualPath) / StringView("lit.hlsl"));
+
+  auto &materialManager = graphics::GetMaterialManager();
+  auto materialHandle =
+      materialManager.CreateMaterial(shaderHandle, "default"_id);
+  materialManager.SetDefaultOpaque(materialHandle);
+
+  shaderHandle = graphics::GetShaderManager().GetOrCreateShader(
+      Path(vfs::kShaderFolderVirtualPath) / StringView("blit.hlsl"));
+
+  materialHandle = materialManager.CreateMaterial(shaderHandle, "blit"_id);
+  materialManager.SetDefaultBlit(materialHandle);
 
   m_scene = MakeUnique<scene::Scene>();
   m_userApp->OnInitialize(*m_scene.Get(), *m_rhi.Get(), {width, height});
@@ -114,22 +133,36 @@ void Engine::Run() {
       m_deltaTime = std::min(m_deltaTime, 0.1f);
     }
 
-    m_frameCount++;
+    m_fpsCount++;
+    m_currentFrame++;
     m_fpsTimer += m_deltaTime;
 
+    m_totalTime += m_deltaTime;
+    auto &context = GetContext();
+    context.globalTime.time = m_totalTime;
+    context.globalTime.sineTime = Sin(m_totalTime);
+    context.globalTime.cosineTime = Cos(m_totalTime);
+    context.globalTime.deltaTime = m_deltaTime;
+    context.currentFrame = m_currentFrame;
+
     if (m_fpsTimer >= 1.f) {
-      m_lastFps = m_frameCount;
+      m_lastFps = m_fpsCount;
 
       float avgFps = static_cast<float>(m_lastFps) / m_fpsTimer;
       float avgMs = 1000.f / avgFps;
+
+      m_fpsCount = 0;
+      m_fpsTimer -= 1.f;
 
       String title =
           String::Format("FPS: {:.1f} | FrameTime: {:.2f} ms", avgFps, avgMs);
       m_window->SetTitle(title);
     }
 
-    if (m_window->IsMinimized())
+    if (m_window->IsMinimized()) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(16));
       continue;
+    }
 
     if (m_window->IsResized()) {
       isRequestExit = !TryHandleRhiError(rhi::ERhiResult::SwapchainOutOfDate);
@@ -158,23 +191,12 @@ auto Engine::ExecuteFrame() -> rhi::ERhiResult {
     TryHandleRhiError(beginRes);
     return beginRes;
   }
-  auto cmd = m_rhi->GetMainCommandBuffer();
-  cmd->Begin();
-  m_scene->Render(*m_renderer.Get(), *cmd);
-  cmd->End();
-  m_rhi->Submit(cmd);
+  m_scene->Render(*m_renderer.Get());
   return beginRes != rhi::ERhiResult::Success ? beginRes : m_rhi->EndFrame();
 }
 
 void Engine::Update() {
-  m_totalTime += m_deltaTime;
-  GetContext().globalTime.time = m_totalTime;
-  GetContext().globalTime.sineTime = Sin(m_totalTime);
-  GetContext().globalTime.cosineTime = Cos(m_totalTime);
-  GetContext().globalTime.deltaTime = m_deltaTime;
-
-  m_scene->GetWorld().Update(m_deltaTime);
-
+  m_scene->Update(m_deltaTime);
   m_userApp->OnUpdate(m_deltaTime, *m_scene.Get());
 }
 
@@ -186,18 +208,12 @@ bool Engine::TryHandleRhiError(rhi::ERhiResult error) {
     m_window->GetFrameBufferSize(width, height);
     if (width == 0 || height == 0)
       break;
-    avalon::Info("[Engine]: Swapchain out of date, resizing swapchain...");
-    auto res = m_rhi->RecreateSwapchain(m_renderPass, width, height);
-    m_renderer->OnResize({width, height});
+    Debug("[Engine]: Swapchain out of date, resizing swapchain...");
+    m_renderer->OnResize(width, height);
     auto view = m_scene->GetWorld().GetView<ecs::CameraComponent>();
     view.Foreach([&](ecs::Entity entity, ecs::CameraComponent &camera) {
       camera.SetAspectRatio(width / static_cast<float>(height));
     });
-
-    if (res != rhi::ERhiResult::Success) {
-      avalon::Error("[Engine]: Failed to recreate swapchain!");
-      return false;
-    }
     m_window->ResetResizeFlag();
     break;
   }

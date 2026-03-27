@@ -1,13 +1,16 @@
 module;
 #include <vulkan/vulkan.h>
+
 export module avalon.rhi.vulkan:pipeline_builder;
 
 import avalon.rhi;
 import :utils;
+import :types;
 import avalon.core;
 
 namespace avalon::rhi {
-class PipelineBuilder : public NonCopyable {
+
+class PipelineBuilder final : public NonCopyable {
 public:
   PipelineBuilder() {
     m_inputAssemblyInfo = {
@@ -16,43 +19,55 @@ public:
 
     m_rasterizationInfo = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+        .lineWidth = 1.0f,
     };
 
     m_multisampleStateInfo = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+        .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
     };
 
     m_viewportStateInfo = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
         .viewportCount = 1,
+        .pViewports = nullptr,
         .scissorCount = 1,
+        .pScissors = nullptr,
     };
 
     m_depthStencilStateInfo = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-        .depthBoundsTestEnable = VK_FALSE,
     };
+
     m_dynamicStateInfo = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
         .dynamicStateCount = static_cast<uint32_t>(m_dynamicStates.GetSize()),
         .pDynamicStates = m_dynamicStates.GetData(),
+    };
+
+    m_renderingCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
     };
   }
 
   PipelineBuilder &LoadStates(const PipelineCreateInfo &info) {
     m_inputAssemblyInfo.topology =
         ToVkPrimitiveTopology(info.inputAssemblyState.topology);
+    m_inputAssemblyInfo.primitiveRestartEnable = VK_FALSE;
+
     m_rasterizationInfo.polygonMode =
         ToVkPolygonMode(info.rasterizationState.polygonMode);
     m_rasterizationInfo.cullMode =
         ToVkCullMode(info.rasterizationState.cullMode);
     m_rasterizationInfo.frontFace =
-        info.rasterizationState.frontFace == EFrontFace::CounterClockwise
+        (info.rasterizationState.frontFace == EFrontFace::CounterClockwise)
             ? VK_FRONT_FACE_COUNTER_CLOCKWISE
             : VK_FRONT_FACE_CLOCKWISE;
     m_rasterizationInfo.lineWidth = info.rasterizationState.lineWidth;
+
     m_multisampleStateInfo.rasterizationSamples =
         ToVkSampleCount(info.multisampleState.sampleCount);
+
     m_depthStencilStateInfo.depthTestEnable =
         info.depthStencilState.isDepthTestEnable ? VK_TRUE : VK_FALSE;
     m_depthStencilStateInfo.depthWriteEnable =
@@ -60,8 +75,9 @@ public:
     m_depthStencilStateInfo.depthCompareOp =
         ToVkCompareOp(info.depthStencilState.depthCompareOp);
     m_depthStencilStateInfo.stencilTestEnable =
-        info.depthStencilState.isStencilTestEnable;
+        info.depthStencilState.isStencilTestEnable ? VK_TRUE : VK_FALSE;
 
+    m_colorBlendAttachmentStates.Clear();
     for (const auto &blendState : info.colorBlendStates) {
       m_colorBlendAttachmentStates.PushBack({
           .blendEnable = blendState.isEnable ? VK_TRUE : VK_FALSE,
@@ -82,6 +98,8 @@ public:
         .pAttachments = m_colorBlendAttachmentStates.GetData(),
     };
 
+    SetDynamicRenderingInfo(info.renderingInfo);
+
     return *this;
   }
 
@@ -90,40 +108,29 @@ public:
     m_bindingDescriptions.Clear();
     m_attributeDescriptions.Clear();
 
-    for (const auto &binding : bindings) {
+    for (const auto &b : bindings) {
       m_bindingDescriptions.PushBack({
-          .binding = binding.binding,
-          .stride = binding.stride,
-          .inputRate = binding.isInstanceData ? VK_VERTEX_INPUT_RATE_INSTANCE
-                                              : VK_VERTEX_INPUT_RATE_VERTEX,
+          .binding = b.binding,
+          .stride = b.stride,
+          .inputRate = b.isInstanceData ? VK_VERTEX_INPUT_RATE_INSTANCE
+                                        : VK_VERTEX_INPUT_RATE_VERTEX,
       });
-      if constexpr (debug::kIsDebug) {
-        Debug("[Vulkan]: Vertex input binding description: \n"
-              "---------------------------------------------\n"
-              "binding: {}\n stride: {}\n inputRate: {}\n"
-              "---------------------------------------------",
-              binding.binding, binding.stride, binding.isInstanceData);
-      }
+
+      Debug("Vertex binding: \n binding: {}, stride: {}, inputRate: {}",
+            b.binding, b.stride, b.isInstanceData);
     }
 
-    for (const auto &attr : attributes) {
-      VkVertexInputAttributeDescription attrDesc{
-          .location = attr.location,
-          .binding = attr.binding,
-          .format = ToVkFormat(attr.format),
-          .offset = attr.offset,
-      };
+    for (const auto &a : attributes) {
+      m_attributeDescriptions.PushBack({
+          .location = a.location,
+          .binding = a.binding,
+          .format = ToVkFormat(a.format),
+          .offset = a.offset,
+      });
 
-      m_attributeDescriptions.PushBack(attrDesc);
-
-      if constexpr (debug::kIsDebug) {
-        Debug("[Vulkan]: Vertex Input attribute description: \n"
-              "---------------------------------------------\n"
-              " location : {}\n binding : {}\n format: {}\n offset: {}\n"
-              "---------------------------------------------",
-              attrDesc.location, attrDesc.binding, ToView(attr.format),
-              attrDesc.offset);
-      }
+      Debug("Vertex attribute: \n location: {}, binding: {}, format: {}, "
+            "offset: {}",
+            a.location, a.binding, ToView(a.format), a.offset);
     }
 
     m_vertexInputInfo = {
@@ -143,28 +150,19 @@ public:
                                   VkShaderModule module) {
     m_entryPointNames.PushBack(entryName);
 
-    VkPipelineShaderStageCreateInfo stageCreateInfo{
+    m_shaderStageCreateInfos.PushBack({
         .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-        .stage = ToVkShaderStageBits(stage),
+        .stage = ToVkShaderStageBit(stage),
         .module = module,
         .pName = m_entryPointNames.GetBack().GetData(),
-    };
-
-    m_shaderStageCreateInfos.PushBack(stageCreateInfo);
-    return *this;
-  }
-
-  PipelineBuilder &SetRenderPass(VkRenderPass renderPass,
-                                 uint32_t subPass = 0) {
-    m_renderPass = renderPass;
-    m_subpass = subPass;
+    });
     return *this;
   }
 
   auto Build(VkDevice device, VkPipelineLayout layout) -> VkPipeline {
-
     VkGraphicsPipelineCreateInfo createInfo{
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+        .pNext = &m_renderingCreateInfo,
         .stageCount = static_cast<uint32_t>(m_shaderStageCreateInfos.GetSize()),
         .pStages = m_shaderStageCreateInfos.GetData(),
         .pVertexInputState = &m_vertexInputInfo,
@@ -176,25 +174,40 @@ public:
         .pColorBlendState = &m_colorBlendStateInfo,
         .pDynamicState = &m_dynamicStateInfo,
         .layout = layout,
-        .renderPass = m_renderPass,
-        .subpass = m_subpass,
+        .renderPass = VK_NULL_HANDLE,
+        .subpass = 0,
     };
 
     VkPipeline pipeline{VK_NULL_HANDLE};
-    auto vkRes = vkCreateGraphicsPipelines(device, nullptr, 1, &createInfo,
-                                           nullptr, &pipeline);
+    VkResult result = vkCreateGraphicsPipelines(
+        device, VK_NULL_HANDLE, 1, &createInfo, nullptr, &pipeline);
 
-    InternalClear(device);
-
-    if (vkRes != VK_SUCCESS) {
-      Error("[VK_RHI]: failed to create pipeline! Error Code: {}",
-            ToView(vkRes));
+    if (result != VK_SUCCESS) {
+      Error("[Vulkan RHI]: Failed to create graphics pipeline! Result: {}",
+            (int)result);
     }
 
     return pipeline;
   }
 
 private:
+  void SetDynamicRenderingInfo(const PipelineRenderingInfo &info) {
+    m_colorFormats.Clear();
+    for (auto f : info.colorAttachmentFormats) {
+      m_colorFormats.PushBack(ToVkFormat(f));
+    }
+
+    m_renderingCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+        .pNext = nullptr,
+        .viewMask = info.viewMask,
+        .colorAttachmentCount = static_cast<uint32_t>(m_colorFormats.GetSize()),
+        .pColorAttachmentFormats = m_colorFormats.GetData(),
+        .depthAttachmentFormat = ToVkFormat(info.depthAttachmentFormat),
+        .stencilAttachmentFormat = ToVkFormat(info.stencilAttachmentFormat),
+    };
+  }
+
   VkPipelineVertexInputStateCreateInfo m_vertexInputInfo{};
   VkPipelineInputAssemblyStateCreateInfo m_inputAssemblyInfo{};
   VkPipelineViewportStateCreateInfo m_viewportStateInfo{};
@@ -203,19 +216,17 @@ private:
   VkPipelineColorBlendStateCreateInfo m_colorBlendStateInfo{};
   VkPipelineDepthStencilStateCreateInfo m_depthStencilStateInfo{};
   VkPipelineDynamicStateCreateInfo m_dynamicStateInfo{};
-  Array<VkPipelineShaderStageCreateInfo> m_shaderStageCreateInfos;
 
+  VkPipelineRenderingCreateInfo m_renderingCreateInfo{};
+  Array<VkFormat> m_colorFormats;
+
+  Array<VkPipelineShaderStageCreateInfo> m_shaderStageCreateInfos;
   Array<VkDynamicState> m_dynamicStates = {VK_DYNAMIC_STATE_VIEWPORT,
                                            VK_DYNAMIC_STATE_SCISSOR};
   Array<VkVertexInputBindingDescription> m_bindingDescriptions;
   Array<VkVertexInputAttributeDescription> m_attributeDescriptions;
   Array<VkPipelineColorBlendAttachmentState> m_colorBlendAttachmentStates;
-
   Array<String> m_entryPointNames;
-
-  VkRenderPass m_renderPass{VK_NULL_HANDLE};
-  uint32_t m_subpass = 0;
-
-  void InternalClear(VkDevice device) { m_shaderStageCreateInfos.Clear(); }
 };
+
 } // namespace avalon::rhi

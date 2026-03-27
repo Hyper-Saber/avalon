@@ -10,15 +10,18 @@ import avalon.rhi;
 import :system;
 import :types;
 import :view;
+import :update_world_matrix_system;
 
 export namespace avalon::ecs {
+
+class IRenderDataSink {};
 
 const Entity kNullEntity = 0;
 
 class AVALON_ECS_API World final : public NonCopyable,
                                    public mem::AutoDestroyable<World> {
 public:
-  World() = default;
+  World() { AddSystem<UpdateWorldMatrixSystem>(); }
   ~World() = default;
 
   Entity CreateEntity() { return ++m_entityConuter; }
@@ -40,7 +43,11 @@ public:
   }
 
   template <TSystem T, typename... Args> void AddSystem(Args &&...args) {
-    m_systems.PushBack(MakeUnique<T>(std::forward<Args>(args)...));
+    auto system = MakeUnique<T>(std::forward<Args>(args)...);
+    if constexpr (std::is_base_of_v<IRenderSystem, T>) {
+      m_renderSystems.PushBack(std::move(system));
+    } else
+      m_logicSystems.PushBack(std::move(system));
   }
 
   auto GetMaxEntity() const { return m_entityConuter; }
@@ -48,8 +55,14 @@ public:
   template <typename... T> auto GetView() { return View<T...>(*this); }
 
   void Update(float dt) {
-    for (auto &system : m_systems) {
+    for (auto &system : m_logicSystems) {
       system->OnUpdate(*this, dt);
+    }
+  }
+
+  void Capture(graphics::SceneSnapshot &outSnapshot) {
+    for (auto &system : m_renderSystems) {
+      system->OnCapture(*this, outSnapshot);
     }
   }
 
@@ -91,7 +104,8 @@ private:
   };
 
   Entity m_entityConuter = kNullEntity;
-  Array<UniquePtr<ISystem>> m_systems;
+  Array<UniquePtr<ISystem>> m_logicSystems;
+  Array<UniquePtr<IRenderSystem>> m_renderSystems;
   HashMap<std::type_index, UniquePtr<IPool>> m_pools;
 };
 

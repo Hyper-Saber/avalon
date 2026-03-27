@@ -25,4 +25,24 @@ public:
     alloc.Deallocate(pDerived, 1);
   }
 };
+
+class IRenderSystem : public ISystem {
+public:
+  virtual ~IRenderSystem() override = default;
+
+  void OnUpdate(World &world, float dt) override final {}
+
+  virtual void OnCapture(World &, graphics::SceneSnapshot &) = 0;
+};
+
+template <typename T> class RenderSystemBase : public IRenderSystem {
+public:
+  void Destroy() {
+    T *pDerived = static_cast<T *>(this);
+    pDerived->~T();
+    mem::Allocator<T> alloc;
+    alloc.Deallocate(pDerived, 1);
+  }
+};
+
 } // namespace avalon::ecs

@@ -21,106 +21,54 @@ class App : public ApplicationBase<App> {
 public:
   void OnInitialize(scene::Scene &scene, rhi::IRhi &rhi,
                     rhi::Extent2D extent) override {
-    rhi::AttachmentDescription colorAttachment{
-        .nameHash = "swapchain"_id,
-        .intent = rhi::EAttachmentIntent::WriteColor,
-        .format = rhi.GetSwapchainImageFormat(),
-        .loadOp = rhi::EAttachmentLoadOp::Clear,
-        .storeOp = rhi::EAttachmentStoreOp::Store,
-        .initialLayout = rhi::EResourceLayout::Undefined,
-        .finalLayout = rhi::EResourceLayout::Present,
-        .isSwapchain = true,
-    };
-
-    rhi::AttachmentDescription depthAttachment{
-        .nameHash = "depth"_id,
-        .intent = rhi::EAttachmentIntent::WriteDepth,
-        .format = rhi::EFormat::D32_SFLOAT_S8_UINT,
-        .loadOp = rhi::EAttachmentLoadOp::Clear,
-        .storeOp = rhi::EAttachmentStoreOp::DontCare,
-        .initialLayout = rhi::EResourceLayout::Undefined,
-        .finalLayout = rhi::EResourceLayout::DepthStencilAttachment,
-        .isAutoResize = true,
-    };
-
-    rhi::RenderPassCreateInfo passCreateInfo{
-        .nameHash = "main"_id,
-        .attachments = {colorAttachment, depthAttachment},
-        .depthAttachmentIndex = 1,
-    };
-
-    auto renderPass = rhi.CreateRenderPass(passCreateInfo);
-    Engine::Get().SetMainPass(renderPass);
-
-    auto shaderHandle = graphics::GetShaderManager().GetOrCreateShader(
-        Path(vfs::kShaderFolderVirtualPath) / StringView("lit.hlsl"));
     auto &materialManager = graphics::GetMaterialManager();
-    auto materialHandle =
-        materialManager.CreateMaterial(shaderHandle, "default"_id);
-    materialManager.SetDefaultMaterial(materialHandle);
-    auto material = materialManager.Resolve(materialHandle);
-
-    auto pipelineCreateInfo = material->GetPipelineCreateInfo();
-    pipelineCreateInfo.renderPassHandle = renderPass;
-
-    m_pipeline = rhi.CreatePipeline(pipelineCreateInfo);
-
-    auto renderer = MakeUnique<graphics::Renderer>(rhi, m_pipeline);
-
-    renderer->AddPass(MakeUnique<graphics::OpaquePass>(m_pipeline, renderPass,
-                                                       shaderHandle, extent));
-
-    Engine::Get().SetRenderer(std::move(renderer));
-
+    auto material = materialManager.Resolve(materialManager.GetDefaultOpaque());
     auto &world = scene.GetWorld();
-    m_camera = world.CreateEntity();
-    world.AddComponent<ecs::CameraComponent>(m_camera);
-    auto transform = Transform{
-        .position = {0, 0, 5},
-        .scale = Vec3::One(),
-    };
-    world.AddComponent<ecs::TransformComponent>(m_camera, transform);
-    auto light = world.CreateEntity();
-    world.AddComponent<ecs::LightComponent>(light);
-
-    auto lightComp = world.GetComponent<ecs::LightComponent>(light);
-    lightComp->directionOrPosition = Vec4::FromVec3(Vec3{0, -1, -1});
 
     auto cube = scene.CreatePrimitive(graphics::EPrimitiveType::Cube);
     auto sphere = scene.CreatePrimitive(graphics::EPrimitiveType::Sphere);
-
     world.AddComponent<ecs::CubeComponent>(cube);
 
+    auto materialInstanceHandle = materialManager.CreateMaterialInstance(
+        materialManager.GetDefaultOpaque());
+    auto materialInstance = materialManager.Resolve(materialInstanceHandle);
+    materialInstance->SetProperty("uMaterials.baseColor"_id, Color::Red());
+    materialInstance->SetProperty("uMaterials.specularColor"_id,
+                                  Color::Yellow());
+    materialInstance->SetProperty("uMaterials.shininess"_id, 20.0f);
+    materialInstance->SetProperty("uMaterials.f0"_id, 0.04f);
     auto renderComp = world.GetComponent<ecs::RenderComponent>(cube);
+    renderComp->materialInstanceHandle = materialInstanceHandle;
     auto meshHandle = renderComp->meshHandle;
     graphics::GetMeshManager().UploadMesh(meshHandle,
                                           material->GetVertexLayout());
-    auto materialInstanceHandle =
-        materialManager.CreateMaterialInstance(materialHandle);
-    auto materialInstance = materialManager.Resolve(materialInstanceHandle);
-    renderComp->materialInstanceHandle = materialInstanceHandle;
-    materialInstance->SetProperty("mMaterial.baseColor"_id, Color::Red());
-    materialInstance->SetProperty("mMaterial.specularColor"_id, Color::Cyan());
-    materialInstance->SetProperty("mMaterial.shininess"_id, 0.f);
-    materialInstance->SetProperty("mMaterial.f0"_id, 0.04f);
+
+    materialInstanceHandle = materialManager.CreateMaterialInstance(
+        materialManager.GetDefaultOpaque());
+    materialInstance = materialManager.Resolve(materialInstanceHandle);
+    materialInstance->SetProperty("uMaterials.baseColor"_id, Color::Blue());
+    materialInstance->SetProperty("uMaterials.specularColor"_id, Color::Cyan());
+    materialInstance->SetProperty("uMaterials.shininess"_id, 100.0f);
+    materialInstance->SetProperty("uMaterials.f0"_id, 0.4f);
 
     renderComp = world.GetComponent<ecs::RenderComponent>(sphere);
+    renderComp->materialInstanceHandle = materialInstanceHandle;
     meshHandle = renderComp->meshHandle;
     graphics::GetMeshManager().UploadMesh(meshHandle,
                                           material->GetVertexLayout());
-    materialInstanceHandle = renderComp->materialInstanceHandle;
-    materialInstance = materialManager.Resolve(materialInstanceHandle);
-    materialInstance->SetProperty("mMaterial.baseColor"_id, Color::Blue());
-    materialInstance->SetProperty("mMaterial.specularColor"_id, Color::Green());
-    materialInstance->SetProperty("mMaterial.shininess"_id, 200.f);
-    materialInstance->SetProperty("mMaterial.f0"_id, 0.5f);
 
     auto transComp = world.GetComponent<ecs::TransformComponent>(cube);
-    transComp->SetPosition(Vec3{-1, 0, 0});
+    transComp->SetPosition({-1, 0, 0});
     transComp = world.GetComponent<ecs::TransformComponent>(sphere);
-    transComp->SetPosition(Vec3{1, 0, 0});
+    transComp->SetPosition({1, 0, 0});
 
-    world.AddSystem<ecs::CameraSystem>();
+    auto light = scene.AddLight(scene::ELightType::Directional);
+    transComp = world.GetComponent<ecs::TransformComponent>(light);
+    transComp->SetRotation({-45, 0, 0});
+    m_camera = scene.AddCamera();
+    transComp = world.GetComponent<ecs::TransformComponent>(m_camera);
+    transComp->SetPosition(Vec3{0, 0, 5});
+
     world.AddSystem<ecs::UpdateLightSystem>();
     world.AddSystem<ecs::MoveCubeSystem>();
   }

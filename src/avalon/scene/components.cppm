@@ -12,7 +12,7 @@ struct AVALON_SCENE_API CameraComponent {
   float fov = 60.f;
   float aspectRatio = 16.f / 9.f;
   float nearPlane = 0.1f;
-  float farPlane = 1000.f;
+  float farPlane = 10.f;
 
   bool isDirty = true;
   Matrix4x4 projectionMatrix;
@@ -48,9 +48,12 @@ struct AVALON_SCENE_API CameraComponent {
 };
 
 struct LightComponent {
-  Vec4 color = Vec4(1.f, 1.f, 1.f, 1.f);
-  Vec4 directionOrPosition{0.f, -1.f, 0.f, 10.f};
-  scene::ELightType lightType = scene::ELightType::Directional;
+  scene::ELightType type = scene::ELightType::Directional;
+  Color color = Color(1.f, 1.f, 1.f, 1.f);
+  float intensity = 1.f;
+  float range = 10.f;
+  float spotInnerRadians = 1.f;
+  float spotOuterRadians = 2.f;
 };
 
 } // namespace avalon::ecs

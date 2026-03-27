@@ -9,10 +9,11 @@ class ICommandBuffer {
 public:
   virtual ~ICommandBuffer() = default;
   virtual void Begin() = 0;
-  virtual void BeginRenderPass(const RenderPassBeginInfo &info) = 0;
+  virtual void BindBindlessSet() = 0;
   virtual void SetViewport(const Viewport &viewport) = 0;
   virtual void SetScissor(const Rect2D &scissor) = 0;
-  virtual void EndRenderPass() = 0;
+  virtual void BeginRendering(const RenderingInfo &info) = 0;
+  virtual void EndRendering() = 0;
   virtual void End() = 0;
 
   virtual void BindPipeline(PipelineHandle handle) = 0;
@@ -37,5 +38,10 @@ public:
   virtual void DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
                            uint32_t firstIndex, int32_t vertexOffset,
                            uint32_t firstInstance) = 0;
+
+  virtual void Transition(TextureHandle handle, EResourceUsage usage) = 0;
+  virtual void PipelineBarrier(const ImageBarrier &barrier) = 0;
+  virtual void CopyImage(TextureHandle src, TextureHandle dst,
+                         const ImageCopyRegion &region) = 0;
 };
 } // namespace avalon::rhi

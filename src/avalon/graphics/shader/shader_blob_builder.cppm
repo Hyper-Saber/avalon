@@ -12,7 +12,7 @@ import :serialization;
 namespace avalon::graphics {
 
 struct ReflectionData {
-  Array<ShaderPushConstant> pushConstantRanges;
+  Array<ShaderCustomPushConstantTextureSlot> pushConstantMembers;
   Array<ShaderInputAttribute> inputAttributes;
   Array<ShaderDescriptorBinding> descBindings;
   Array<ShaderBufferMember> bufferMembers;
@@ -80,7 +80,7 @@ public:
 
 private:
   void WriteReflectionBlock(const ReflectionData &data) {
-    const auto &pushConstantRanges = data.pushConstantRanges;
+    const auto &pushConstantRanges = data.pushConstantMembers;
     const auto &inputAttributes = data.inputAttributes;
     const auto &descBindings = data.descBindings;
     const auto &bufferMembers = data.bufferMembers;
@@ -89,7 +89,7 @@ private:
     uint32_t relativePushConstantOffset = sizeof(ShaderReflectionHeader);
     uint32_t relativeInputOffset =
         relativePushConstantOffset +
-        static_cast<uint32_t>(sizeof(ShaderPushConstant) *
+        static_cast<uint32_t>(sizeof(ShaderCustomPushConstantTextureSlot) *
                               pushConstantRanges.GetSize());
     uint32_t relativeDescBindingOffset =
         relativeInputOffset +
@@ -121,7 +121,8 @@ private:
     AppendRaw(&reflHeader, sizeof(ShaderReflectionHeader));
     if (!pushConstantRanges.IsEmpty()) {
       AppendRaw(pushConstantRanges.GetData(),
-                pushConstantRanges.GetSize() * sizeof(ShaderPushConstant));
+                pushConstantRanges.GetSize() *
+                    sizeof(ShaderCustomPushConstantTextureSlot));
     }
     if (!inputAttributes.IsEmpty())
       AppendRaw(inputAttributes.GetData(),
@@ -141,20 +142,20 @@ private:
     ReflectionData merged;
 
     for (const auto &stageData : m_pendingReflections) {
-      for (const auto &pushConstant : stageData.pushConstantRanges) {
-        ShaderPushConstant *pExistPushConstant = nullptr;
-        for (auto &mergedPushConstant : merged.pushConstantRanges) {
-          if (mergedPushConstant.offset == pushConstant.offset &&
-              mergedPushConstant.size == pushConstant.size) {
-            pExistPushConstant = &mergedPushConstant;
-            break;
-          }
-        }
-        if (pExistPushConstant) {
-          pExistPushConstant->visibleStages |= pushConstant.visibleStages;
-        } else {
-          merged.pushConstantRanges.PushBack(pushConstant);
-        }
+      for (const auto &pushConstant : stageData.pushConstantMembers) {
+        // ShaderCustomPushConstantMember *pExistPushConstant = nullptr;
+        // for (auto &mergedPushConstant : merged.pushConstantMembers) {
+        //   if (mergedPushConstant.offset == pushConstant.offset &&
+        //       mergedPushConstant.size == pushConstant.size) {
+        //     pExistPushConstant = &mergedPushConstant;
+        //     break;
+        //   }
+        // }
+        // if (pExistPushConstant) {
+        //   pExistPushConstant->visibleStages |= pushConstant.visibleStages;
+        // } else {
+        merged.pushConstantMembers.PushBack(pushConstant);
+        // }
       }
 
       for (const auto &attr : stageData.inputAttributes) {

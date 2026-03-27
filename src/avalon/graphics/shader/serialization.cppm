@@ -36,10 +36,9 @@ struct ShaderStageHeader {
   uint32_t reflectionSize;
 };
 
-struct ShaderPushConstant {
-  rhi::EShaderStage visibleStages;
-  uint32_t offset;
-  uint32_t size;
+struct ShaderCustomPushConstantTextureSlot {
+  StringId nameHash;
+  uint32_t textureSlot;
 };
 
 struct ShaderBufferMember {
@@ -57,7 +56,7 @@ struct ShaderDescriptorBinding {
   uint32_t set;
   uint32_t bindingPoint;
   rhi::EDescriptorType type;
-  rhi::EBufferUsage usage;
+  rhi::EResourceUsage usage;
   rhi::EShaderStage visibleStages;
   uint32_t bufferSize;
   uint32_t memberCount;
@@ -92,7 +91,7 @@ static_assert(sizeof(ShaderStageHeader) == 28,
               "ShaderStageHeader size mismatch!");
 static_assert(sizeof(ShaderBufferMember) == 32,
               "ShaderBufferMember size mismatch!");
-static_assert(sizeof(ShaderPushConstant) == 12,
+static_assert(sizeof(ShaderCustomPushConstantTextureSlot) == 12,
               "ShaderPushConstants size mismatch!");
 static_assert(sizeof(ShaderDescriptorBinding) == 44,
               "ShaderResourceBinding size mismatch!");

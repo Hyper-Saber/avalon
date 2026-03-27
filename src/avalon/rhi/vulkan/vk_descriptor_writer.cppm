@@ -1,12 +1,11 @@
 module;
-#include <algorithm>
 #include <debug/assert.hpp>
 #include <deque>
 #include <vulkan/vulkan.h>
 
 export module avalon.rhi.vulkan:descriptor_writer;
 
-import :descriptor_allocator;
+import :descriptor_provider;
 import :types;
 import avalon.core;
 import avalon.rhi;
@@ -17,10 +16,15 @@ class DescriptorWriter final : public NonCopyable,
                                public IDescriptorWriter,
                                public mem::AutoDestroyable<DescriptorWriter> {
 public:
+  DescriptorWriter(VkDevice device, IRenderResourceProvider &provider)
+      : m_device(device), m_resourceProvider(provider) {
+    m_isSceneGlobalSet = true;
+  }
+
   DescriptorWriter(VkDevice device, IRenderResourceProvider &provider,
-                   DescriptorAllocator &allocator,
-                   PipelineHandle pipelineHandle, uint32_t setIndex)
-      : m_device(device), m_resourceProvider(provider), m_allocator(allocator),
+                   DescriptorProvider &allocator, PipelineHandle pipelineHandle,
+                   uint32_t setIndex)
+      : m_device(device), m_resourceProvider(provider), m_allocator(&allocator),
         m_setIndex(setIndex) {
 
     auto pipelineResource = m_resourceProvider.GetPipeline({pipelineHandle});
@@ -33,16 +37,28 @@ public:
     }
   }
 
-  bool IsValid() const noexcept override { return m_isValid; }
+  bool IsValid() const noexcept override {
+    return m_isValid || m_isSceneGlobalSet;
+  }
 
   auto WriteBuffer(StringId id, const BufferWriteInfo &info)
       -> IDescriptorWriter & override {
 
-    auto binding = m_meta->Get(id);
-    if (!binding) {
-      Error("[Vulkan]: Id [{}] not found in descriptor set layout!",
-            id.Resolve());
-      return *this;
+    uint32_t bindingPoint;
+    VkDescriptorType type;
+
+    if (m_isSceneGlobalSet) {
+      bindingPoint = 0;
+      type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    } else {
+      auto binding = m_meta->Get(id);
+      if (!binding) {
+        Error("[Vulkan]: Id [{}] not found in descriptor set layout!",
+              id.Resolve());
+        return *this;
+      }
+      bindingPoint = binding->binding;
+      type = binding->descriptorType;
     }
 
     VkDescriptorBufferInfo bufferInfo{
@@ -53,9 +69,9 @@ public:
 
     m_bufferInfos.push_back(bufferInfo);
     m_writes.PushBack({.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                       .dstBinding = binding->binding,
+                       .dstBinding = bindingPoint,
                        .descriptorCount = 1,
-                       .descriptorType = binding->descriptorType,
+                       .descriptorType = type,
                        .pBufferInfo = &m_bufferInfos.back(),
                        .pTexelBufferView = nullptr});
     return *this;
@@ -92,14 +108,23 @@ public:
   }
 
   auto Build() -> DescriptorSetHandle override {
-    auto handle = m_allocator.Allocate(m_meta->setLayout);
+    VkDescriptorSet set;
+    DescriptorSetHandle handle;
+    if (m_isSceneGlobalSet) {
+      handle = m_resourceProvider.GetSceneGlobalSetHandle();
+      set = m_resourceProvider.GetSceneGlobalSet();
+    } else {
+      auto setLayout = m_meta->setLayout;
+      auto allocation =
+          m_allocator->Allocate(setLayout, EDescriptorLifetime::PerFrame);
 
-    if (!handle.IsValid()) {
-      return {};
+      if (!allocation) {
+        return {};
+      }
+
+      handle = {allocation->handle.id};
+      set = allocation->set;
     }
-
-    auto setRes = m_allocator.Resolve(handle);
-    auto set = setRes->descriptorSet;
 
     for (auto &write : m_writes) {
       write.dstSet = set;
@@ -107,17 +132,18 @@ public:
 
     vkUpdateDescriptorSets(m_device, static_cast<uint32_t>(m_writes.GetSize()),
                            m_writes.GetData(), 0, nullptr);
-    return {handle.id};
+    return handle;
   }
 
 private:
   VkDevice m_device;
-  DescriptorAllocator &m_allocator;
+  DescriptorProvider *m_allocator;
   IRenderResourceProvider &m_resourceProvider;
   const DescriptorSetLayoutMeta *m_meta;
   uint32_t m_setIndex;
 
   bool m_isValid;
+  bool m_isSceneGlobalSet;
 
   Array<VkWriteDescriptorSet> m_writes;
   std::deque<VkDescriptorBufferInfo> m_bufferInfos;

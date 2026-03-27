@@ -10,6 +10,8 @@ import :containers.array;
 import :memory;
 import :debug;
 import :life_cycle;
+import :string;
+import :utils;
 
 export namespace avalon::mem {
 
@@ -74,24 +76,40 @@ public:
 
     slot.isActive = true;
 
-    Handle<T> handle{.id = (static_cast<uint64_t>(slot.generation) << 32) |
-                           index};
+    Handle<T> handle = Handle<T>::Create(index, slot.generation);
     return handle;
   }
 
   T *Resolve(Handle<T> handle) noexcept {
+    AVALON_ASSERT_MSG(handle.IsValid(),
+                      String::Format("[ResourcePool<{}>]: Invalid handle!",
+                                     utils::GetTypeName<T>()));
+
     uint32_t index = handle.GetIndex();
-    AVALON_ASSERT_MSG(index < m_slots.GetSize(),
-                      "[ResourcePool]: Handle index out of bounds!");
+    AVALON_ASSERT_MSG(
+        index < m_slots.GetSize(),
+        String::Format(
+            "[ResourcePool<{}>]: Handle index {} out of bounds! Size: {}",
+            utils::GetTypeName<T>(), index, m_slots.GetSize()));
     if (index >= m_slots.GetSize())
       return nullptr;
     Slot &slot = m_slots[index];
-    auto ret = slot.isActive && slot.generation == handle.GetGeneration()
-                   ? reinterpret_cast<T *>(slot.data)
-                   : nullptr;
-    AVALON_ASSERT_MSG(
-        ret, "[ResourcePool]: Double free or version mismatch detected!");
-    return ret;
+    bool isValid = slot.isActive && (slot.generation == handle.GetGeneration());
+
+    if (!isValid) {
+      const char *reason = !slot.isActive
+                               ? "Resource already freed"
+                               : "Generation mismatch (stale handle)";
+
+      AVALON_ASSERT_MSG(
+          isValid, String::Format("[ResourcePool<{}>]: {}! [Index: {}, "
+                                  "HandleGen: {}, SlotGen: {}]",
+                                  utils::GetTypeName<T>(), reason, index,
+                                  handle.GetGeneration(), slot.generation));
+      return nullptr;
+    }
+
+    return reinterpret_cast<T *>(slot.data);
   }
 
   void Release(Handle<T> handle) {

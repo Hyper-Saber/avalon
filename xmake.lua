@@ -16,6 +16,7 @@ set_exceptions("none")
 
 if is_mode("debug") then
     add_defines("AVALON_DEBUG")
+    -- set_policy("build.sanitizer.address", true)
 end
 
 option("enable_tests")

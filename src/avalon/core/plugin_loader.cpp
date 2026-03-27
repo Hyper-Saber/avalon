@@ -18,7 +18,7 @@ void *InternalGetSymbol(void *handle, StringView symbol) {
   return dlsym(handle, symbol.GetData());
 }
 void InternalUnloadPlugin(void *handle) {
-  Info("--- unloading Plugin Handle: {}", handle);
+  Debug("--- unloading Plugin Handle: {}", handle);
   if (handle)
     dlclose(handle);
 }

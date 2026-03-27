@@ -1,4 +1,5 @@
 module;
+#include <cstring>
 #include <debug/assert.hpp>
 #include <expected>
 #include <functional>
@@ -11,7 +12,7 @@ import avalon.core;
 import avalon.rhi;
 import :utils;
 import :descriptor_writer;
-import :descriptor_allocator;
+import :descriptor_provider;
 
 import :command_buffer;
 
@@ -21,6 +22,7 @@ VkRhi::VkRhi() = default;
 
 VkRhi::~VkRhi() {
   vkDeviceWaitIdle(m_deviceContext->GetDevice());
+
   for (auto &syncObject : m_frameSyncObjects) {
     if (syncObject.renderFinishedSemaphore != VK_NULL_HANDLE)
       vkDestroySemaphore(m_deviceContext->GetDevice(),
@@ -41,10 +43,10 @@ VkRhi::~VkRhi() {
   if (m_immTransferPool != VK_NULL_HANDLE)
     vkDestroyCommandPool(m_deviceContext->GetDevice(), m_immTransferPool,
                          nullptr);
-
-  for (auto &allocator : m_descriptorAllocators) {
-    allocator.Reset();
-  }
+  UnmapMemory({m_materialPool.handle.id});
+  m_descriptorProvider.Reset();
+  m_bindlessManager.Reset();
+  m_uboPool.Reset();
   m_pipelineManager.Reset();
   m_resourcePool.Reset();
   m_swapchainContext.Reset();
@@ -66,19 +68,45 @@ auto VkRhi::Initialize(const DeviceRequirement &requirement,
                           MakeUnique<SwapchainContext>(*m_deviceContext.Get());
                       return m_swapchainContext->Initialize(width, height);
                     })
-                    .and_then([&]() { return CreateCommandPools(); })
+                    .and_then([&]() {
+                      m_stateTracker = MakeUnique<StateTracker>();
+                      return CreateCommandPools();
+                    })
                     .and_then([&]() { return CreateSyncObjects(); });
   if (!result.has_value())
     return result.error();
 
   m_resourcePool = MakeUnique<ResourcePool>(*m_deviceContext.Get());
+  CreateUBOPool();
+  CreateMaterialBuffer();
+  WarpSwapchainTextures();
+  m_descriptorProvider =
+      MakeUnique<DescriptorProvider>(m_deviceContext->GetDevice());
+  m_bindlessManager = MakeUnique<BindlessManager>(
+      m_deviceContext->GetDevice(), *this, *m_descriptorProvider.Get());
   m_pipelineManager =
       MakeUnique<PipelineManager>(m_deviceContext->GetDevice(), *this);
-  for (uint32_t i = 0; i < m_maxFrameInFlight; i++) {
-    m_descriptorAllocators.PushBack(
-        MakeUnique<DescriptorAllocator>(m_deviceContext->GetDevice()));
-  }
+  CreateStaticSamplers();
+  m_sceneGlobalSetWriter =
+      MakeUnique<DescriptorWriter>(m_deviceContext->GetDevice(), *this);
   return {};
+}
+
+void VkRhi::CreateUBOPool() {
+  m_uboPool = MakeUnique<rhi::RingBufferPool>(
+      *this, rhi::EResourceUsage::UniformBuffer,
+      rhi::EMemoryProperty::HostVisible | rhi::EMemoryProperty::HostCoherent,
+      1024 * 1024 * 16);
+}
+
+auto VkRhi::GetUBOPool() const -> RingBufferPool & { return *m_uboPool.Get(); }
+
+auto VkRhi::GetBindlessManager() const -> IBindlessManager & {
+  return *m_bindlessManager.Get();
+}
+
+auto VkRhi::GetStaticSamplers() const -> const StaticSamplers & {
+  return m_staticSamplers;
 }
 
 auto VkRhi::GetSwapchainImageFormat() const -> EFormat {
@@ -99,6 +127,15 @@ auto VkRhi::GetSwapchainImageFormat() const -> EFormat {
   }
 }
 
+auto VkRhi::GetSwapchainExtent() const -> Extent2D {
+  auto extent = m_swapchainContext->GetExtent();
+  return {extent.width, extent.height};
+}
+
+auto VkRhi::GetCurrentPresentTexture() -> TextureHandle {
+  return m_swapchainTextures[m_currentImageIndex];
+}
+
 auto VkRhi::GetMainCommandBuffer() const -> ICommandBuffer * {
   return m_frameCommandBuffers[m_currentFrame].Get();
 }
@@ -110,62 +147,8 @@ auto VkRhi::GetCapabilities() const -> DeviceCapabilities {
   return m_deviceContext->GetCapabilities();
 }
 
-auto VkRhi::GetRenderPass(RenderPassHandle handle)
-    -> const RenderPassResource * {
-  return m_resourcePool->ResolveRenderPass({handle.id});
-}
-
-auto VkRhi::GetFrameBuffer(const RenderPassHandle renderPassHandle,
-                           const RenderPassResource &renderPassRes,
-                           const RenderTargetBinding &targets)
-    -> const FrameBufferResource * {
-
-  Array<VkImageView> finalViews;
-  TextureResource *anyTexture{nullptr};
-  uint32_t extenalCounter = 0;
-  bool isSwapchainPass = false;
-
-  for (const auto &desc : renderPassRes.createInfo.attachments) {
-    if (desc.isSwapchain) {
-      isSwapchainPass = true;
-      finalViews.PushBack(
-          m_swapchainContext->GetImageView(m_currentImageIndex));
-    } else if (desc.isAutoResize) {
-      auto textureHandle = renderPassRes.internalTextures.Get(desc.nameHash);
-      auto res = m_resourcePool->ResolveTexture(*textureHandle);
-      anyTexture = anyTexture == nullptr ? res : anyTexture;
-      finalViews.PushBack(res->imageView);
-    } else {
-      AVALON_ASSERT(extenalCounter < targets.externalAttachments.GetSize());
-      auto textureHandle = targets.externalAttachments[extenalCounter++];
-      auto res = m_resourcePool->ResolveTexture({textureHandle.id});
-      anyTexture = anyTexture == nullptr ? res : anyTexture;
-      finalViews.PushBack(res->imageView);
-    }
-  }
-
-  FrameBufferCreateInfo info{
-      .renderPassHandle = renderPassHandle,
-      .views = finalViews,
-  };
-
-  if (anyTexture != nullptr) {
-    info.width = anyTexture->info.width;
-    info.height = anyTexture->info.height;
-    info.layers = anyTexture->info.layers;
-  } else {
-    AVALON_ASSERT_MSG(
-        isSwapchainPass,
-        String::Format("[Vulkan] No texture found! Pass: {}.",
-                       renderPassRes.createInfo.nameHash.Resolve()));
-    auto extent = m_swapchainContext->GetExtent();
-    info.width = extent.width;
-    info.height = extent.height;
-    info.layers = 1;
-  }
-
-  auto handle = m_resourcePool->GetOrCreateFrameBuffer(info);
-  return m_resourcePool->ResolveFrameBuffer(handle);
+auto VkRhi::GetDefaultTexture() const -> TextureHandle {
+  return m_defaultTexture;
 }
 
 auto VkRhi::GetPipeline(PipelineHandle handle) -> const PipelineResource * {
@@ -186,30 +169,121 @@ auto VkRhi::GetSampler(SamplerHandle handle) -> const SamplerResource * {
 
 auto VkRhi::GetDescriptorSet(DescriptorSetHandle handle)
     -> const DescriptorSetResource * {
-  return m_descriptorAllocators[m_currentFrame]->Resolve({handle.id});
+  return m_descriptorProvider->Resolve(handle);
 }
 
-auto VkRhi::RecreateSwapchain(RenderPassHandle handle, uint32_t width,
-                              uint32_t height) -> ERhiResult {
+auto VkRhi::GetBindlessSet() const -> VkDescriptorSet {
+  return m_bindlessManager->GetBindlessSet();
+}
+
+auto VkRhi::GetSceneGlobalSet() const -> VkDescriptorSet {
+  return m_bindlessManager->GetSceneGlobalSet();
+}
+
+auto VkRhi::GetSceneGlobalSetHandle() const -> DescriptorSetHandle {
+  return m_bindlessManager->GetSceneGlobalSetHandle();
+}
+
+auto VkRhi::GetBindlessSetLayout() const -> VkDescriptorSetLayout {
+  return m_bindlessManager->GetBindlessSetLayout();
+}
+
+auto VkRhi::GetSceneGlobalSetLayout() const -> VkDescriptorSetLayout {
+  return m_bindlessManager->GetSceneGlobalSetLayout();
+}
+
+auto VkRhi::GetCurrentSwapchainImage() const -> VkImage {
+  return m_swapchainContext->GetImage(m_currentImageIndex);
+}
+
+auto VkRhi::GetTextureCreateInfo(TextureHandle handle) const
+    -> TextureCreateInfo {
+  return m_resourcePool->ResolveTexture({handle.id})->createInfo;
+}
+
+uint32_t VkRhi::GetCurrentFrameIndex() { return m_currentFrame; }
+uint32_t VkRhi::GetLastCompletedFrameIndex() {
+  return m_currentFrame - 1 < 0 ? m_maxFrameInFlight - 1 : m_currentFrame - 1;
+}
+
+auto VkRhi::GetMaterialBufferInfo() const -> const VkDescriptorBufferInfo & {
+  return m_materialPool.bufferInfo;
+}
+
+void VkRhi::CreateMaterialBuffer() {
+  const uint64_t bufferSize = sizeof(StandardMaterialData) * kMaxMaterialCount;
+
+  BufferCreateInfo gpuInfo{.size = bufferSize,
+                           .usage = EResourceUsage::StorageBuffer |
+                                    EResourceUsage::TransferDst,
+                           .memoryProperty = EMemoryProperty::DeviceLocal |
+                                             EMemoryProperty::HostVisible |
+                                             EMemoryProperty::HostCoherent};
+
+  m_materialPool.handle = m_resourcePool->CreateBuffer(gpuInfo);
+
+  if (!m_materialPool.handle.IsValid()) {
+    avalon::Error("Failed to create Bindless Material Pool!");
+    return;
+  }
+
+  auto *bufferRes = m_resourcePool->ResolveBuffer(m_materialPool.handle);
+  m_materialPool.buffer = bufferRes->buffer;
+  m_materialPool.memory = bufferRes->memory;
+  m_materialPool.size = bufferSize;
+
+  m_materialPool.pHostAddress = MapMemory({m_materialPool.handle.id});
+
+  m_materialPool.bufferInfo.buffer = m_materialPool.buffer;
+  m_materialPool.bufferInfo.offset = 0;
+  m_materialPool.bufferInfo.range = m_materialPool.size;
+}
+
+void VkRhi::UpdateMaterialBuffer(size_t offset, const void *data, size_t size) {
+  AVALON_ASSERT(m_materialPool.pHostAddress != nullptr);
+  AVALON_ASSERT(offset + size <= m_materialPool.size);
+
+  std::memcpy(static_cast<uint8_t *>(m_materialPool.pHostAddress) + offset,
+              data, size);
+
+#ifndef NDEBUG
+  // DumpMaterial(offset / sizeof(StandardMaterialData));
+
+#endif // !NDEBUG
+}
+
+auto VkRhi::RecreateSwapchain(uint32_t width, uint32_t height) -> ERhiResult {
   vkDeviceWaitIdle(m_deviceContext->GetDevice());
   auto result = m_swapchainContext->RecreateSwapchain(width, height);
   if (!result) {
     return result.error();
   }
 
-  m_resourcePool->ForeachRenderPass([&](RenderPassResource &renderPassRes) {
-    bool hasInternalTexture = renderPassRes.internalTextures.GetSize();
-    if (hasInternalTexture) {
-      for (auto &entry : renderPassRes.internalTextures)
-        m_resourcePool->ReleaseTexture(entry.GetValue());
-
-      renderPassRes.internalTextures.Clear();
-
-      CreateRenderPassInternalTextures(renderPassRes);
-    }
-  });
+  WarpSwapchainTextures();
 
   return ERhiResult::Success;
+}
+
+void VkRhi::WarpSwapchainTextures() {
+  auto extent = m_swapchainContext->GetExtent();
+  auto &views = m_swapchainContext->GetImageViews();
+  auto &images = m_swapchainContext->GetImages();
+
+  m_swapchainTextures.Clear();
+  auto size = images.GetSize();
+  m_swapchainTextures.Reserve(size);
+  TextureCreateInfo info{
+      .width = extent.width,
+      .height = extent.height,
+      .layers = 1,
+      .usage = EResourceUsage::Present,
+  };
+
+  for (uint32_t i = 0; i < size; i++) {
+    auto handle = m_resourcePool->ImportExternalTexture(
+        m_deviceContext->GetDevice(), images[i], views[i], info, true);
+    m_swapchainTextures.PushBack({handle.id});
+  }
 }
 
 auto VkRhi::CreateBuffer(const BufferCreateInfo &info) -> BufferHandle {
@@ -220,53 +294,31 @@ void VkRhi::ReleaseBuffer(BufferHandle handle) {
   m_resourcePool->ReleaseBuffer({handle.id});
 }
 
+auto VkRhi::CreateTexture(const TextureCreateInfo &info) -> TextureHandle {
+  return {m_resourcePool->CreateTexture(info).id};
+}
+
+void VkRhi::ReleaseTexture(TextureHandle handle) {
+  m_bindlessManager->UnregisterTexture(handle);
+
+  return m_resourcePool->ReleaseTexture({handle.id});
+}
+
+auto VkRhi::GetSceneGlobalSetWriter() -> IDescriptorWriter & {
+  return *m_sceneGlobalSetWriter.Get();
+}
+
 auto VkRhi::CreateDescriptorWriter(PipelineHandle handle, uint32_t set)
     -> IDescriptorWriter & {
-  m_descriptorWriter = MakeUnique<DescriptorWriter>(
-      m_deviceContext->GetDevice(), *this,
-      *m_descriptorAllocators[m_currentFrame].Get(), handle, set);
+  m_descriptorWriter =
+      MakeUnique<DescriptorWriter>(m_deviceContext->GetDevice(), *this,
+                                   *m_descriptorProvider.Get(), handle, set);
   return *m_descriptorWriter.Get();
 }
 
-auto VkRhi::CreatePipeline(const PipelineCreateInfo &info) -> PipelineHandle {
+auto VkRhi::GetOrCreatePipeline(const PipelineCreateInfo &info)
+    -> PipelineHandle {
   return {m_pipelineManager->GetOrCreate(info).id};
-}
-
-auto VkRhi::CreateRenderPass(const RenderPassCreateInfo &info)
-    -> RenderPassHandle {
-
-  auto renderPassHandle = m_resourcePool->CreateRenderPass(info);
-  auto renderPassRes = m_resourcePool->ResolveRenderPass(renderPassHandle);
-
-  CreateRenderPassInternalTextures(*renderPassRes);
-
-  return {renderPassHandle.id};
-}
-
-void VkRhi::CreateRenderPassInternalTextures(
-    RenderPassResource &renderPassRes) {
-  auto info = renderPassRes.createInfo;
-  auto extent = m_swapchainContext->GetExtent();
-
-  bool foundSwapchain = false;
-  for (auto &attachment : info.attachments) {
-    if (attachment.isSwapchain) {
-      AVALON_ASSERT_MSG(!foundSwapchain,
-                        "[Vulkan] Only one swapchain attachment allowed!");
-      foundSwapchain = true;
-    }
-    if (!attachment.isSwapchain && attachment.isAutoResize) {
-      TextureCreateInfo info{
-          .width = extent.width,
-          .height = extent.height,
-          .format = attachment.format,
-          .usage = MapIntentToUsage(attachment.intent),
-      };
-
-      auto textureHandle = m_resourcePool->CreateTexture(info);
-      renderPassRes.internalTextures.Insert(attachment.nameHash, textureHandle);
-    }
-  }
 }
 
 void VkRhi::CreateCommandBuffer() {
@@ -286,7 +338,8 @@ void VkRhi::CreateCommandBuffer() {
           ToView(result));
     return;
   }
-  auto cmdBuffer = MakeUnique<CommandBuffer>(vkCmdBuffer, *this);
+  auto cmdBuffer =
+      MakeUnique<CommandBuffer>(vkCmdBuffer, *this, *m_stateTracker.Get());
   m_frameCommandBuffers.PushBack(std::move(cmdBuffer));
 }
 
@@ -313,7 +366,7 @@ void VkRhi::ExcuteOnce(EQueueType queueType,
     return;
   }
 
-  auto cmd = MakeUnique<CommandBuffer>(vkCmd, *this);
+  auto cmd = MakeUnique<CommandBuffer>(vkCmd, *this, *m_stateTracker.Get());
 
   cmd->Begin();
   action(cmd.Get());
@@ -356,9 +409,9 @@ void VkRhi::UnmapMemory(BufferHandle handle) {
   }
 }
 
-void VkRhi::Submit(ICommandBuffer *cmd) {
-  auto *commandBuffer = static_cast<CommandBuffer *>(cmd);
-  auto vkCmd = commandBuffer->GetRaw();
+void VkRhi::Submit(ICommandBuffer &cmd) {
+  auto &commandBuffer = static_cast<CommandBuffer &>(cmd);
+  auto vkCmd = commandBuffer.GetRaw();
   VkPipelineStageFlags pipelineStageFlags[] = {
       VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT};
   VkSubmitInfo info{
@@ -376,6 +429,8 @@ void VkRhi::Submit(ICommandBuffer *cmd) {
 
   vkQueueSubmit(m_deviceContext->GetQueue(EQueueType::Graphics), 1, &info,
                 m_frameSyncObjects[m_currentFrame].m_inflightFence);
+
+  m_stateTracker->Clear();
 }
 
 auto VkRhi::BeginFrame() -> ERhiResult {
@@ -402,7 +457,9 @@ auto VkRhi::BeginFrame() -> ERhiResult {
   vkResetCommandPool(m_deviceContext->GetDevice(),
                      m_frameCommandPools[m_currentFrame], 0);
 
-  m_descriptorAllocators[m_currentFrame]->ResetPools();
+  m_uboPool->ResetPool();
+  m_descriptorProvider->Flip();
+  m_bindlessManager->ProcessPendingDeletions();
   return {};
 }
 
@@ -486,6 +543,32 @@ auto VkRhi::CreateCommandPools() -> std::expected<void, ERhiResult> {
   return {};
 }
 
+void VkRhi::CreateStaticSamplers() {
+  SamplerCreateInfo linearClampInfo{
+      .magFilter = EFilter::Linear,
+      .minFilter = EFilter::Linear,
+      .mipmapMode = EMipmapMode::Linear,
+      .addressModeU = EAddressMode::ClampToEdge,
+      .addressModeV = EAddressMode::ClampToEdge,
+      .addressModeW = EAddressMode::ClampToEdge,
+  };
+
+  m_staticSamplers.linearClamp = {
+      m_resourcePool->CreateSampler(linearClampInfo).id};
+
+  SamplerCreateInfo pointClampInfo{
+      .magFilter = EFilter::Nearest,
+      .minFilter = EFilter::Nearest,
+      .mipmapMode = EMipmapMode::Nearest,
+      .addressModeU = EAddressMode::ClampToEdge,
+      .addressModeV = EAddressMode::ClampToEdge,
+      .addressModeW = EAddressMode::ClampToEdge,
+  };
+
+  m_staticSamplers.pointClamp = {
+      m_resourcePool->CreateSampler(pointClampInfo).id};
+}
+
 auto VkRhi::CreateSyncObjects() -> std::expected<void, ERhiResult> {
   if (m_maxFrameInFlight == 0)
     m_maxFrameInFlight = m_swapchainContext->GetImageCount();
@@ -524,4 +607,20 @@ auto VkRhi::CreateSyncObjects() -> std::expected<void, ERhiResult> {
   }
   return {};
 }
+
+//-------------------------------DEBUG-------------------------------------
+#ifndef NDEBUG
+
+void VkRhi::DumpMaterial(uint32_t index) {
+  if (!m_materialPool.pHostAddress) {
+    Error("Material Pool host address is null!");
+    return;
+  }
+
+  size_t offset = index * sizeof(StandardMaterialData);
+  debug::DumpMaterial(static_cast<uint8_t *>(m_materialPool.pHostAddress) +
+                      offset);
+}
+
+#endif // !NDEBUG
 } // namespace avalon::rhi

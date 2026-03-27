@@ -1,13 +1,36 @@
 module;
 #include <cstddef>
+#include <cstdlib>
+#include <cxxabi.h>
 #include <type_traits>
+#include <typeinfo>
 
 export module avalon.core:utils;
 import :types;
 import :string_view;
 import :status;
+import :string;
+
+namespace avalon::utils {
+template <typename T> const String GetTypeName() noexcept {
+  static String typeName = []() {
+    int status;
+    const char *mangled = typeid(T).name();
+    char *demangled = abi::__cxa_demangle(mangled, nullptr, nullptr, &status);
+    String name = (status == 0) ? demangled : mangled;
+    free(demangled);
+    return name;
+  }();
+  return typeName;
+}
+} // namespace avalon::utils
 
 export namespace avalon::rhi {
+
+template <typename T> constexpr bool HasFlag(T value, T flag) noexcept {
+  using U = std::underlying_type_t<T>;
+  return (static_cast<U>(value) & static_cast<U>(flag)) != 0;
+}
 
 template <typename T> struct EnableBitmaskOperators : std::false_type {};
 

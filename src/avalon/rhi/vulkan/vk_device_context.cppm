@@ -332,6 +332,8 @@ private:
         properties.limits.minStorageBufferOffsetAlignment;
     m_capabilities.limits.maxSamplerAnisotroy =
         properties.limits.maxSamplerAnisotropy;
+
+    IRhi::capabilities = m_capabilities;
   }
 
   auto CreateLogicalDevice() -> std::expected<void, ERhiResult> {
@@ -362,17 +364,46 @@ private:
       queueCreateInfos.PushBack(createInfo);
     }
 
+    VkPhysicalDeviceVulkan13Features features13{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+        .pNext = nullptr,
+        .synchronization2 = VK_TRUE,
+        .dynamicRendering = VK_TRUE,
+    };
+
+    VkPhysicalDeviceVulkan12Features features12{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+        .pNext = &features13,
+
+        .descriptorIndexing = VK_TRUE,
+        .shaderSampledImageArrayNonUniformIndexing = VK_TRUE,
+        .descriptorBindingSampledImageUpdateAfterBind = VK_TRUE,
+        .descriptorBindingStorageBufferUpdateAfterBind = VK_TRUE,
+        .descriptorBindingPartiallyBound = VK_TRUE,
+        .runtimeDescriptorArray = VK_TRUE,
+        // .bufferDeviceAddress = VK_TRUE,
+    };
+
+    VkPhysicalDeviceFeatures2 features2{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+        .pNext = &features12,
+        .features = m_config.features,
+    };
+
+    if constexpr (debug::kIsDebug) {
+      m_config.extensions.PushBack("VK_GOOGLE_user_type");
+    }
+
     VkDeviceCreateInfo createInfo{
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+        .pNext = &features2,
         .queueCreateInfoCount =
             static_cast<uint32_t>(queueCreateInfos.GetSize()),
         .pQueueCreateInfos = queueCreateInfos.GetData(),
-        .enabledLayerCount = 0,
-        .ppEnabledLayerNames = nullptr,
         .enabledExtensionCount =
             static_cast<uint32_t>(m_config.extensions.GetSize()),
         .ppEnabledExtensionNames = m_config.extensions.GetData(),
-        .pEnabledFeatures = &m_config.features,
+        .pEnabledFeatures = nullptr,
     };
 
     auto result =

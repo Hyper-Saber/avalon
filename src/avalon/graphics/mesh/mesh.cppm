@@ -31,10 +31,28 @@ struct MeshData {
   Array<Vec2> texCoords;
   Array<SubMesh> subMeshs;
 
-  struct AABB {
-    float min[3];
-    float max[3];
-  } bounds;
+  static AABB ComputeFullAABB(const MeshData &data) {
+    AABB aabb;
+    for (const auto &pos : data.positions) {
+      aabb.Encapsulate(pos);
+    }
+    return aabb;
+  }
+
+  static AABB ComputeSubMeshAABB(const MeshData &data, uint32_t subMeshIndex) {
+    if (subMeshIndex >= data.subMeshs.GetSize())
+      return {};
+
+    const auto &subMesh = data.subMeshs[subMeshIndex];
+    AABB aabb;
+
+    for (uint32_t i = 0; i < subMesh.indexCount; ++i) {
+      uint32_t index = data.indices[subMesh.startIndex + i];
+      const Vec3 &pos = data.positions[subMesh.baseVertex + index];
+      aabb.Encapsulate(pos);
+    }
+    return aabb;
+  }
 };
 
 class AVALON_GRAPHICS_API Mesh final : public mem::AutoDestroyable<Mesh> {
@@ -46,7 +64,9 @@ public:
     m_isUploaded = true;
   }
 
-  Mesh(MeshData &&data) : m_data(std::move(data)), m_isUploaded(false), m_indexCount(m_data.indices.GetSize()) {}
+  Mesh(MeshData &&data)
+      : m_data(std::move(data)), m_isUploaded(false),
+        m_indexCount(m_data.indices.GetSize()) {}
 
   auto GetData() const noexcept -> const MeshData & { return m_data; }
 
@@ -78,7 +98,5 @@ private:
   uint32_t m_indexCount;
   EFormat m_indexFormat = EFormat::R32_Uint;
 };
-
-using MeshHandle = Handle<Mesh>;
 
 } // namespace avalon::graphics

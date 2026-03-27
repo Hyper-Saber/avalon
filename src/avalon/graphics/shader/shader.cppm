@@ -38,12 +38,6 @@ public:
     AVALON_ASSERT(m_shaderBlob->GetData() != nullptr)
   }
 
-  auto GetPushConstantStageMask() const {
-    if (m_pushConstantRanges.GetSize() == 0)
-      return EShaderStage::None;
-    return m_pushConstantRanges[0].visibleStages;
-  }
-
   auto GetDescriptorMetaData() const noexcept
       -> Span<const ShaderDescriptorBinding> {
     return {m_reflection.pBindings, m_reflection.pHeader->descBindingCount};
@@ -64,7 +58,7 @@ public:
     return begin[0];
   }
 
-  auto GetPushConstants() const -> Span<const rhi::PushConstantRange> {
+  auto GetPushConstants() const -> Span<const ShaderCustomPushConstantTextureSlot> {
     return {m_pushConstantRanges.GetData(), m_pushConstantRanges.GetSize()};
   }
 
@@ -159,10 +153,10 @@ private:
 
   void ParseDescriptorSetLayouts() {
     uint32_t bindingCount = m_reflection.pHeader->descBindingCount;
-    m_descriptorBindings.Reserve(bindingCount);
-
     for (uint32_t i = 0; i < bindingCount; i++) {
       const auto &binding = m_reflection.pBindings[i];
+      if (binding.set <= 1)
+        continue;
       m_descriptorBindings.PushBack({
           .nameHash = binding.nameHash,
           .binding = binding.bindingPoint,
@@ -185,16 +179,15 @@ private:
     if (m_reflection.pHeader->pushConstantCount == 0)
       return;
 
-    auto pPushTable = reinterpret_cast<const ShaderPushConstant *>(
+    auto pPushTable = reinterpret_cast<const ShaderCustomPushConstantTextureSlot *>(
         pReflBase + m_reflection.pHeader->pushConstantTableOffset);
 
     for (uint32_t i = 0; i < m_reflection.pHeader->pushConstantCount; i++) {
       const auto &pushConstants = pPushTable[i];
 
       m_pushConstantRanges.PushBack({
-          .visibleStages = pushConstants.visibleStages,
-          .offset = pushConstants.offset,
-          .size = pushConstants.size,
+          .nameHash = pushConstants.nameHash,
+          .textureSlot = pushConstants.textureSlot,
       });
     }
   }
@@ -211,7 +204,7 @@ private:
   Array<rhi::ShaderStageInfo> m_stageInfos;
   Array<rhi::VertexInputAttribute> m_vertexAttributes;
   Array<rhi::DescriptorSetLayoutBinding> m_descriptorBindings;
-  Array<rhi::PushConstantRange> m_pushConstantRanges;
+  Array<ShaderCustomPushConstantTextureSlot> m_pushConstantRanges;
 };
 
 using ShaderHandle = Handle<Shader>;

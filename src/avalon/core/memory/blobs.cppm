@@ -37,7 +37,10 @@ public:
     AVALON_ASSERT_MSG(offset + size <= GetSize(),
                       "[IBlob]: Write out of range!");
     if (size > 0) {
-      std::memcpy(static_cast<uint8_t *>(GetData()) + offset, pSource, size);
+      auto pData = static_cast<uint8_t *>(GetData()) + offset;
+      if (std::memcmp(pData, pSource, size) == 0)
+        return false;
+      std::memcpy(pData, pSource, size);
       return true;
     }
     return false;

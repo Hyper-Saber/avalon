@@ -2,20 +2,12 @@ module;
 #include <cstdint>
 
 export module avalon.window;
-
+export import :types;
 import avalon.core;
 
-export namespace avalon::window {
+using namespace avalon::input;
 
-struct WindowProps {
-  const char *title = "Avalon Engine";
-  uint32_t width = 1280;
-  uint32_t height = 720;
-  bool resizable = true;
-  bool vsync = false;
-  WindowMode mode = WindowMode::Windowed;
-  WindowBackend backend = WindowBackend::Auto;
-};
+export namespace avalon::window {
 
 class IWindow : public IPlugin {
 public:
@@ -30,5 +22,11 @@ public:
   virtual void GetFrameBufferSize(uint32_t &outWidth,
                                   uint32_t &outHeight) const = 0;
   virtual void WaitEvents() const = 0;
+
+  virtual void SetCursorMode(input::ECursorMode mode) = 0;
+
+  virtual bool IsGamepadPresent(int joystickId) const = 0;
+  virtual auto GetGamepadInfos() -> Span<const input::GamepadInfo> = 0;
+  virtual auto GetInputSnapshot() -> input::FrameInputSnapshot & = 0;
 };
 } // namespace avalon::window

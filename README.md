@@ -23,7 +23,7 @@
 - **架构**: 基于 **Entity Component System (ECS)**。
 - **优势**: 保证了缓存友好的内存布局，支持大规模实体的并行更新。
 
-### 2. 渲染流程 (Render Graph) ✅
+### 2. 渲染流程 (Render Graph)
 
 - **状态**: **已实现 (Stable)**。
 - **同步优化**: 自动分析资源读写依赖，精确注入 **Pipeline Barriers** 与 **Image Layout Transitions**。

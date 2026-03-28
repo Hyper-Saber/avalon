@@ -10,7 +10,7 @@ add_rules("mode.debug", "mode.release")
 add_rules("plugin.compile_commands.autoupdate", { outputdir = "." })
 add_requires("vulkan","directx-shader-compiler", { system = true })
 add_requires("glfw", {configs = {wayland = true, x11 = true}})
-add_requires("glm", "spdlog", "spirv-reflect")
+add_requires("spdlog", "spirv-reflect")
 set_config("mode", "debug")
 set_exceptions("none")
 

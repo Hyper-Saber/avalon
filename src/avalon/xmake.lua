@@ -9,14 +9,6 @@ function add_avalon_api_rules(target_name)
     end
 end
 
-function add_window_backend(name)
-    local path = "window"
-    add_files("window/window.cppm", { public = true })
-    add_files(format("%s/%s/%s_window.cpp", path, name, name))
-    set_targetdir("$(builddir)/$(plat)/$(arch)/$(mode)/plugins")
-    add_packages(name)
-end
-
 target "avalon.core"
     set_kind "shared"
     add_avalon_api_rules("avalon.core")
@@ -30,16 +22,31 @@ target "avalon.core"
     add_packages("spdlog")
     add_syslinks("stdc++exp")
 
+
 target "avalon.rhi"
     set_kind "shared"
     add_avalon_api_rules("avalon.rhi")
     add_files("rhi/*.cppm", {public = true})
     add_deps("avalon.core")
 
+target "avalon.ecs"
+    set_kind "shared"
+    set_targetdir("$(builddir)/$(plat)/$(arch)/$(mode)/plugins")
+    add_avalon_api_rules("avalon.ecs")
+    add_deps("avalon.core")
+    add_files("ecs/*.cppm", {public = true})
+    add_files("ecs/*.cpp")
+
+target "avalon.input"
+    set_kind "shared"
+    add_avalon_api_rules("avalon.input")
+    add_files("input/*.cppm", {public = true})
+    add_deps("avalon.core", "avalon.ecs", "avalon.window")
+
 target "avalon.window"
     set_kind "shared"
-    add_avalon_api_rules("avalon.rhi")
-    add_files("window/window.cppm", {public = true})
+    add_avalon_api_rules("avalon.window")
+    add_files("window/*.cppm", {public = true})
     add_deps("avalon.core")
 
 target "avalon.rhi.vulkan"
@@ -62,21 +69,15 @@ target "avalon.rhi.vulkan"
 target "avalon.window.glfw"
     set_kind "shared"
     add_avalon_api_rules("avalon.window.glfw")
+    add_files("window/glfw/*.cppm", { public = true })
     add_deps("avalon.core", "avalon.window")
-    add_window_backend("glfw")
+    set_targetdir("$(builddir)/$(plat)/$(arch)/$(mode)/plugins")
+    add_packages("glfw")
     if is_plat("linux") then
         add_defines "GLFW_EXPOSE_NATIVE_X11"
         add_defines "GLFW_EXPOSE_NATIVE_WAYLAND"
         add_syslinks("X11-xcb")
     end
-
-target "avalon.ecs"
-    set_kind "shared"
-    set_targetdir("$(builddir)/$(plat)/$(arch)/$(mode)/plugins")
-    add_avalon_api_rules("avalon.ecs")
-    add_deps("avalon.core", "avalon.rhi")
-    add_files("ecs/*.cppm", {public = true})
-    add_files("ecs/*.cpp")
 
 target "avalon.shader"
     set_kind "shared"

@@ -94,6 +94,23 @@ inline Vec3 Normalize(const Vec3 &v) {
   return {0.0f, 0.0f, 0.0f};
 }
 
+inline float LengthSquared(const Vec2 &v) { return v.x * v.x + v.y * v.y; }
+
+inline float Length(const Vec2 &v) { return std::sqrt(LengthSquared(v)); }
+
+inline Vec2 Normalize(const Vec2 &v) {
+  float lenSq = LengthSquared(v);
+
+  if (lenSq > kEpsilon) {
+    float invLen = 1.0f / std::sqrt(lenSq);
+    return {v.x * invLen, v.y * invLen};
+  }
+
+  AVALON_ASSERT_MSG(false, "Attempting to normalize a zero-length vector!");
+
+  return {0.0f, 0.0f};
+}
+
 inline Matrix4x4 Orthographic(float left, float right, float bottom, float top,
                               float zNear, float zFar) {
   Matrix4x4 res = Matrix4x4::Identity;

@@ -138,6 +138,24 @@ public:
     std::swap(m_size, other.m_size);
   }
 
+  V &operator[](const K &key) noexcept {
+    if (static_cast<float>(m_size + 1) / m_capacity > kMaxLoadFactor) {
+      Grow();
+    }
+
+    auto index = FindSlot(key);
+
+    if (!m_entries[index].occupied) {
+      mem::LifeCycle::Instantiate<K>(&m_entries[index].keyData, key);
+      mem::LifeCycle::Instantiate<V>(&m_entries[index].valueData);
+
+      m_entries[index].occupied = true;
+      m_size++;
+    }
+
+    return m_entries[index].GetValue();
+  }
+
   V &Insert(const K &key, const V &value) noexcept {
     if (static_cast<float>(m_size + 1) / m_capacity > kMaxLoadFactor) {
       Grow();

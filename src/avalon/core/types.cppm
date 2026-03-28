@@ -87,14 +87,6 @@ struct Color {
 } // namespace avalon
 export namespace avalon::window {
 
-enum class WindowMode { Windowed, Fullscreen, Borderless };
-
-enum class WindowBackend {
-  Auto,
-  Glfw,
-  // Wayland, Win32
-};
-
 enum class NativeWindowApi {
   Wayland,
   Xcb,

@@ -6,7 +6,6 @@ module;
 export module avalon.ecs:world;
 
 import avalon.core;
-import avalon.rhi;
 import :system;
 import :types;
 import :view;

@@ -17,6 +17,8 @@ struct Quaternion {
     return Quaternion(axis.x * s, axis.y * s, axis.z * s, std::cos(halfAngle));
   }
 
+  static Quaternion LookRotation(const Vec3 &forward, const Vec3 &up);
+
   static Quaternion FromEuler(const Vec3 &euler) {
     float ex = euler.x * kDeg2Rad;
     float ey = euler.y * kDeg2Rad;
@@ -105,6 +107,43 @@ struct Quaternion {
     res.data[3][3] = 1.0f;
 
     return res;
+  }
+
+  static Quaternion FromMatrix(const Matrix4x4 &m) {
+    float trace = m.data[0][0] + m.data[1][1] + m.data[2][2];
+    Quaternion q;
+
+    if (trace > 0.0f) {
+      float s = std::sqrt(trace + 1.0f) * 2.0f;
+      q.w = 0.25f * s;
+      q.x = (m.data[2][1] - m.data[1][2]) / s;
+      q.y = (m.data[0][2] - m.data[2][0]) / s;
+      q.z = (m.data[1][0] - m.data[0][1]) / s;
+    } else if ((m.data[0][0] > m.data[1][1]) && (m.data[0][0] > m.data[2][2])) {
+      float s =
+          std::sqrt(1.0f + m.data[0][0] - m.data[1][1] - m.data[2][2]) * 2.0f;
+      q.w = (m.data[2][1] - m.data[1][2]) / s;
+      q.x = 0.25f * s;
+      q.y = (m.data[1][0] + m.data[0][1]) / s;
+      q.z = (m.data[2][0] + m.data[0][2]) / s;
+    } else if (m.data[1][1] > m.data[2][2]) {
+      float s =
+          std::sqrt(1.0f + m.data[1][1] - m.data[0][0] - m.data[2][2]) * 2.0f;
+      q.w = (m.data[0][2] - m.data[2][0]) / s;
+      q.x = (m.data[1][0] + m.data[0][1]) / s;
+      q.y = 0.25f * s;
+      q.z = (m.data[2][1] + m.data[1][2]) / s;
+    } else {
+      float s =
+          std::sqrt(1.0f + m.data[2][2] - m.data[0][0] - m.data[1][1]) * 2.0f;
+      q.w = (m.data[1][0] - m.data[0][1]) / s;
+      q.x = (m.data[2][0] + m.data[0][2]) / s;
+      q.y = (m.data[2][1] + m.data[1][2]) / s;
+      q.z = 0.25f * s;
+    }
+
+    q.Normalize();
+    return q;
   }
 
   auto ToString() {

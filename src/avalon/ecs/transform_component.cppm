@@ -48,6 +48,16 @@ struct TransformComponent {
     worldMatrix = T * R * S;
   }
 
+  void LookAt(const Vec3 &target, const Vec3 &up = Vec3{0.0f, 1.0f, 0.0f}) {
+    Vec3 position = local.position;
+    if (LengthSquared(target - position) < kEpsilon)
+      return;
+
+    local.rotation = Quaternion::LookRotation(target - position, up);
+
+    isDirty = true;
+  }
+
   Vec3 Forward() const {
     return Normalize(Vec3{-worldMatrix.data[2][0], -worldMatrix.data[2][1],
                           -worldMatrix.data[2][2]});

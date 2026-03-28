@@ -50,11 +50,11 @@
 - [x] **Render Graph** 自动化同步与资源流转引擎。
 - [x] **Bindless** 渲染架构（贴图与采样器全局绑定）。
 - [x] **Inverse-Z** 高精度深度缓冲策略。
+- [x] **输入系统 (Input System)**: 抽象手柄的三种输入方式,按键,扳机,摇杆。
 
 ### 🛠️ 开发中 (In Progress)
 
 - [ ] **PBR 材质系统**: 基于 Cook-Torrance 模型，整合进目前的 Bindless SSBO 布局。
-- [ ] **输入系统 (Input System)**: 响应式输入处理，对接 ECS 逻辑层。
 
 ### 🚀 远期目标 (Future)
 

@@ -13,6 +13,7 @@ enum class EEngineService : uint32_t {
   ShaderManager,
   MeshManager,
   MaterialManager,
+  InputManager,
   Count
 };
 

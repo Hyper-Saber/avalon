@@ -5,7 +5,7 @@ export module avalon.scene:extract_light_system;
 import avalon.ecs;
 import avalon.graphics;
 import avalon.core;
-import :components;
+import :light_component;
 import :types;
 
 namespace avalon::ecs {

@@ -54,10 +54,10 @@ float4 FsMain(VSOutput input) : SV_TARGET {
   float3 kD = (1.0 - F);
 
   float dotNL = max(dot(N, L), 0.0);
-  float3 diffuse = kD * dotNL * lightColor * baseColor / PI;
+  float3 diffuse = kD * dotNL * lightColor * baseColor / kPi;
 
   float shininess = max(mMaterial.shininess, 1.0);
-  float energyConservation = (shininess + 8.0) / (8.0 * PI);
+  float energyConservation = (shininess + 8.0) / (8.0 * kPi);
   float spec = pow(max(dot(N, H), 0.0), shininess) * energyConservation;
   float3 specular = spec * F * lightColor * mMaterial.specularColor.rgb;
 

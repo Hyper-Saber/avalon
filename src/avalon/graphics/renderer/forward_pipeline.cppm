@@ -8,6 +8,7 @@ import :renderer_types;
 import :material;
 import :material_manager;
 import :opaque_pass;
+import :skybox_pass;
 import :blit_pass;
 
 export namespace avalon::graphics {
@@ -20,8 +21,9 @@ public:
   StringId GetName() const override { return "ForwardPipeline"_id; }
 
   void Setup(RenderGraphBuilder &builder, const RenderPacket &packet) override {
-    auto &pass = builder.AddPass<OpaquePass>("Opaque"_id);
+    // auto &pass = builder.AddPass<OpaquePass>("Opaque"_id);
     // auto &pass = builder.AddPass<BlitPass>("Blit"_id);
+    auto &pass = builder.AddPass<SkyboxPass>("Skybox"_id);
   }
 
 private:

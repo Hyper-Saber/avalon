@@ -26,7 +26,7 @@ public:
 
     m_materialInstancePool.Foreach([&](MaterialInstance &instance) {
       // if (instance.m_isPropertyDirty) {
-    if (true){
+      if (true) {
 
         auto &dataBlob = instance.GetDataBlob();
         uint32_t gpuIdx = instance.GetGpuIndex();
@@ -45,7 +45,8 @@ public:
       //     rhi::TextureHandle texHandle = instance.GetTexture(id);
       //     if (!texHandle.IsValid())
       //       texHandle = rhi.GetDefaultTexture();
-      //     uint32_t bindlessIndex = bindlessManager.RegisterTexture(texHandle);
+      //     uint32_t bindlessIndex =
+      //     bindlessManager.RegisterTexture(texHandle);
       //     instance.WriteTextureIndex(id, bindlessIndex);
       //   }
       // }
@@ -65,6 +66,13 @@ public:
       m_materials.Insert(nameHash, handle);
     }
     return handle;
+  }
+
+  auto TryGetMaterial(StringId nameHash) -> MaterialHandle {
+    if (auto *existing = m_materials.Get(nameHash)) {
+      return *existing;
+    }
+    return {};
   }
 
   auto CreateMaterialInstance(MaterialHandle handle = {})
@@ -123,14 +131,15 @@ public:
   }
 
   void SetDefaultBlit(MaterialHandle handle) { m_defaultBlit = handle; }
-
+  void SetDefaultSkyBox(MaterialHandle handle) { m_defaultSkybox = handle; }
   void SetErrorMaterial(MaterialHandle handle) { m_errorMaterial = handle; }
 
   auto GetDefaultOpaque() const -> MaterialHandle { return m_defaultOpaque; }
   auto GetDefaultTransparent() const -> MaterialHandle {
     return m_defaultTransparent;
   }
-  auto GetDeafaultBlit() const -> MaterialHandle { return m_defaultBlit; }
+  auto GetDefaultBlit() const -> MaterialHandle { return m_defaultBlit; }
+  auto GetDefaultSkybox() const -> MaterialHandle { return m_defaultSkybox; }
   auto GetDefaultOpaqueInstance() const -> MaterialInstanceHandle {
     return m_defaultOpaqueInstance;
   }
@@ -142,6 +151,7 @@ private:
   MaterialHandle m_defaultOpaque;
   MaterialHandle m_defaultTransparent;
   MaterialHandle m_defaultBlit;
+  MaterialHandle m_defaultSkybox;
   MaterialHandle m_errorMaterial;
 
   MaterialInstanceHandle m_defaultOpaqueInstance;

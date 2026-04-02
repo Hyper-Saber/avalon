@@ -4,7 +4,7 @@ export module avalon.scene:visibility_system;
 import avalon.ecs;
 import avalon.graphics;
 import avalon.core;
-import :components;
+import :camera_component;
 import :types;
 
 namespace avalon::ecs {
@@ -24,6 +24,10 @@ class VisibilitySystem final : public RenderSystemBase<VisibilitySystem> {
       outSnapshot.camera.projection = cam.projectionMatrix;
       outSnapshot.camera.viewProjection =
           outSnapshot.camera.projection * outSnapshot.camera.view;
+      outSnapshot.camera.invView = outSnapshot.camera.view.Inverse();
+      outSnapshot.camera.invProjection = cam.inverseProjectionMatrix;
+      outSnapshot.camera.invViewProjection =
+          outSnapshot.camera.viewProjection.Inverse();
       outSnapshot.camera.worldPosition =
           Vec4::FromVec3(trans.GetWorldPosition());
 

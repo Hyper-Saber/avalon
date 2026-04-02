@@ -9,8 +9,10 @@ import avalon.window;
 
 export namespace avalon::input {
 
-class InputManager {
+class InputManager final : public NonCopyable,
+                           public mem::AutoDestroyable<InputManager> {
 public:
+  ~InputManager() = default;
   void LoadMapping(InputMapping &&mapping) {
     m_actions.Swap(mapping.actions);
     m_triggers.Swap(mapping.triggers);
@@ -22,12 +24,12 @@ public:
     m_actions[name] = {
         .button = button,
         .key = key,
-        .mouseButton = EMouseButton::Last,
+        .mouseButton = EMouseButton::None,
     };
   }
 
   void BindAction(StringId name, EGamepadButton button,
-                  EMouseButton key = EMouseButton::Last) {
+                  EMouseButton key = EMouseButton::None) {
     m_actions[name] = {
         .button = button,
         .key = EKeyCode::Unknown,
@@ -40,12 +42,12 @@ public:
     m_triggers[name] = {
         .axis = axis,
         .key = key,
-        .mouseButton = EMouseButton::Last,
+        .mouseButton = EMouseButton::None,
     };
   }
 
   void BindTrigger(StringId name, EGamepadAxis axis,
-                   EMouseButton mouseButton = EMouseButton::Last) {
+                   EMouseButton mouseButton = EMouseButton::None) {
     m_triggers[name] = {
         .axis = axis,
         .key = EKeyCode::Unknown,
@@ -82,14 +84,14 @@ public:
       return false;
 
     if (playerIndex < m_current.activeGamepadCount &&
-        binding->button != EGamepadButton::Last) {
+        binding->button != EGamepadButton::None) {
       if (m_current.gamepads[playerIndex].IsPressed(binding->button))
         return true;
     }
     if (binding->key != EKeyCode::Unknown)
       return m_current.IsKeyPressed(binding->key);
 
-    return binding->mouseButton != EMouseButton::Last &&
+    return binding->mouseButton != EMouseButton::None &&
            m_current.IsMouseButtonPressed(binding->mouseButton);
   }
 
@@ -101,7 +103,7 @@ public:
     bool curr = IsActionHolding(name, playerIndex);
     bool prev = false;
     if (playerIndex < m_previous.activeGamepadCount &&
-        binding->button != EGamepadButton::Last) {
+        binding->button != EGamepadButton::None) {
       if (m_previous.gamepads[playerIndex].IsPressed(binding->button))
         prev = true;
     }
@@ -109,7 +111,7 @@ public:
       if (binding->key != EKeyCode::Unknown) {
         prev = m_previous.IsKeyPressed(binding->key);
       } else {
-        prev = binding->mouseButton != EMouseButton::Last &&
+        prev = binding->mouseButton != EMouseButton::None &&
                m_previous.IsMouseButtonPressed(binding->mouseButton);
       }
     }
@@ -122,7 +124,7 @@ public:
       return 0.0f;
 
     if (playerIndex < m_current.activeGamepadCount &&
-        binding->axis != EGamepadAxis::Last) {
+        binding->axis != EGamepadAxis::None) {
       float value = m_current.gamepads[playerIndex].GetAxis(binding->axis);
       if (Abs(value) > 0.0f)
         return value;
@@ -132,7 +134,7 @@ public:
       return m_current.IsKeyPressed(binding->key) ? 1.0f : 0.0f;
     }
 
-    return binding->mouseButton != EMouseButton::Last &&
+    return binding->mouseButton != EMouseButton::None &&
                    m_current.IsMouseButtonPressed(binding->mouseButton)
                ? 1.0f
                : 0.0f;
@@ -201,5 +203,9 @@ private:
 
   float m_mouseSensitivity = 0.05f;
 };
+
+inline auto &GetInputManager() {
+  return GetContext().GetService<InputManager>(EEngineService::InputManager);
+}
 
 } // namespace avalon::input

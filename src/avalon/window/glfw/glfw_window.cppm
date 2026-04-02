@@ -182,6 +182,7 @@ public:
 private:
   bool GetGamepadState(int joystickId, GamepadState &outState) const {
     GLFWgamepadstate glfwState;
+
     if (glfwGetGamepadState(joystickId, &glfwState)) {
       outState.isConnected = true;
 
@@ -189,11 +190,21 @@ private:
         outState.buttons[i] = (glfwState.buttons[i] == GLFW_PRESS);
       }
 
-      for (int i = 0; i <= GLFW_GAMEPAD_AXIS_LAST; ++i) {
+      for (int i = 0; i <= GLFW_GAMEPAD_AXIS_RIGHT_Y; ++i) {
         outState.axes[i] = glfwState.axes[i];
       }
+
+      auto normalizeTrigger = [](float v) { return (v + 1.0f) * 0.5f; };
+
+      outState.axes[static_cast<size_t>(EGamepadAxis::LT)] =
+          normalizeTrigger(glfwState.axes[GLFW_GAMEPAD_AXIS_LEFT_TRIGGER]);
+
+      outState.axes[static_cast<size_t>(EGamepadAxis::RT)] =
+          normalizeTrigger(glfwState.axes[GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER]);
+
       return true;
     }
+
     outState.isConnected = false;
     return false;
   }

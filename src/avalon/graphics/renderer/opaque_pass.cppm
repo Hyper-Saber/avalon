@@ -11,7 +11,7 @@ import :types;
 import :utils;
 import :renderer_types;
 
-export namespace avalon::graphics {
+namespace avalon::graphics {
 
 class OpaquePass final : public RenderPass<OpaquePass> {
 public:

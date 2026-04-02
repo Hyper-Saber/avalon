@@ -8,14 +8,14 @@ export namespace avalon::input {
 enum class EAxisSource { Gamepad, Keyboard, Mouse };
 
 struct ActionBinding {
-  EGamepadButton button = EGamepadButton::Last;
+  EGamepadButton button = EGamepadButton::None;
   EKeyCode key = EKeyCode::Unknown;
   bool isMouse = false;
   EMouseButton mouseButton = EMouseButton::Left;
 };
 
 struct TriggerBinding {
-  EGamepadAxis axis = EGamepadAxis::Last;
+  EGamepadAxis axis = EGamepadAxis::None;
   EKeyCode key = EKeyCode::Unknown;
   EMouseButton mouseButton = EMouseButton::Left;
 };

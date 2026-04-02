@@ -12,8 +12,10 @@ import avalon.window;
 import avalon.rhi;
 import avalon.shader;
 import avalon.graphics;
+import avalon.physics;
 import :utils;
 import :application;
+import avalon.input;
 
 namespace avalon {
 
@@ -95,22 +97,35 @@ auto Engine::Initialize(const EngineConfig &config,
       EEngineService::MeshManager, *m_rhi.Get());
   GetContext().RegisterService<graphics::MaterialManager>(
       EEngineService::MaterialManager);
+  GetContext().RegisterService<input::InputManager>(
+      EEngineService::InputManager);
 
-  auto shaderHandle = graphics::GetShaderManager().GetOrCreateShader(
-      Path(vfs::kShaderFolderVirtualPath) / StringView("lit.hlsl"));
-
+  auto &shaderManager = graphics::GetShaderManager();
   auto &materialManager = graphics::GetMaterialManager();
+
+  auto shaderHandle = shaderManager.GetOrCreateShader(
+      Path(vfs::kShaderFolderVirtualPath) / StringView("lit.hlsl"));
   auto materialHandle =
-      materialManager.CreateMaterial(shaderHandle, "default"_id);
+      materialManager.CreateMaterial(shaderHandle, "Default"_id);
   materialManager.SetDefaultOpaque(materialHandle);
 
-  shaderHandle = graphics::GetShaderManager().GetOrCreateShader(
+  shaderHandle = shaderManager.GetOrCreateShader(
       Path(vfs::kShaderFolderVirtualPath) / StringView("blit.hlsl"));
-
-  materialHandle = materialManager.CreateMaterial(shaderHandle, "blit"_id);
+  materialHandle = materialManager.CreateMaterial(shaderHandle, "Blit"_id);
   materialManager.SetDefaultBlit(materialHandle);
 
+  shaderHandle = shaderManager.GetOrCreateShader(
+      Path(vfs::kShaderFolderVirtualPath) / StringView("skybox.hlsl"));
+  materialHandle = materialManager.CreateMaterial(shaderHandle, "Skybox"_id);
+  auto material = materialManager.Resolve(materialHandle);
+  material->SetDepthComplieOp(rhi::ECompareOp::GreaterOrEqual);
+  material->DisableDepthTest();
+  material->DisableDepthWrite();
+  materialManager.SetDefaultSkyBox(materialHandle);
+
   m_scene = MakeUnique<scene::Scene>();
+
+  m_scene->GetWorld().AddSystem<ecs::PhysicsSystem>();
   m_userApp->OnInitialize(*m_scene.Get(), *m_rhi.Get(), {width, height});
   return {};
 }
@@ -123,6 +138,7 @@ void Engine::Run() {
   bool isRequestExit = false;
   while (!m_window->ShouldClose() && !isRequestExit) {
     m_window->PollEvents();
+    input::GetInputManager().Update(m_window->GetInputSnapshot());
 
     auto currentTime = std::chrono::steady_clock::now();
     m_deltaTime =

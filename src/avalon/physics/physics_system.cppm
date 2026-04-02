@@ -1,6 +1,6 @@
 module;
-export module avalon.physics:systems;
-import :components;
+export module avalon.physics:physics_system;
+import :rigidbody_component;
 
 import avalon.core;
 import avalon.ecs;

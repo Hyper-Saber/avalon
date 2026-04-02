@@ -196,8 +196,8 @@ public:
           .y = static_cast<float>(node.renderArea.offset.y),
           .width = static_cast<float>(node.renderArea.extent.width),
           .height = static_cast<float>(node.renderArea.extent.height),
-          .minDepth = 1.0f,
-          .maxDepth = 0.0f,
+          .minDepth = 0.0f,
+          .maxDepth = 1.0f,
       };
 
       cmd.SetViewport(port);

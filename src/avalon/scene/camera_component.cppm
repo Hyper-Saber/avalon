@@ -1,5 +1,5 @@
 module;
-export module avalon.scene:components;
+export module avalon.scene:camera_component;
 
 import :types;
 import avalon.core;
@@ -12,10 +12,13 @@ struct AVALON_SCENE_API CameraComponent {
   float fov = 60.f;
   float aspectRatio = 16.f / 9.f;
   float nearPlane = 0.1f;
-  float farPlane = 10.f;
 
   bool isDirty = true;
   Matrix4x4 projectionMatrix;
+  Matrix4x4 inverseProjectionMatrix;
+
+  float sensitivity = 1.5f;
+  Vec3 currentRotation = {0, 0, 0};
 
   void SetFov(float fov) {
     this->fov = fov;
@@ -32,28 +35,15 @@ struct AVALON_SCENE_API CameraComponent {
     isDirty = true;
   }
 
-  void setFarPlane(float farPlane) {
-    this->farPlane = farPlane;
-    isDirty = true;
-  }
-
   void UpdateProjectionMatrix() {
     if (!isDirty)
       return;
 
-    projectionMatrix =
-        CalculatePerspectiveMatrix(fov, aspectRatio, nearPlane, farPlane);
+    projectionMatrix = CalculatePerspectiveMatrix(fov, aspectRatio, nearPlane);
+    inverseProjectionMatrix =
+        CalculateInversePerspective(fov, aspectRatio, nearPlane);
     isDirty = false;
   }
-};
-
-struct LightComponent {
-  scene::ELightType type = scene::ELightType::Directional;
-  Color color = Color(1.f, 1.f, 1.f, 1.f);
-  float intensity = 1.f;
-  float range = 10.f;
-  float spotInnerRadians = 1.f;
-  float spotOuterRadians = 2.f;
 };
 
 } // namespace avalon::ecs

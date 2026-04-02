@@ -14,7 +14,7 @@ struct InputMapping {
 
     map.actions["Jump"_id] = {
         .button = EGamepadButton::A,
-        .key = EKeyCode::Backspace,
+        .key = EKeyCode::Space,
     };
     map.actions["Interact"_id] = {
         .button = EGamepadButton::X,
@@ -51,6 +51,49 @@ struct InputMapping {
         .right = EKeyCode::D,
     };
     map.axes["Look"_id] = {
+        .source = EAxisSource::Gamepad,
+        .isLeftAxis = false,
+    };
+
+    return map;
+  }
+
+  static InputMapping CreateDefaultDrone() {
+    InputMapping map;
+
+    map.actions["Menu"_id] = {
+        .button = EGamepadButton::Start,
+        .key = EKeyCode::Escape,
+    };
+
+    map.triggers["Ascend"_id] = {
+        .axis = EGamepadAxis::RT,
+        .key = EKeyCode::Space,
+    };
+    map.triggers["Descend"_id] = {
+        .axis = EGamepadAxis::LT,
+        .key = EKeyCode::LeftShift,
+    };
+
+    map.actions["RollLeft"_id] = {
+        .button = EGamepadButton::LB,
+        .key = EKeyCode::Q,
+    };
+    map.actions["RollRight"_id] = {
+        .button = EGamepadButton::RB,
+        .key = EKeyCode::E,
+    };
+
+    map.axes["FlightMove"_id] = {
+        .source = EAxisSource::Gamepad,
+        .isLeftAxis = true,
+        .up = EKeyCode::W,
+        .down = EKeyCode::S,
+        .left = EKeyCode::A,
+        .right = EKeyCode::D,
+    };
+
+    map.axes["CameraLook"_id] = {
         .source = EAxisSource::Gamepad,
         .isLeftAxis = false,
     };

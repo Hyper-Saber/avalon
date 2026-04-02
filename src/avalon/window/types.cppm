@@ -74,7 +74,7 @@ enum class EKeyCode : uint16_t {
   Escape = 256,
   Enter,
   Tab,
-  Backspace,
+  Space,
   Insert,
   Delete,
   Right,
@@ -118,7 +118,7 @@ enum class EMouseButton : int {
   Middle = 2,
   Button4 = 3,
   Button5 = 4,
-  Last = Button5
+  None = 5,
 };
 
 enum class EGamepadButton : int {
@@ -137,7 +137,7 @@ enum class EGamepadButton : int {
   Right,
   Down,
   Left,
-  Last = Left
+  None,
 };
 
 enum class EGamepadAxis : int {
@@ -147,7 +147,7 @@ enum class EGamepadAxis : int {
   RightY = 3,
   LT = 4,
   RT = 5,
-  Last = RT
+  None = 6,
 };
 
 struct GamepadState {
@@ -161,6 +161,11 @@ struct GamepadState {
 
   float GetAxis(EGamepadAxis axis, float deadzone = 0.1f) const {
     float val = axes[static_cast<size_t>(axis)];
+
+    if (axis == EGamepadAxis::LT || axis == EGamepadAxis::RT) {
+      return (val < deadzone) ? 0.0f : val;
+    }
+
     return (val > -deadzone && val < deadzone) ? 0.0f : val;
   }
 };
@@ -201,6 +206,36 @@ struct FrameInputSnapshot {
 
   bool IsMouseButtonPressed(EMouseButton button) const {
     return mouseButtons[static_cast<size_t>(button)];
+  }
+
+  String ToString() const {
+    String res = "InputSnapshot:\n";
+
+    res +=
+        String::Format("  Mouse: ({:.2f}, {:.2f}) | Scroll: ({:.2f}, {:.2f})\n",
+                       mouseX, mouseY, scrollX, scrollY);
+
+    String mb = "  Buttons: [ ";
+    for (size_t i = 0; i < mouseButtons.size(); ++i) {
+      if (mouseButtons[i])
+        mb += String::Format("{} ", i);
+    }
+    res += mb + "]\n";
+
+    res += "  Keyboard: (Active Keys in buffer)\n";
+
+    res += String::Format("  Gamepads: (Active: {})\n", activeGamepadCount);
+    for (uint32_t i = 0; i < activeGamepadCount; ++i) {
+      const auto &pad = gamepads[i];
+      res += String::Format(
+          "    [{}] LX: {:.2f}, LY: {:.2f} | RX: {:.2f}, RY: {:.2f} | LT: "
+          "{:.2f}, RT: {:.2f}\n",
+          i, pad.GetAxis(EGamepadAxis::LeftX), pad.GetAxis(EGamepadAxis::LeftY),
+          pad.GetAxis(EGamepadAxis::RightX), pad.GetAxis(EGamepadAxis::RightY),
+          pad.GetAxis(EGamepadAxis::LT), pad.GetAxis(EGamepadAxis::RT));
+    }
+
+    return res;
   }
 };
 

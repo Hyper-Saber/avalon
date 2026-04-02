@@ -1,5 +1,5 @@
 module;
-export module avalon.graphics:blit_pass;
+export module avalon.graphics:skybox_pass;
 
 import avalon.core;
 import avalon.rhi;
@@ -12,33 +12,32 @@ import :renderer_types;
 
 namespace avalon::graphics {
 
-class BlitPass final : public RenderPass<BlitPass> {
+class SkyboxPass final : public RenderPass<SkyboxPass> {
 public:
   void Setup(RenderGraphBuilder &builder) override {
-    m_outputHandle =
+    m_colorHandle =
         builder.Write(kSwapchainColor, rhi::EResourceUsage::Present);
   }
 
-  void OnCompile(rhi::IRhi &rhi) override {
-    m_blitMaterialHandle = GetMaterialManager().GetDefaultBlit();
-  }
+  void OnCompile(rhi::IRhi &rhi) override {}
 
   void Execute(rhi::ICommandBuffer &cmd, RenderContext &context) override {
-    auto *material = GetMaterialManager().Resolve(m_blitMaterialHandle);
-    if (!material)
+    const auto &handle = GetMaterialManager().GetDefaultSkybox();
+    if (!handle.IsValid()) [[unlikely]]
       return;
+
+    auto material = GetMaterialManager().Resolve(handle);
 
     auto pipeline = material->GetOrCreatePipeline(
         context.rhi, context.pipelineRenderingInfo);
-    cmd.BindPipeline(pipeline);
 
+    cmd.BindPipeline(pipeline);
     cmd.Draw(3, 1, 0, 0);
   }
 
 private:
-  VirtualResourceHandle m_inputHandle;
-  VirtualResourceHandle m_outputHandle;
-  MaterialHandle m_blitMaterialHandle;
+  VirtualResourceHandle m_colorHandle;
+  VirtualResourceHandle m_depthHandle;
 };
 
 } // namespace avalon::graphics

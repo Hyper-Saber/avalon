@@ -19,7 +19,7 @@ target "avalon.core"
 
     add_includedirs("..", {public = true})
     add_includedirs("core", {public = true})
-    add_packages("spdlog")
+    add_packages("spdlog", "glm")
     add_syslinks("stdc++exp")
 
 
@@ -112,6 +112,6 @@ target "avalon.engine"
     set_kind "shared"
     add_avalon_api_rules("avalon.engine")
     add_deps("avalon.core", "avalon.window", "avalon.rhi", "avalon.shader", "avalon.graphics", "avalon.ecs", "avalon.scene", "avalon.physics")
-    add_deps("avalon.rhi.vulkan", "avalon.window.glfw")
+    add_deps("avalon.rhi.vulkan", "avalon.window.glfw", "avalon.input")
     add_files("engine/*.cppm", {public = true})
     add_files("engine/*.cpp")

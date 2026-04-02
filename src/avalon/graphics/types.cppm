@@ -37,32 +37,39 @@ struct Frustum {
   Plane planes[6];
 
   void Update(const Matrix4x4 &vp) {
-    planes[0].normal = {vp[3][0] + vp[0][0], vp[3][1] + vp[0][1],
-                        vp[3][2] + vp[0][2]};
-    planes[0].distance = vp[3][3] + vp[0][3];
 
-    planes[1].normal = {vp[3][0] - vp[0][0], vp[3][1] - vp[0][1],
-                        vp[3][2] - vp[0][2]};
-    planes[1].distance = vp[3][3] - vp[0][3];
+    // Left: row3 + row0
+    planes[0].normal = {vp[0][3] + vp[0][0], vp[1][3] + vp[1][0],
+                        vp[2][3] + vp[2][0]};
+    planes[0].distance = vp[3][3] + vp[3][0];
 
-    planes[2].normal = {vp[3][0] - vp[1][0], vp[3][1] - vp[1][1],
-                        vp[3][2] - vp[1][2]};
-    planes[2].distance = vp[3][3] - vp[1][3];
+    // Right: row3 - row0
+    planes[1].normal = {vp[0][3] - vp[0][0], vp[1][3] - vp[1][0],
+                        vp[2][3] - vp[2][0]};
+    planes[1].distance = vp[3][3] - vp[3][0];
 
-    planes[3].normal = {vp[3][0] + vp[1][0], vp[3][1] + vp[1][1],
-                        vp[3][2] + vp[1][2]};
-    planes[3].distance = vp[3][3] + vp[1][3];
+    // Bottom: row3 + row1
+    planes[2].normal = {vp[0][3] + vp[0][1], vp[1][3] + vp[1][1],
+                        vp[2][3] + vp[2][1]};
+    planes[2].distance = vp[3][3] + vp[3][1];
 
-    planes[4].normal = {vp[3][0] - vp[2][0], vp[3][1] - vp[2][1],
-                        vp[3][2] - vp[2][2]};
-    planes[4].distance = vp[3][3] - vp[2][3];
+    // Top: row3 - row1
+    planes[3].normal = {vp[0][3] - vp[0][1], vp[1][3] - vp[1][1],
+                        vp[2][3] - vp[2][1]};
+    planes[3].distance = vp[3][3] - vp[3][1];
 
-    planes[5].normal = {-vp[2][0], -vp[2][1], -vp[2][2]};
-    planes[5].distance = -vp[2][3];
+    // Near Plane: row3 - row2  (当 z=w 时，结果为0)
+    planes[4].normal = {vp[0][3] - vp[0][2], vp[1][3] - vp[1][2],
+                        vp[2][3] - vp[2][2]};
+    planes[4].distance = vp[3][3] - vp[3][2];
+
+    // Far Plane: 直接就是 row2 (当 z=0 时，结果为0)
+    planes[5].normal = {vp[0][2], vp[1][2], vp[2][2]};
+    planes[5].distance = vp[3][2];
 
     for (int i = 0; i < 6; ++i) {
       float length = planes[i].normal.Length();
-      if (length > kEpsilon) {
+      if (length > 1e-6f) {
         float invLen = 1.0f / length;
         planes[i].normal *= invLen;
         planes[i].distance *= invLen;

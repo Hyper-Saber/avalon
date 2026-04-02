@@ -161,6 +161,9 @@ struct RenderView {
   Matrix4x4 view;
   Matrix4x4 projection;
   Matrix4x4 viewProjection;
+  Matrix4x4 invView;
+  Matrix4x4 invProjection;
+  Matrix4x4 invViewProjection;
   Vec4 worldPosition;
 };
 

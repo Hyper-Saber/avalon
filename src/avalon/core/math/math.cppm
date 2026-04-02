@@ -89,8 +89,6 @@ inline Vec3 Normalize(const Vec3 &v) {
     return {v.x * invLen, v.y * invLen, v.z * invLen};
   }
 
-  AVALON_ASSERT_MSG(false, "Attempting to normalize a zero-length vector!");
-
   return {0.0f, 0.0f, 0.0f};
 }
 
@@ -105,8 +103,6 @@ inline Vec2 Normalize(const Vec2 &v) {
     float invLen = 1.0f / std::sqrt(lenSq);
     return {v.x * invLen, v.y * invLen};
   }
-
-  AVALON_ASSERT_MSG(false, "Attempting to normalize a zero-length vector!");
 
   return {0.0f, 0.0f};
 }
@@ -195,17 +191,35 @@ inline Matrix4x4 Rotate(const Vec3 &rotation) {
 }
 
 inline Matrix4x4 CalculatePerspectiveMatrix(float fovDeg, float aspect,
-                                            float near, float far) {
+                                            float near) {
   float const fov = ToRadians(fovDeg);
   float h = 1.0f / std::tan(fov / 2.0f);
   float w = h / aspect;
   Matrix4x4 res;
   res.data[0][0] = w;
   res.data[1][1] = -h;
-  res.data[2][2] = near / (far - near);
+  res.data[2][2] = 0;
   res.data[2][3] = -1.0f;
-  res.data[3][2] = (far * near) / (far - near);
+  res.data[3][2] = near;
   res.data[3][3] = 0;
+  return res;
+}
+
+inline Matrix4x4 CalculateInversePerspective(float fovDeg, float aspect,
+                                             float near) {
+  float const fov = ToRadians(fovDeg);
+  float h = 1.0f / std::tan(fov / 2.0f);
+  float w = h / aspect;
+
+  Matrix4x4 res;
+  res.data[0][0] = 1.0f / w;
+  res.data[1][1] = 1.0f / (-h);
+
+  res.data[2][2] = 0.0f;
+  res.data[3][2] = -1.0f;
+  res.data[2][3] = 1.0f / near;
+  res.data[3][3] = 0.0f;
+
   return res;
 }
 

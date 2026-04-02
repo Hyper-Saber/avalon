@@ -21,12 +21,16 @@
 
 #define mMaterial uMaterials[mMaterialIndex]
 
-#define PI 3.14159265359
+#define kPi 3.14159265359
+#define kEpsilon 1e-6
 
 struct Camera {
   float4x4 view;
   float4x4 projection;
   float4x4 viewProjection;
+  float4x4 invView;
+  float4x4 invProjection;
+  float4x4 invViewProjection;
   float4 cameraPosition;
 };
 
@@ -69,7 +73,7 @@ struct ModelData {
 struct StandardPushConstants {
   ModelData model;
   uint materialIdx;
-  uint padding[7];
+  uint textureIndices[7];
 };
 
 VK_BINDING(0, 0) StructuredBuffer<MaterialData> uMaterials

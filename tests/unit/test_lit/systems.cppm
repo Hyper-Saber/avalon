@@ -37,4 +37,5 @@ class UpdateLightSystem : public ecs::SystemBase<UpdateLightSystem> {
     view.Foreach([&](auto &light, auto &transform) {});
   }
 };
+
 } // namespace avalon::ecs

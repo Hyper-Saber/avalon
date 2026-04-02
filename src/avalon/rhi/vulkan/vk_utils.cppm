@@ -208,6 +208,8 @@ constexpr auto ToVkImageLayout(EResourceLayout layout) noexcept
     return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
   case EResourceLayout::DepthStencilAttachment:
     return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+  case EResourceLayout::DepthStencilReadOnly:
+    return VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
   case EResourceLayout::ShaderReadOnly:
     return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
   case EResourceLayout::Present:

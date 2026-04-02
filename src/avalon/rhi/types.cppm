@@ -153,6 +153,7 @@ enum class EResourceLayout {
   Undefined,
   ColorAttachment,
   DepthStencilAttachment,
+  DepthStencilReadOnly,
   ShaderReadOnly,
   Present,
   TransferSrc,
@@ -357,6 +358,7 @@ template <> struct EnableBitmaskOperators<EPipelineStage> : std::true_type {};
 //---------------------------------------------------------------------------------------------------------------------
 
 constexpr uint32_t kMaxTextureSlots = 7;
+constexpr uint32_t kInvalidTextureSlot = 0xFFFF;
 
 struct alignas(16) StandardPushConstant {
   Matrix4x4 model;
@@ -701,8 +703,8 @@ struct MultisampleState {
 struct ColorBlendState {
   bool isEnable = false;
   EBlendOp colorOp = EBlendOp::Add;
-  EBlendFactor srcColorFactor = EBlendFactor::One;
-  EBlendFactor dstColorFactor = EBlendFactor::Zero;
+  EBlendFactor srcColorFactor = EBlendFactor::SrcAlpha;
+  EBlendFactor dstColorFactor = EBlendFactor::OneMinusSrcAlpha;
   EBlendOp alphaOp = EBlendOp::Add;
   EBlendFactor srcAlphaFactor = EBlendFactor::One;
   EBlendFactor dstAlphaFactor = EBlendFactor::Zero;
@@ -893,6 +895,7 @@ struct DepthStencilAttachmentInfo {
   EAttachmentStoreOp storeOp = EAttachmentStoreOp::Store;
   float clearDepth = 1.0f;
   uint32_t clearStencil = 0;
+  EResourceLayout layout = EResourceLayout::DepthStencilAttachment;
 };
 
 struct RenderingInfo {
@@ -934,8 +937,8 @@ struct ImageCopyRegion {
 };
 
 struct StaticSamplers {
-  SamplerHandle linearClamp;
-  SamplerHandle pointClamp;
+  uint32_t linearClamp;
+  uint32_t pointClamp;
 };
 
 struct ResourceState {

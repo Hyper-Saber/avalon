@@ -21,9 +21,9 @@ public:
   StringId GetName() const override { return "ForwardPipeline"_id; }
 
   void Setup(RenderGraphBuilder &builder, const RenderPacket &packet) override {
-    // auto &pass = builder.AddPass<OpaquePass>("Opaque"_id);
-    // auto &pass = builder.AddPass<BlitPass>("Blit"_id);
-    auto &pass = builder.AddPass<SkyboxPass>("Skybox"_id);
+    builder.AddPass<OpaquePass>("Opaque"_id);
+    builder.AddPass<SkyboxPass>("Skybox"_id);
+    builder.AddPass<BlitPass>("Blit"_id);
   }
 
 private:

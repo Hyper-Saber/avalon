@@ -34,11 +34,11 @@ public:
   }
 
   void Compile() {
-    HashMap<uint32_t, uint32_t> producerMap;
+    HashMap<VirtualResourceHandle, uint32_t> producerMap;
 
     for (uint32_t i = 0; i < m_nodes.GetSize(); i++) {
       for (auto request : m_nodes[i].outputs) {
-        producerMap.Insert(request.handle.GetIndex(), i);
+        producerMap.Insert(request.handle, i);
       }
     }
 
@@ -52,8 +52,8 @@ public:
 
       node.isCulled = false;
       for (auto request : node.inputs) {
-        if (producerMap.Contains(request.handle.GetIndex())) {
-          self(*producerMap.Get(request.handle.GetIndex()));
+        if (producerMap.Contains(request.handle)) {
+          self(*producerMap.Get(request.handle));
         }
       }
     };
@@ -74,7 +74,7 @@ public:
       if (m_nodes[i].isCulled)
         continue;
       for (auto request : m_nodes[i].inputs) {
-        if (auto *pProducerIndex = producerMap.Get(request.handle.GetIndex())) {
+        if (auto *pProducerIndex = producerMap.Get(request.handle)) {
           adjacencyList[*pProducerIndex].PushBack(i);
           inDegrees[i]++;
         }
@@ -160,7 +160,8 @@ public:
               .loadOp = output.loadOp,
               .storeOp = output.storeOp,
               .clearDepth = output.clearValue.depthStencil.depth,
-              .clearStencil = output.clearValue.depthStencil.stencil};
+              .clearStencil = output.clearValue.depthStencil.stencil,
+              .layout = MapUsageToLayout(fixedUsage)};
           context.pipelineRenderingInfo.depthAttachmentFormat = resDesc.format;
           if (HasStencilComponent(resDesc.format))
             context.pipelineRenderingInfo.stencilAttachmentFormat =
@@ -170,13 +171,16 @@ public:
               {.texture = physicalHandle,
                .loadOp = output.loadOp,
                .storeOp = output.storeOp,
-               .clearColor = output.clearValue.color});
+               .clearColor = output.clearValue.color,
+               .layout = MapUsageToLayout(fixedUsage)});
           context.pipelineRenderingInfo.colorAttachmentFormats.PushBack(
               resDesc.format);
         }
       }
 
       for (auto &input : node.inputs) {
+        if (input.usage == rhi::EResourceUsage::None)
+          continue;
         auto physicalHandle = m_resourceManager.GetPhysical(input.handle);
         if (physicalHandle.IsValid()) {
           cmd.Transition(physicalHandle, input.usage);
@@ -218,7 +222,7 @@ private:
   struct ResourceRequest {
     StringId nameHash;
     VirtualResourceHandle handle;
-    rhi::EResourceUsage usage;
+    rhi::EResourceUsage usage = rhi::EResourceUsage::None;
     rhi::EAttachmentLoadOp loadOp = rhi::EAttachmentLoadOp::DontCare;
     rhi::EAttachmentStoreOp storeOp = rhi::EAttachmentStoreOp::DontCare;
     rhi::ClearValue clearValue;
@@ -254,6 +258,14 @@ private:
       -> VirtualResourceHandle {
     auto handleIndex = m_resourceManager.GetOrCreateVirtualResouceIndex(desc);
     auto &node = GetNode(&owner);
+    if (!m_resourceManager.IsFirstGeneration(handleIndex)) {
+      auto handle = m_resourceManager.GetVirtualResource(handleIndex);
+      if (!handle.IsExternal()) {
+        node.inputs.PushBack({
+            .handle = m_resourceManager.GetVirtualResource(handleIndex),
+        });
+      }
+    }
     auto handle = m_resourceManager.IncreaseGeneration(handleIndex);
     node.outputs.PushBack({.handle = handle, .usage = desc.usage});
     node.renderArea.extent = desc.extent;

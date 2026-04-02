@@ -130,7 +130,14 @@ public:
     m_defaultTransparentInstance = CreateMaterialInstance(m_defaultTransparent);
   }
 
-  void SetDefaultBlit(MaterialHandle handle) { m_defaultBlit = handle; }
+  void SetDefaultBlit(MaterialHandle handle) {
+    m_defaultBlit = handle;
+    if (m_defaultBlitInstance.IsValid()) {
+      m_materialInstancePool.Release(m_defaultBlitInstance);
+    }
+    m_defaultBlitInstance = CreateMaterialInstance(m_defaultBlit);
+  }
+
   void SetDefaultSkyBox(MaterialHandle handle) { m_defaultSkybox = handle; }
   void SetErrorMaterial(MaterialHandle handle) { m_errorMaterial = handle; }
 
@@ -146,6 +153,9 @@ public:
   auto GetDefaultTransparentInstance() const -> MaterialInstanceHandle {
     return m_defaultTransparentInstance;
   }
+  auto GetDefaultBlitInstance() const -> MaterialInstanceHandle {
+    return m_defaultBlitInstance;
+  }
 
 private:
   MaterialHandle m_defaultOpaque;
@@ -156,6 +166,7 @@ private:
 
   MaterialInstanceHandle m_defaultOpaqueInstance;
   MaterialInstanceHandle m_defaultTransparentInstance;
+  MaterialInstanceHandle m_defaultBlitInstance;
 
   HashMap<StringId, MaterialHandle> m_materials;
   mem::ResourcePool<Material> m_materialPool;

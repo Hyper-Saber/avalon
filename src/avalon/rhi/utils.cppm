@@ -1,6 +1,5 @@
 module;
 #include <cstdint>
-#include <cstdint>
 export module avalon.rhi:utils;
 import :types;
 
@@ -117,6 +116,11 @@ constexpr EResourceLayout MapUsageToLayout(EResourceUsage usage) noexcept {
   using enum EResourceUsage;
   if (usage == None)
     return EResourceLayout::Undefined;
+
+  if (HasFlag(usage, EResourceUsage::DepthStencilAttachment) &&
+      HasFlag(usage, EResourceUsage::ReadOnly)) {
+    return EResourceLayout::DepthStencilReadOnly;
+  }
 
   if (HasFlag(usage, Present))
     return EResourceLayout::Present;
@@ -527,6 +531,8 @@ constexpr StringView ToView(EResourceLayout e) {
     return "ColorAttachment";
   case EResourceLayout::DepthStencilAttachment:
     return "DepthStencilAttachment";
+  case EResourceLayout::DepthStencilReadOnly:
+    return "DepthStencilReadOnly";
   case EResourceLayout::ShaderReadOnly:
     return "ShaderReadOnly";
   case EResourceLayout::Present:
@@ -629,4 +635,3 @@ String DepthStencilState::ToString() const {
       isStencilTestEnable);
 }
 } // namespace avalon::rhi
-

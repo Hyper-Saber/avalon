@@ -14,12 +14,12 @@
 #define uResolution uSceneGlobals.resolution
 
 #define mModel push.model.model
-// #define mModelView push.model.modelView
-// #define mMVP push.model.mvp
 #define mNormalMatrix push.model.normalMatrix
 #define mMaterialIndex push.materialIdx
 
 #define mMaterial uMaterials[mMaterialIndex]
+
+#define kSizeOfPushConstant
 
 #define kPi 3.14159265359
 #define kEpsilon 1e-6
@@ -62,7 +62,8 @@ struct MaterialData {
   float4 specularColor;
   float shininess;
   float f0;
-  float2 padding;
+  uint sampler;
+  float padding;
 };
 
 struct ModelData {
@@ -70,14 +71,24 @@ struct ModelData {
   float4x4 normalMatrix;
 };
 
+#ifndef CUSTOM_PUSH_TYPE
+struct DefaultCustomPush {
+  float padding[7];
+};
+#define CUSTOM_PUSH_TYPE DefaultCustomPush
+#endif
+
 struct StandardPushConstants {
   ModelData model;
   uint materialIdx;
-  uint textureIndices[7];
+  CUSTOM_PUSH_TYPE custom;
 };
+
+VK_PUSH_CONSTANT StandardPushConstants push;
 
 VK_BINDING(0, 0) StructuredBuffer<MaterialData> uMaterials
     : register(t2, space0);
+
 VK_BINDING(1, 0) Texture2D uTextures[] : register(t0, space0);
 VK_BINDING(2, 0) SamplerState uSamplers[] : register(s0, space0);
 

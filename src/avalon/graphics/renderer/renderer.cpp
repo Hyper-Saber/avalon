@@ -91,8 +91,8 @@ public:
         .extent = m_rhi.GetSwapchainExtent(),
     };
 
-    graph.ImportExternalTexture(kSwapchainColor,
-                                m_rhi.GetCurrentPresentTexture(), desc);
+    auto presentTexture = m_rhi.GetCurrentPresentTexture();
+    graph.ImportExternalTexture(kSwapchainColor, presentTexture, desc);
 
     RenderGraphBuilder builder(graph);
     m_pipeline->Setup(builder, m_packet);

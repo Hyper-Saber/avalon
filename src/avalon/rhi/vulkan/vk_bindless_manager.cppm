@@ -248,7 +248,7 @@ private:
 
     VkWriteDescriptorSet write{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                                .dstSet = m_bindlessSet,
-                               .dstBinding = 22,
+                               .dstBinding = 2,
                                .dstArrayElement = index,
                                .descriptorCount = 1,
                                .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,

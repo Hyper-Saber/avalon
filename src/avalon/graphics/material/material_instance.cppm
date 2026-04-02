@@ -27,12 +27,24 @@ public:
     return *m_dataBlob.Get();
   }
 
+  uint32_t GetTextureSlot(StringId nameHash) const {
+    auto texture = m_textureMap.Get(nameHash);
+    if (texture)
+      return texture->pushConstantTextureSlot;
+    return kInvalidTextureSlot;
+  }
+
   auto GetTextureSlots() const -> Span<const uint32_t> {
     return {&m_textureSlots[0], m_textureSlots.size()};
   }
 
   void SetTexture(StringId nameHash, rhi::TextureHandle handle) {
     auto texture = m_textureMap.Get(nameHash);
+    if (!texture) {
+      Error("[Material]: Texture {} not exsit!", nameHash.Resolve());
+      return;
+    }
+
     if (texture->handle != handle) {
       texture->handle = handle;
       m_texturePushPending.PushBack(nameHash);

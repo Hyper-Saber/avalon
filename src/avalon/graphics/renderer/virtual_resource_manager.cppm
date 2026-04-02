@@ -93,6 +93,14 @@ public:
     return m_virtualDescs[index];
   }
 
+  bool IsFirstGeneration(uint32_t index) {
+    AVALON_ASSERT_MSG(
+        index < m_currentGenerations.GetSize(),
+        String::Format(
+            "[RenderGraph]: VirtualResourceHandle index {} not exsit!", index));
+    return m_currentGenerations[index] == 0;
+  }
+
   auto IncreaseGeneration(uint32_t index) -> VirtualResourceHandle {
     AVALON_ASSERT_MSG(
         index < m_currentGenerations.GetSize(),
@@ -207,6 +215,7 @@ private:
     const uint32_t index = static_cast<uint32_t>(m_virtualDescs.GetSize());
     m_virtualDescs.PushBack(desc);
     m_currentGenerations.PushBack(0);
+    m_nameToIndex.Insert(desc.nameHash, index);
     return index;
   }
 

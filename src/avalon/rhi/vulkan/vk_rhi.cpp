@@ -553,8 +553,9 @@ void VkRhi::CreateStaticSamplers() {
       .addressModeW = EAddressMode::ClampToEdge,
   };
 
-  m_staticSamplers.linearClamp = {
-      m_resourcePool->CreateSampler(linearClampInfo).id};
+  auto handle = m_resourcePool->CreateSampler(linearClampInfo);
+  m_staticSamplers.linearClamp =
+      m_bindlessManager->RegisterSampler({handle.id});
 
   SamplerCreateInfo pointClampInfo{
       .magFilter = EFilter::Nearest,
@@ -565,8 +566,8 @@ void VkRhi::CreateStaticSamplers() {
       .addressModeW = EAddressMode::ClampToEdge,
   };
 
-  m_staticSamplers.pointClamp = {
-      m_resourcePool->CreateSampler(pointClampInfo).id};
+  handle = m_resourcePool->CreateSampler(pointClampInfo);
+  m_staticSamplers.pointClamp = m_bindlessManager->RegisterSampler({handle.id});
 }
 
 auto VkRhi::CreateSyncObjects() -> std::expected<void, ERhiResult> {

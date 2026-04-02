@@ -16,8 +16,9 @@ namespace avalon::graphics {
 class OpaquePass final : public RenderPass<OpaquePass> {
 public:
   void Setup(RenderGraphBuilder &builder) override {
-    m_colorHandle = builder.SetClearValue(ClearValue::Color(0, 0, 0.01))
-                        .Write(kSwapchainColor, rhi::EResourceUsage::Present);
+    m_colorHandle =
+        builder.SetClearValue(ClearValue::Color(0, 0, 0.01))
+            .Write(kSceneColor, rhi::EResourceUsage::ColorAttachment);
     m_depthHandle =
         builder.SetClearValue(ClearValue::DepthStencil(0, 0))
             .Write(kSceneDepth, rhi::EResourceUsage::DepthStencilAttachment);

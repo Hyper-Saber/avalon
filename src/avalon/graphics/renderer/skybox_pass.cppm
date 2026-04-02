@@ -16,10 +16,20 @@ class SkyboxPass final : public RenderPass<SkyboxPass> {
 public:
   void Setup(RenderGraphBuilder &builder) override {
     m_colorHandle =
-        builder.Write(kSwapchainColor, rhi::EResourceUsage::Present);
+        builder.SetLoadOp(rhi::EAttachmentLoadOp::Load)
+            .Write(kSceneColor, rhi::EResourceUsage::ColorAttachment);
+    m_depthHandle =
+        builder.SetLoadOp(rhi::EAttachmentLoadOp::Load)
+            .Write(kSceneDepth, rhi::EResourceUsage::DepthStencilAttachment |
+                                    rhi::EResourceUsage::ReadOnly);
   }
 
-  void OnCompile(rhi::IRhi &rhi) override {}
+  void OnCompile(rhi::IRhi &rhi) override {
+    auto &materialManager = GetMaterialManager();
+    auto material = materialManager.Resolve(materialManager.GetDefaultSkybox());
+    material->SetDepthComplieOp(rhi::ECompareOp::GreaterOrEqual);
+    material->DisableDepthWrite();
+  }
 
   void Execute(rhi::ICommandBuffer &cmd, RenderContext &context) override {
     const auto &handle = GetMaterialManager().GetDefaultSkybox();

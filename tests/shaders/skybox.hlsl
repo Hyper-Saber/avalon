@@ -27,9 +27,7 @@ float4 FsMain(VsOutput input) : SV_Target {
 
   float3 sunDir = normalize(-uMainLight.posDir.xyz);
   float sunDot = saturate(dot(dir, sunDir));
-  float sunMask = smoothstep(0.995, 1.0, sunDot);
+  float sunMask = pow(sunDot, 1000.0);
   float3 finalColor = skyColor + (sunMask * kSunColor);
-  // float3 c = height;
-  // return float4(c, 1.0);
-  return float4(finalColor, 1.0);
+  return float4(finalColor, 1);
 }

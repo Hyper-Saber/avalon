@@ -53,10 +53,10 @@ void ExtractPushConstant(SpvReflectShaderModule *pModule,
         rootBlock.size == sizeof(StandardPushConstant),
         "PushConstant block size is not equal to sizeof(StanardPushConstant)!");
     uint32_t slot = 0;
-    for (uint32_t j = 0; j < rootBlock.member_count; j++) {
-      const auto &member = rootBlock.members[j];
-
-      if (StringView(member.name).IsStartWith("u")) {
+    auto customBlock = rootBlock.members[2];
+    for (uint32_t j = 0; j < customBlock.member_count; j++) {
+      auto member = customBlock.members[j];
+      if (StringView(member.name) != "padding") {
         ShaderCustomPushConstantTextureSlot pushConstant;
         pushConstant.nameHash = StringId(member.name);
         pushConstant.textureSlot = slot++;
@@ -85,10 +85,6 @@ void AddBufferMember(const SpvReflectBlockVariable &spvMember,
   bufferMember.format = SpvTypeToEFormat(spvMember.type_description);
   bufferMember.defaultValueOffset = kNoDefaultValue;
   reflectionData.bufferMembers.PushBack(bufferMember);
-
-  // Debug("[Shader Reflection] Member: {}, Offset: {}, Size: {}, Format: {}",
-  //       fullName, bufferMember.offset, bufferMember.size,
-  //       ToView(bufferMember.format));
 }
 
 void ProcessStructMembers(const SpvReflectBlockVariable &block,
@@ -271,8 +267,8 @@ auto ReflectShader(EShaderStage stage, const void *data, size_t size)
 
   if (stage == EShaderStage::Vertex) {
     ExtractVertexInputs(&module, reflectionData);
-    ExtractPushConstant(&module, reflectionData);
   }
+  ExtractPushConstant(&module, reflectionData);
 
   ExtractDescriptorBindings(&module, reflectionData, stage);
 
@@ -384,6 +380,7 @@ public:
 
       if constexpr (platform::kIsLinux) {
         AddArg(L"-spirv");
+        // AddArg(L"-fspv-extension=SPV_EXT_descriptor_indexing");
         AddArg(L"-fspv-target-env=universal1.5");
       }
 
@@ -391,8 +388,6 @@ public:
       AddArg(L"-fspv-preserve-bindings");
       AddArg(L"-fvk-use-dx-layout");
       AddArg(L"-Zpc");
-      AddArg(L"-Fi");
-      AddDynamicArg(Utf8ToWstring(desc.filePath.GetCStr()));
 
       Path shaderPath;
       auto res = vfs::GetVfs().GetAbsolute(
@@ -408,6 +403,7 @@ public:
       AddDynamicArg(std::move(wEntryPoint));
       AddArg(L"-T");
       AddDynamicArg(std::move(wProfile));
+      AddDynamicArg(Utf8ToWstring(desc.filePath.GetCStr()));
 
       DxcPtr<IDxcResult> pResult;
 

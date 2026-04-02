@@ -104,14 +104,29 @@ public:
   void EnableDepthTest() { m_depthState.isDepthTestEnable = true; }
   void EnableDepthWrite() { m_depthState.isDepthWriteEnable = true; }
   void EnableStencilTest() { m_depthState.isStencilTestEnable = true; }
+  void EnableBlend() { m_mainBlendState.isEnable = true; }
   void DisableDepthTest() { m_depthState.isDepthTestEnable = false; }
   void DisableDepthWrite() { m_depthState.isDepthWriteEnable = false; }
   void DisableStencilTest() { m_depthState.isStencilTestEnable = false; }
-  void SetDepthComplieOp(rhi::ECompareOp op) {
+  void DisableBlend() { m_mainBlendState.isEnable = false; }
+  void SetDepthComplieOp(const rhi::ECompareOp op) {
     m_depthState.depthCompareOp = op;
   }
-  void SetCullMode(rhi::ECullMode cullMode) {
+  void SetCullMode(const rhi::ECullMode cullMode) {
     m_rasterState.cullMode = cullMode;
+  }
+  void SetBlendOp(const rhi::EBlendOp op) { m_mainBlendState.colorOp = op; }
+
+  void SetBlendColorFactor(rhi::EBlendFactor srcFactor,
+                           rhi::EBlendFactor dstFactor) {
+    m_mainBlendState.srcColorFactor = srcFactor;
+    m_mainBlendState.dstColorFactor = dstFactor;
+  }
+
+  void SetBlendAlphaFactor(rhi::EBlendFactor srcFactor,
+                           rhi::EBlendFactor dstFactor) {
+    m_mainBlendState.srcAlphaFactor = srcFactor;
+    m_mainBlendState.dstAlphaFactor = dstFactor;
   }
 
   auto GetShader() const { return m_shaderHandle; }

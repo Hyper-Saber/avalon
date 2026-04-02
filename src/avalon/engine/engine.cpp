@@ -117,10 +117,6 @@ auto Engine::Initialize(const EngineConfig &config,
   shaderHandle = shaderManager.GetOrCreateShader(
       Path(vfs::kShaderFolderVirtualPath) / StringView("skybox.hlsl"));
   materialHandle = materialManager.CreateMaterial(shaderHandle, "Skybox"_id);
-  auto material = materialManager.Resolve(materialHandle);
-  material->SetDepthComplieOp(rhi::ECompareOp::GreaterOrEqual);
-  material->DisableDepthTest();
-  material->DisableDepthWrite();
   materialManager.SetDefaultSkyBox(materialHandle);
 
   m_scene = MakeUnique<scene::Scene>();

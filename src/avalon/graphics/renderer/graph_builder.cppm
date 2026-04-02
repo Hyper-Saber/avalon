@@ -51,6 +51,8 @@ private:
   class RenderGraph &m_graph;
   IRenderPass *m_owner;
   VirtualTextureDesc m_desc{};
+  std::optional<rhi::EAttachmentLoadOp> m_loadOp;
+  std::optional<rhi::EAttachmentStoreOp> m_storeOp;
   std::optional<ClearValue> m_clearValue;
 
   VirtualResourceHandle m_currentResource;

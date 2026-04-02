@@ -15,8 +15,6 @@ struct VSOutput {
   VK_LOCATION(3) float3 worldNormal : NORMAL;
 };
 
-VK_PUSH_CONSTANT StandardPushConstants push;
-
 VSOutput VsMain(VSInput input) {
   VSOutput output;
 
@@ -31,7 +29,7 @@ VSOutput VsMain(VSInput input) {
   return output;
 }
 
-float4 FsMain(VSOutput input) : SV_TARGET {
+float4 FsMain(VSOutput input) : SV_Target {
   float3 N = normalize(input.worldNormal);
   float3 V = normalize(uCamera.cameraPosition.xyz - input.worldPos);
   float3 L = normalize(-uMainLight.posDir.xyz);

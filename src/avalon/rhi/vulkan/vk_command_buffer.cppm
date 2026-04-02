@@ -55,7 +55,7 @@ public:
           {.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
            .pNext = nullptr,
            .imageView = texRes->imageView,
-           .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+           .imageLayout = ToVkImageLayout(col.layout),
            .loadOp = ToVkLoadOp(col.loadOp),
            .storeOp = ToVkStoreOp(col.storeOp),
            .clearValue = {{{col.clearColor.r, col.clearColor.g,
@@ -73,7 +73,7 @@ public:
       auto *dsRes = m_resourceProvider.GetTexture(ds.texture);
 
       vkDepth.imageView = dsRes->imageView;
-      vkDepth.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+      vkDepth.imageLayout = ToVkImageLayout(ds.layout);
       vkDepth.loadOp = ToVkLoadOp(ds.loadOp);
       vkDepth.storeOp = ToVkStoreOp(ds.storeOp);
       vkDepth.clearValue = {.depthStencil = {ds.clearDepth, ds.clearStencil}};

@@ -29,7 +29,9 @@ RenderGraphBuilder::SpecifyTextureDefaultFormat(rhi::EResourceUsage usage) {
   case avalon::rhi::EResourceUsage::ReadOnly:
   case avalon::rhi::EResourceUsage::ReadWrite:
   case avalon::rhi::EResourceUsage::ColorAttachment:
+    return rhi::EFormat::R16G16B16A16_SFLOAT;
   case avalon::rhi::EResourceUsage::TransferSrc:
+    return rhi::EFormat::R16G16B16A16_SFLOAT;
   case avalon::rhi::EResourceUsage::TransferDst:
     return rhi::EFormat::R16G16B16A16_SFLOAT;
   case avalon::rhi::EResourceUsage::DepthStencilAttachment:
@@ -37,6 +39,11 @@ RenderGraphBuilder::SpecifyTextureDefaultFormat(rhi::EResourceUsage usage) {
   case avalon::rhi::EResourceUsage::Present:
     return m_rhi->GetSwapchainImageFormat();
   }
+
+  if (HasFlag(usage, rhi::EResourceUsage::DepthStencilAttachment)) {
+    return rhi::EFormat::D32_SFLOAT_S8_UINT;
+  }
+
   AVALON_ASSERT_MSG(
       false, String::Format(
                  "[RenderGraph] Failed To specify default format for usage {}!",
@@ -57,21 +64,16 @@ auto RenderGraphBuilder::Write(StringId name, rhi::EResourceUsage usage)
     m_desc.extent = m_rhi->GetSwapchainExtent();
   }
 
-  if (!m_clearValue) {
-    if (IsDepthFormat(m_desc.format))
-      m_clearValue = ClearValue::DepthStencil();
-    else
-      m_clearValue = ClearValue::Black();
-  }
-
   m_currentResource = m_graph.Write(*m_owner, m_desc);
 
   auto &node = m_graph.GetNode(m_owner);
   for (auto &request : node.outputs) {
     if (request.handle == m_currentResource) {
-      request.loadOp = rhi::EAttachmentLoadOp::Clear;
-      request.storeOp = rhi::EAttachmentStoreOp::Store;
-      request.clearValue = m_clearValue.value();
+      request.loadOp = m_loadOp.value_or(rhi::EAttachmentLoadOp::Clear);
+      request.storeOp = m_storeOp.value_or(rhi::EAttachmentStoreOp::Store);
+      request.clearValue = m_clearValue.value_or(
+          IsDepthFormat(m_desc.format) ? rhi::ClearValue::DepthStencil()
+                                       : rhi::ClearValue::Black());
       break;
     }
   }
@@ -112,25 +114,13 @@ auto RenderGraphBuilder::SetSamplerCount(rhi::ESampleCount count)
 
 auto RenderGraphBuilder::SetLoadOp(rhi::EAttachmentLoadOp op)
     -> RenderGraphBuilder & {
-  auto &node = m_graph.GetNode(m_owner);
-  for (auto &request : node.outputs) {
-    if (request.handle == m_currentResource) {
-      request.loadOp = op;
-      break;
-    }
-  }
+  m_loadOp = op;
   return *this;
 }
 
 auto RenderGraphBuilder::SetStoreOp(rhi::EAttachmentStoreOp op)
     -> RenderGraphBuilder & {
-  auto &node = m_graph.GetNode(m_owner);
-  for (auto &request : node.outputs) {
-    if (request.handle == m_currentResource) {
-      request.storeOp = op;
-      break;
-    }
-  }
+  m_storeOp = op;
   return *this;
 }
 

@@ -13,5 +13,8 @@ VsOutput VsMain(uint vertexId : SV_VertexID) {
 float4 FsMain(VsOutput input) : SV_Target {
   float3 dir = normalize(input.viewDir);
 
-  return sampleCube(push.custom.cubeTexture, mMaterial.sampler, dir);
+  float4 hdrColor = sampleCube(push.custom.cubeTexture, mMaterial.sampler, dir);
+  // float4 ldrColor = hdrColor / (hdrColor + 1.0);
+  // return ldrColor;
+  return hdrColor;
 }

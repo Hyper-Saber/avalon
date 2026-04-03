@@ -15,6 +15,7 @@ inline auto GetMaterialManager() -> MaterialManager & {
   return GetContext().GetService<MaterialManager>(
       EEngineService::MaterialManager);
 }
+
 inline ProbeData CreateSkyboxProbeData() {
   ProbeData probe;
 

@@ -37,11 +37,11 @@ VsOutput FullscreenSkybox(uint vertexId, float4x4 invProjection,
 
   output.uv = attribute.uv;
   output.pos = attribute.pos;
-  output.pos.z = 1e-6;
 
   float4 viewPos = mul(invProjection, output.pos);
   float3 viewRay = viewPos.xyz / viewPos.w;
 
+  output.pos.z = 1e-6;
   output.viewDir = mul((float3x3)invView, viewRay);
 
   return output;

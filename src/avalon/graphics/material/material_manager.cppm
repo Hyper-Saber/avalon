@@ -89,6 +89,15 @@ public:
     return instanceHandle;
   }
 
+  auto GetOrCreateDefaultMaterialInstance(MaterialHandle handle)
+      -> MaterialInstanceHandle {
+    if (m_defaultMaterialInstances.Contains(handle))
+      return *m_defaultMaterialInstances.Get(handle);
+    auto instanceHandle = CreateMaterialInstance(handle);
+    m_defaultMaterialInstances.Insert(handle, instanceHandle);
+    return instanceHandle;
+  }
+
   void DestroyMaterialInstance(MaterialInstanceHandle handle) {
     if (auto *instance = m_materialInstancePool.Resolve(handle)) {
       m_freeIndices.PushBack(instance->GetGpuIndex());
@@ -169,6 +178,7 @@ private:
   MaterialInstanceHandle m_defaultBlitInstance;
 
   HashMap<StringId, MaterialHandle> m_materials;
+  HashMap<MaterialHandle, MaterialInstanceHandle> m_defaultMaterialInstances;
   mem::ResourcePool<Material> m_materialPool;
   mem::ResourcePool<MaterialInstance> m_materialInstancePool;
 

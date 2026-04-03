@@ -27,7 +27,7 @@ public:
     m_material = mm.Resolve(handle);
     m_material->DisableDepthTest();
     m_material->DisableDepthWrite();
-    auto instance = mm.Resolve(mm.CreateMaterialInstance(handle));
+    auto instance = mm.Resolve(mm.GetOrCreateDefaultMaterialInstance(handle));
     instance->SetProperty("uMaterials.sampler"_id,
                           rhi.GetStaticSamplers().linearClamp);
     m_materialInstance = instance;

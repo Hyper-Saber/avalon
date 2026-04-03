@@ -12,6 +12,12 @@ struct alignas(16) Matrix4x4 {
   float data[4][4];
 
   constexpr Matrix4x4() : data{} {}
+  constexpr Matrix4x4(Vec4 col0, Vec4 col1, Vec4 col2, Vec4 col3)
+      : data{{col0.x, col0.y, col0.z, col0.w},
+             {col1.x, col1.y, col1.z, col1.w},
+             {col2.x, col2.y, col2.z, col2.w},
+             {col3.x, col3.y, col3.z, col3.w}} {}
+
   constexpr Matrix4x4(float m00, float m01, float m02, float m03, float m10,
                       float m11, float m12, float m13, float m20, float m21,
                       float m22, float m23, float m30, float m31, float m32,

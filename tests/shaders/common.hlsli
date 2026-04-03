@@ -90,18 +90,24 @@ struct StandardPushConstants {
 
 VK_PUSH_CONSTANT StandardPushConstants push;
 
-VK_BINDING(0, 0) StructuredBuffer<MaterialData> uMaterials
+VK_BINDING(0, 0) SamplerState uSamplers[] : register(s0, space0);
+VK_BINDING(1, 0) StructuredBuffer<MaterialData> uMaterials
     : register(t0, space0);
-
-VK_BINDING(1, 0) Texture2D uTextures[] : register(t2, space0);
-VK_BINDING(2, 0) SamplerState uSamplers[] : register(s0, space0);
-VK_BINDING(3, 0) StructuredBuffer<ProbeData> uProbes : register(t1, space0);
+VK_BINDING(2, 0) StructuredBuffer<ProbeData> uProbes : register(t1, space0);
+VK_BINDING(3, 0) TextureCube uEnvCubes[] : register(t8, space0);
+VK_BINDING(4, 0) Texture2DArray uTextureArrays[] : register(t128, space0);
+VK_BINDING(5, 0) Texture3D uVolumes[] : register(t256, space0);
+VK_BINDING(6, 0) Texture2D uTextures[] : register(t512, space0);
 
 VK_BINDING(0, 1) ConstantBuffer<SceneGlobals> uSceneGlobals
     : register(b0, space1);
 
-float4 sampleBindless(uint textureIdx, uint samplerIdx, float2 uv) {
+float4 sampleTexture2d(uint textureIdx, uint samplerIdx, float2 uv) {
   return uTextures[textureIdx].Sample(uSamplers[samplerIdx], uv);
+}
+
+float4 sampleCube(uint cubeIndex, uint samplerIndex, float3 dir) {
+  return uEnvCubes[cubeIndex].Sample(uSamplers[samplerIndex], dir);
 }
 
 #endif // AVALON_COMMON_HLSLI

@@ -130,13 +130,20 @@ public:
   }
 
   void Render(rhi::ICommandBuffer &cmd, RenderContext &context) {
-    HashMap<rhi::EResourceUsage, rhi::TextureHandle> finalPendingUsages;
+    struct PendingUsage {
+      rhi::EResourceUsage usage;
+      rhi::TextureHandle handle;
+      uint32_t layerCount;
+    };
+
+    Array<PendingUsage> finalPendingUsages;
 
     bool isGlobalSetBinded = false;
 
     for (uint32_t nodeIdx : m_executionQueue) {
       auto &node = m_nodes[nodeIdx];
       context.pipelineRenderingInfo.Clear();
+      context.pipelineRenderingInfo.viewMask = node.viewMask;
       rhi::RenderingInfo renderingInfo{
           .renderArea = node.renderArea,
           .layerCount = node.layerCount,
@@ -151,9 +158,10 @@ public:
         auto fixedUsage = output.usage;
         if (fixedUsage == rhi::EResourceUsage::Present) {
           fixedUsage = rhi::EResourceUsage::ColorAttachment;
-          finalPendingUsages.Insert(output.usage, physicalHandle);
+          finalPendingUsages.PushBack(
+              {output.usage, physicalHandle, output.layerCount});
         }
-        cmd.Transition(physicalHandle, fixedUsage);
+        cmd.Transition(physicalHandle, fixedUsage, output.layerCount);
 
         auto resDesc = m_resourceManager.GetResourceDesc(output.handle);
 
@@ -188,7 +196,7 @@ public:
           continue;
         auto physicalHandle = m_resourceManager.GetPhysical(input.handle);
         if (physicalHandle.IsValid()) {
-          cmd.Transition(physicalHandle, input.usage);
+          cmd.Transition(physicalHandle, input.usage, input.layerCount);
         }
       }
 
@@ -213,9 +221,7 @@ public:
       cmd.SetScissor(node.renderArea);
       node.pass->Execute(cmd, context);
       for (auto &entry : finalPendingUsages) {
-        auto usage = entry.GetKey();
-        auto handle = entry.GetValue();
-        cmd.Transition(handle, usage);
+        cmd.Transition(entry.handle, entry.usage, entry.layerCount);
       }
       cmd.EndRendering();
     }
@@ -231,6 +237,7 @@ private:
     rhi::EAttachmentLoadOp loadOp = rhi::EAttachmentLoadOp::DontCare;
     rhi::EAttachmentStoreOp storeOp = rhi::EAttachmentStoreOp::DontCare;
     rhi::ClearValue clearValue;
+    uint32_t layerCount = 1;
   };
 
   struct PassNode {
@@ -240,8 +247,8 @@ private:
     Array<ResourceRequest> outputs;
 
     Rect2D renderArea;
-    uint32_t layerCount;
-    uint32_t viewMask;
+    uint32_t layerCount = 1;
+    uint32_t viewMask = 0;
     bool isCulled = false;
   };
 
@@ -274,7 +281,8 @@ private:
       }
     }
     auto handle = m_resourceManager.IncreaseGeneration(handleIndex);
-    node.outputs.PushBack({.handle = handle, .usage = desc.usage});
+    node.outputs.PushBack(
+        {.handle = handle, .usage = desc.usage, .layerCount = desc.layerCount});
     node.renderArea.extent = desc.extent;
     m_resourceManager.RefineUsage(handle, desc.usage);
     return handle;

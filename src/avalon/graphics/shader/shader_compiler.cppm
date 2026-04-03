@@ -145,11 +145,13 @@ void ExtractDescriptorBindings(SpvReflectShaderModule *module,
   spvReflectEnumerateDescriptorSets(module, &count, sets.data());
 
   for (auto *set : sets) {
-    if (set->set != kMaterialsBinding)
+    if (set->set != kBindlessSet)
       continue;
     for (uint32_t i = 0; i < set->binding_count; i++) {
       SpvReflectDescriptorBinding *pSpvReflDescBinding = set->bindings[i];
       auto type = pSpvReflDescBinding->descriptor_type;
+      if (StringView(pSpvReflDescBinding->name) != "uMaterials")
+        continue;
       auto descBinding = ShaderDescriptorBinding{
           .nameHash = StringId(
               pSpvReflDescBinding->name ? pSpvReflDescBinding->name : ""),
@@ -289,7 +291,7 @@ struct ShaderCompileDesc {
   BlobPtr sourceCode;
   Path filePath;
   Array<StageDesc> shaderStages;
-  rhi::EShaderFeatureLevel level = rhi::EShaderFeatureLevel::Level_6_0;
+  rhi::EShaderFeatureLevel level = rhi::EShaderFeatureLevel::Level_6_6;
 };
 
 template <typename T> class DxcPtr {

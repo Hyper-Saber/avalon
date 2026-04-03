@@ -15,6 +15,7 @@ namespace avalon::graphics {
 class SkyboxGeneratorPass final : public RenderPass<SkyboxGeneratorPass> {
 public:
   void Setup(RenderGraphBuilder &builder) override {
+    builder.SetViewMask(0x3F).SetLayers(6);
     m_cubeHandle =
         builder.SetLayers(6)
             .SetTextureType(rhi::ETextureType::TextureCube)

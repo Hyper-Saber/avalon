@@ -13,7 +13,7 @@ VsOutput VsMain(uint vertexID : SV_VertexID) {
 
 float4 FsMain(VsOutput input) : SV_Target {
   float4 color =
-      sampleBindless(push.custom.sceneColor, mMaterial.sampler, input.uv);
+      sampleTexture2d(push.custom.sceneColor, mMaterial.sampler, input.uv);
   // return float4(input.uv, 0, 1);
   return color;
 }

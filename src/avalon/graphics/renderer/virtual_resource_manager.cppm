@@ -149,7 +149,7 @@ public:
             .nameHash = vDesc.nameHash,
             .width = vDesc.extent.width,
             .height = vDesc.extent.height,
-            .layers = vDesc.layers,
+            .layerCount = vDesc.layerCount,
             .format = vDesc.format,
             .usage = vDesc.usage,
             .sampleCount = vDesc.sampleCount,

@@ -8,15 +8,31 @@ export namespace avalon::rhi {
 constexpr uint32_t kInternalSetCount = 2;
 
 constexpr uint32_t kBindlessSet = 0;
-constexpr uint32_t kMaterialsBinding = 0;
-constexpr uint32_t kTexturesBinding = 1;
-constexpr uint32_t kSamplersBinding = 2;
-constexpr uint32_t kProbesBinding = 3;
+constexpr uint32_t kSamplersBinding = 0;
+constexpr uint32_t kMaterialsBinding = 1;
+constexpr uint32_t kProbesBinding = 2;
+constexpr uint32_t kTextureCubeBinding = 3;
+constexpr uint32_t kTexture2DArrayBinding = 4;
+constexpr uint32_t kTexture3DBinding = 5;
+constexpr uint32_t kTexturesBinding = 6;
 constexpr uint32_t kSceneGlobalsSet = 1;
 constexpr uint32_t kSceneGlobalsBinding = 0;
 
-constexpr uint32_t kMaxMaterialCount = 65535;
-constexpr uint32_t kMaxProbeCount = 128;
+constexpr uint32_t kMaxSamplerDescriptor = 256;
+
+constexpr uint32_t kMaxMaterialCount = 65535; // uMaterials
+constexpr uint32_t kMaxProbeCount = 128;      // uProbes
+
+constexpr uint32_t kMaxTexture2DDescriptor = 1024 * 16;
+constexpr uint32_t kMaxTextureCubeDescriptor = 128;
+constexpr uint32_t kMaxTextureArrayDescriptor = 128;
+constexpr uint32_t kMaxTexture3DDescriptor = 128;
+
+constexpr uint32_t kMaxSampledImageDescriptor =
+    kMaxTexture2DDescriptor + kMaxTextureCubeDescriptor +
+    kMaxTextureArrayDescriptor + kMaxTexture3DDescriptor;
+
+constexpr uint32_t kMaxStorageImageDescriptor = 1024;
 
 struct alignas(4) StandardMaterialData {
   float baseColor[4];
@@ -34,6 +50,12 @@ class IBindlessManager {
 public:
   virtual uint32_t RegisterTexture(TextureHandle handle) = 0;
   virtual void UnregisterTexture(TextureHandle handle) = 0;
+  virtual uint32_t RegisterTextureArray(TextureHandle handle) = 0;
+  virtual void UnregisterTextureArray(TextureHandle handle) = 0;
+  virtual uint32_t RegisterTextureCube(TextureHandle handle) = 0;
+  virtual void UnregisterTextureCube(TextureHandle handle) = 0;
+  virtual uint32_t RegisterTexture3D(TextureHandle handle) = 0;
+  virtual void UnregisterTexture3D(TextureHandle handle) = 0;
   virtual uint32_t RegisterSampler(SamplerHandle) = 0;
 };
 } // namespace avalon::rhi

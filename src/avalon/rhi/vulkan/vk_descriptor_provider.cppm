@@ -18,12 +18,6 @@ struct DescriptorAllocation {
   VkDescriptorPool pool;
 };
 
-constexpr uint32_t kMaxSampledImageDescriptor = 1024 * 512;
-constexpr uint32_t kMaxStorageImageDescriptor = 1024 * 4;
-constexpr uint32_t kMaxTextureDescriptor =
-    kMaxSampledImageDescriptor + kMaxStorageImageDescriptor;
-constexpr uint32_t kMaxSamplerDescriptor = 256;
-
 class DescriptorProvider final
     : public NonCopyable,
       public mem::AutoDestroyable<DescriptorProvider> {
@@ -45,10 +39,10 @@ public:
 
   bool Initialize() {
     VkDescriptorPoolSize staticSizes[] = {
-        {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kMaxTextureDescriptor},
+        {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kMaxSampledImageDescriptor},
         {VK_DESCRIPTOR_TYPE_SAMPLER, kMaxSamplerDescriptor},
         {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kMaxStorageImageDescriptor},
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 2},
+        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1},
         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2048}};
 
     VkDescriptorPoolCreateInfo staticCI{

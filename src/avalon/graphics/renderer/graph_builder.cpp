@@ -68,8 +68,13 @@ auto RenderGraphBuilder::Write(StringId name, rhi::EResourceUsage usage)
   m_currentResource = m_graph.Write(*m_owner, m_desc);
 
   auto &node = m_graph.GetNode(m_owner);
+  AVALON_ASSERT_MSG(node.viewMask == 0 || node.viewMask == m_viewMask,
+                    "[RenderGraph]: Overwrite of view mask!");
+  AVALON_ASSERT_MSG(
+      node.layerCount == 1 || node.layerCount == m_desc.layerCount,
+      "[RenderGraph]: Different layer count between attachments!");
   node.viewMask = m_viewMask;
-  node.layerCount = m_viewMask == 0 ? m_desc.layers : 1;
+  node.layerCount = m_viewMask == 0 ? m_desc.layerCount : 1;
   for (auto &request : node.outputs) {
     if (request.handle == m_currentResource) {
       request.loadOp = m_loadOp.value_or(rhi::EAttachmentLoadOp::Clear);
@@ -116,7 +121,7 @@ auto RenderGraphBuilder::SetSamplerCount(rhi::ESampleCount count)
 }
 
 auto RenderGraphBuilder::SetLayers(uint32_t layers) -> RenderGraphBuilder & {
-  m_desc.layers = layers;
+  m_desc.layerCount = layers;
   return *this;
 }
 
@@ -127,6 +132,7 @@ auto RenderGraphBuilder::SetTextureType(rhi::ETextureType type)
 }
 
 auto RenderGraphBuilder::SetViewMask(uint32_t mask) -> RenderGraphBuilder & {
+  m_viewMask = mask;
   return *this;
 }
 

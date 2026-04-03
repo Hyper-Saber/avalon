@@ -78,7 +78,8 @@ auto VkRhi::Initialize(const DeviceRequirement &requirement,
 
   m_resourcePool = MakeUnique<ResourcePool>(*m_deviceContext.Get());
   CreateUBOPool();
-  m_materialPool = CreateStorageBuffer(sizeof(StandardMaterialData), kMaxMaterialCount);
+  m_materialPool =
+      CreateStorageBuffer(sizeof(StandardMaterialData), kMaxMaterialCount);
   m_probePool = CreateStorageBuffer(sizeof(ProbeData), kMaxProbeCount);
   WarpSwapchainTextures();
   m_descriptorProvider =
@@ -288,7 +289,7 @@ void VkRhi::WarpSwapchainTextures() {
   TextureCreateInfo info{
       .width = extent.width,
       .height = extent.height,
-      .layers = 1,
+      .layerCount = 1,
       .usage = EResourceUsage::Present,
   };
 

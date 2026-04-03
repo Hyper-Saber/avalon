@@ -60,7 +60,7 @@ struct VirtualTextureDesc {
   rhi::EFormat format = rhi::EFormat::Undefined;
   rhi::Extent2D extent{};
   rhi::ESampleCount sampleCount = rhi::ESampleCount::SampleCount1x;
-  uint32_t layers = 1;
+  uint32_t layerCount = 1;
   rhi::ETextureType textureType = rhi::ETextureType::Texture2D;
 
   HashType GetHash() const noexcept {
@@ -68,7 +68,7 @@ struct VirtualTextureDesc {
                           static_cast<uint64_t>(extent.height);
     HashType h = Hash::Combine(Hash::kOffsetBasis, sizePacked);
 
-    h = Hash::Combine(h, static_cast<uint64_t>(layers));
+    h = Hash::Combine(h, static_cast<uint64_t>(layerCount));
 
     uint64_t attrPacked = 0;
     using std::to_underlying;
@@ -84,7 +84,7 @@ struct VirtualTextureDesc {
     return extent.width == other.extent.width &&
            extent.height == other.extent.height && format == other.format &&
            sampleCount == other.sampleCount && usage == other.usage &&
-           layers == other.layers;
+           layerCount == other.layerCount;
   }
 };
 

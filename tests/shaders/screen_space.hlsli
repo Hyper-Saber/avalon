@@ -4,29 +4,40 @@ struct VsOutput {
   float3 viewDir : TEXCOORD1;
 };
 
-VsOutput FullscreenBase(uint vertexID) {
-  VsOutput output;
+struct FullscreenVertexAttribute {
+  float4 pos;
+  float2 uv;
+};
 
+FullscreenVertexAttribute GenerateVertices(uint vertexId) {
+  FullscreenVertexAttribute output;
   static const float2 uvTable[3] = {float2(0, 0), float2(0, 2), float2(2, 0)};
 
-  float2 uv = uvTable[vertexID];
+  float2 uv = uvTable[vertexId];
   output.uv = uv;
 
-  output.pos = float4(uv.x * 2.0f - 1.0f, uv.y * 2.0f - 1.0f, 0.5f, 1.0f);
+  output.pos = float4(uv.x * 2.0 - 1.0, uv.y * 2.0 - 1.0, 1.0, 1.0);
+  return output;
+}
+
+VsOutput FullscreenBase(uint vertexId) {
+  VsOutput output;
+  FullscreenVertexAttribute attribute = GenerateVertices(vertexId);
+
+  output.uv = attribute.uv;
+  output.pos = attribute.pos;
 
   return output;
 }
 
-VsOutput FullscreenSkybox(uint vertexID, float4x4 invProjection,
+VsOutput FullscreenSkybox(uint vertexId, float4x4 invProjection,
                           float4x4 invView) {
   VsOutput output;
+  FullscreenVertexAttribute attribute = GenerateVertices(vertexId);
 
-  static const float2 uvTable[3] = {float2(0, 0), float2(0, 2), float2(2, 0)};
-
-  float2 uv = uvTable[vertexID];
-  output.uv = uv;
-
-  output.pos = float4(uv.x * 2.0f - 1.0f, uv.y * 2.0f - 1.0f, 1e-6, 1.0f);
+  output.uv = attribute.uv;
+  output.pos = attribute.pos;
+  output.pos.z = 1e-6;
 
   float4 viewPos = mul(invProjection, output.pos);
   float3 viewRay = viewPos.xyz / viewPos.w;

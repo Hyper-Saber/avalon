@@ -444,7 +444,7 @@ struct TextureCreateInfo {
   uint32_t width = 1;
   uint32_t height = 1;
   uint32_t depth = 1;
-  uint32_t layers = 1;
+  uint32_t layerCount = 1;
   uint32_t mipLevels = 1;
 
   EFormat format = EFormat::B8G8R8A8_SRGB;

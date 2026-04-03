@@ -161,7 +161,7 @@ private:
   void InitializePropertyLayout(const Shader *shader) {
     auto members = shader->GetBufferMembers();
     for (const auto &member : members) {
-      Debug("[Material] Property: {}", member.nameHash.Resolve());
+      // Debug("[Material] Property: {}", member.nameHash.Resolve());
       m_propertyMap.Insert(member.nameHash,
                            {.bindingPoint = member.bindingPoint,
                             .bufferOffset = member.offset,

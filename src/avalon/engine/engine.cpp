@@ -119,6 +119,16 @@ auto Engine::Initialize(const EngineConfig &config,
   materialHandle = materialManager.CreateMaterial(shaderHandle, "Skybox"_id);
   materialManager.SetDefaultSkyBox(materialHandle);
 
+  shaderHandle =
+      shaderManager.GetOrCreateShader(Path(vfs::kShaderFolderVirtualPath) /
+                                      StringView("skybox_generator.hlsl"));
+  materialHandle = materialManager.CreateMaterial(shaderHandle, "SkyboxGen"_id);
+
+  shaderHandle = shaderManager.GetOrCreateShader(
+      Path(vfs::kShaderFolderVirtualPath) / StringView("cubemap_test.hlsl"));
+  materialHandle =
+      materialManager.CreateMaterial(shaderHandle, "CubemapTest"_id);
+
   m_scene = MakeUnique<scene::Scene>();
 
   m_scene->GetWorld().AddSystem<ecs::PhysicsSystem>();

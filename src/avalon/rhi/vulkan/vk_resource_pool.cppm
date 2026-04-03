@@ -1,6 +1,5 @@
 module;
 #include <debug/assert.hpp>
-#include <utility>
 #include <vulkan/vulkan.h>
 export module avalon.rhi.vulkan:resource_pool;
 
@@ -108,7 +107,7 @@ public:
                 info.depth,
             },
         .mipLevels = info.mipLevels,
-        .arrayLayers = info.layers,
+        .arrayLayers = info.layerCount,
         .samples = ToVkSampleCount(info.sampleCount),
         .tiling = VK_IMAGE_TILING_OPTIMAL,
         .usage = ToVkImageUsageFlags(info.usage),
@@ -170,9 +169,9 @@ public:
 
     VkImageViewType viewType = VK_IMAGE_VIEW_TYPE_2D;
     if (info.textureType == ETextureType::TextureCube) {
-      viewType = info.layers > 6 ? VK_IMAGE_VIEW_TYPE_CUBE_ARRAY
-                                 : VK_IMAGE_VIEW_TYPE_CUBE;
-    } else if (info.layers > 1) {
+      viewType = info.layerCount > 6 ? VK_IMAGE_VIEW_TYPE_CUBE_ARRAY
+                                     : VK_IMAGE_VIEW_TYPE_CUBE;
+    } else if (info.layerCount > 1) {
       viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
     } else if (info.depth > 1) {
       viewType = VK_IMAGE_VIEW_TYPE_3D;
@@ -189,7 +188,7 @@ public:
                 .baseMipLevel = 0,
                 .levelCount = info.mipLevels,
                 .baseArrayLayer = 0,
-                .layerCount = info.layers,
+                .layerCount = info.layerCount,
             },
     };
 

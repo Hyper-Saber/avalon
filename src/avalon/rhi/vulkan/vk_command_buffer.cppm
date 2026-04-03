@@ -232,8 +232,9 @@ public:
                      firstInstance);
   }
 
-  void Transition(TextureHandle handle, EResourceUsage usage) override {
-    auto barrier = m_stateTracker.RequestSync(*this, handle, usage);
+  void Transition(TextureHandle handle, EResourceUsage usage,
+                  uint32_t layerCount) override {
+    auto barrier = m_stateTracker.RequestSync(*this, handle, usage, layerCount);
     if (barrier.has_value()) {
       m_pendingBarriers.PushBack(barrier.value());
       m_isDirty = true;

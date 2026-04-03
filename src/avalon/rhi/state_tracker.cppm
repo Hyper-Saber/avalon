@@ -1,4 +1,5 @@
 module;
+#include <cstdint>
 #include <optional>
 export module avalon.rhi:state_tracker;
 
@@ -13,7 +14,8 @@ class AVALON_RHI_API StateTracker final
     : public mem::AutoDestroyable<StateTracker> {
 public:
   auto RequestSync(ICommandBuffer &cmd, TextureHandle texture,
-                   EResourceUsage nextUsage) -> std::optional<ImageBarrier> {
+                   EResourceUsage nextUsage, uint32_t layerCount)
+      -> std::optional<ImageBarrier> {
 
     auto state = m_resourceState.Get(texture);
 
@@ -22,7 +24,8 @@ public:
                                  .currentLayout = EResourceLayout::Undefined,
                                  .lastWriteStage = EPipelineStage::None};
 
-      auto barrier = CreateBarrier(texture, initialState, nextUsage);
+      auto barrier =
+          CreateBarrier(texture, initialState, nextUsage, layerCount);
 
       m_resourceState.Insert(texture,
                              {.currentUsage = nextUsage,
@@ -40,7 +43,7 @@ public:
       return std::nullopt;
     }
 
-    auto barrier = CreateBarrier(texture, *state, nextUsage);
+    auto barrier = CreateBarrier(texture, *state, nextUsage, layerCount);
 
     state->currentUsage = nextUsage;
     state->currentLayout = barrier.newLayout;
@@ -57,7 +60,8 @@ public:
 
 private:
   ImageBarrier CreateBarrier(TextureHandle handle, const ResourceState &state,
-                             EResourceUsage nextUsage) const {
+                             EResourceUsage nextUsage,
+                             uint32_t layerCount) const {
 
     EPipelineStage srcStage = state.lastWriteStage;
     if (srcStage == EPipelineStage::None) {
@@ -78,6 +82,7 @@ private:
         .dstAccess = MapUsageToAccess(nextUsage),
         .srcStage = srcStage,
         .dstStage = MapUsageToStage(nextUsage),
+        .layerCount = layerCount,
     };
   }
 

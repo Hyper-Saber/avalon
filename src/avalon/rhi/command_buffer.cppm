@@ -39,7 +39,8 @@ public:
                            uint32_t firstIndex, int32_t vertexOffset,
                            uint32_t firstInstance) = 0;
 
-  virtual void Transition(TextureHandle handle, EResourceUsage usage) = 0;
+  virtual void Transition(TextureHandle handle, EResourceUsage usage,
+                          uint32_t layerCount) = 0;
   virtual void PipelineBarrier(const ImageBarrier &barrier) = 0;
   virtual void CopyImage(TextureHandle src, TextureHandle dst,
                          const ImageCopyRegion &region) = 0;

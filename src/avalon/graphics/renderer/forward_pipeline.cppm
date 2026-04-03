@@ -10,6 +10,8 @@ import :material_manager;
 import :opaque_pass;
 import :skybox_pass;
 import :blit_pass;
+import :cubemap_test_pass;
+import :skybox_gen_pass;
 
 export namespace avalon::graphics {
 
@@ -21,9 +23,11 @@ public:
   StringId GetName() const override { return "ForwardPipeline"_id; }
 
   void Setup(RenderGraphBuilder &builder, const RenderPacket &packet) override {
-    builder.AddPass<OpaquePass>("Opaque"_id);
-    builder.AddPass<SkyboxPass>("Skybox"_id);
-    builder.AddPass<BlitPass>("Blit"_id);
+    // builder.AddPass<OpaquePass>("Opaque"_id);
+    // builder.AddPass<SkyboxPass>("Skybox"_id);
+    // builder.AddPass<BlitPass>("Blit"_id);
+    builder.AddPass<SkyboxGeneratorPass>("SkyboxGen"_id);
+    builder.AddPass<CubemapTestPass>("CubemapTest"_id);
   }
 
 private:

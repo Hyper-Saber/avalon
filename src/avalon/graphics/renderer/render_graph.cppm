@@ -137,8 +137,11 @@ public:
     for (uint32_t nodeIdx : m_executionQueue) {
       auto &node = m_nodes[nodeIdx];
       context.pipelineRenderingInfo.Clear();
-      rhi::RenderingInfo renderingInfo{.renderArea = node.renderArea,
-                                       .layerCount = 1};
+      rhi::RenderingInfo renderingInfo{
+          .renderArea = node.renderArea,
+          .layerCount = node.layerCount,
+          .viewMask = node.viewMask,
+      };
 
       for (auto &output : node.outputs) {
         auto physicalHandle = m_resourceManager.GetPhysical(output.handle);
@@ -161,18 +164,20 @@ public:
               .storeOp = output.storeOp,
               .clearDepth = output.clearValue.depthStencil.depth,
               .clearStencil = output.clearValue.depthStencil.stencil,
-              .layout = MapUsageToLayout(fixedUsage)};
+              .layout = MapUsageToLayout(fixedUsage),
+          };
           context.pipelineRenderingInfo.depthAttachmentFormat = resDesc.format;
           if (HasStencilComponent(resDesc.format))
             context.pipelineRenderingInfo.stencilAttachmentFormat =
                 resDesc.format;
         } else {
-          renderingInfo.colorAttachments.PushBack(
-              {.texture = physicalHandle,
-               .loadOp = output.loadOp,
-               .storeOp = output.storeOp,
-               .clearColor = output.clearValue.color,
-               .layout = MapUsageToLayout(fixedUsage)});
+          renderingInfo.colorAttachments.PushBack({
+              .texture = physicalHandle,
+              .loadOp = output.loadOp,
+              .storeOp = output.storeOp,
+              .clearColor = output.clearValue.color,
+              .layout = MapUsageToLayout(fixedUsage),
+          });
           context.pipelineRenderingInfo.colorAttachmentFormats.PushBack(
               resDesc.format);
         }
@@ -235,6 +240,8 @@ private:
     Array<ResourceRequest> outputs;
 
     Rect2D renderArea;
+    uint32_t layerCount;
+    uint32_t viewMask;
     bool isCulled = false;
   };
 

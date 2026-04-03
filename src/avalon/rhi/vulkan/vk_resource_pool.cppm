@@ -109,12 +109,16 @@ public:
             },
         .mipLevels = info.mipLevels,
         .arrayLayers = info.layers,
-        .samples = VK_SAMPLE_COUNT_1_BIT,
+        .samples = ToVkSampleCount(info.sampleCount),
         .tiling = VK_IMAGE_TILING_OPTIMAL,
         .usage = ToVkImageUsageFlags(info.usage),
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
         .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
     };
+
+    if (info.textureType == ETextureType::TextureCube) {
+      imageInfo.flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+    }
 
     VkImage image{VK_NULL_HANDLE};
 
@@ -164,12 +168,20 @@ public:
     aspectMask = hasStencilComponent ? aspectMask | VK_IMAGE_ASPECT_STENCIL_BIT
                                      : aspectMask;
 
+    VkImageViewType viewType = VK_IMAGE_VIEW_TYPE_2D;
+    if (info.textureType == ETextureType::TextureCube) {
+      viewType = info.layers > 6 ? VK_IMAGE_VIEW_TYPE_CUBE_ARRAY
+                                 : VK_IMAGE_VIEW_TYPE_CUBE;
+    } else if (info.layers > 1) {
+      viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+    } else if (info.depth > 1) {
+      viewType = VK_IMAGE_VIEW_TYPE_3D;
+    }
+
     VkImageViewCreateInfo viewInfo{
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
         .image = image,
-        .viewType = info.layers > 1  ? VK_IMAGE_VIEW_TYPE_2D_ARRAY
-                    : info.depth > 1 ? VK_IMAGE_VIEW_TYPE_3D
-                                     : VK_IMAGE_VIEW_TYPE_2D,
+        .viewType = viewType,
         .format = vkFormat,
         .subresourceRange =
             {

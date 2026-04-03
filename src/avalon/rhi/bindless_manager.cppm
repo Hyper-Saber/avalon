@@ -5,12 +5,29 @@ import :types;
 import avalon.core;
 export namespace avalon::rhi {
 
-struct alignas(16) StandardMaterialData {
+constexpr uint32_t kInternalSetCount = 2;
+
+constexpr uint32_t kBindlessSet = 0;
+constexpr uint32_t kMaterialsBinding = 0;
+constexpr uint32_t kTexturesBinding = 1;
+constexpr uint32_t kSamplersBinding = 2;
+constexpr uint32_t kProbesBinding = 3;
+constexpr uint32_t kSceneGlobalsSet = 1;
+constexpr uint32_t kSceneGlobalsBinding = 0;
+
+constexpr uint32_t kMaxMaterialCount = 65535;
+constexpr uint32_t kMaxProbeCount = 128;
+
+struct alignas(4) StandardMaterialData {
   float baseColor[4];
   float specularColor[4];
   float shininess;
   float f0;
   Vec2 padding;
+};
+
+struct alignas(16) ProbeData {
+  Matrix4x4 captureViews[6];
 };
 
 class IBindlessManager {

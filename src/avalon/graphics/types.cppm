@@ -14,6 +14,7 @@ constexpr StringId kSwapchainColor = "SwapchainColor"_id;
 constexpr StringId kSceneGlobalsBuffer = "uSceneGlobals"_id;
 constexpr StringId kSceneColor = "SceneColor"_id;
 constexpr StringId kSceneDepth = "SceneDepth"_id;
+constexpr StringId kSkyboxCube = "SkyboxCube"_id;
 
 using MeshHandle = Handle<Mesh>;
 using MaterialHandle = Handle<Material>;

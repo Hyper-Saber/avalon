@@ -78,7 +78,8 @@ auto VkRhi::Initialize(const DeviceRequirement &requirement,
 
   m_resourcePool = MakeUnique<ResourcePool>(*m_deviceContext.Get());
   CreateUBOPool();
-  CreateMaterialBuffer();
+  m_materialPool = CreateStorageBuffer(sizeof(StandardMaterialData), kMaxMaterialCount);
+  m_probePool = CreateStorageBuffer(sizeof(ProbeData), kMaxProbeCount);
   WarpSwapchainTextures();
   m_descriptorProvider =
       MakeUnique<DescriptorProvider>(m_deviceContext->GetDevice());
@@ -210,8 +211,13 @@ auto VkRhi::GetMaterialBufferInfo() const -> const VkDescriptorBufferInfo & {
   return m_materialPool.bufferInfo;
 }
 
-void VkRhi::CreateMaterialBuffer() {
-  const uint64_t bufferSize = sizeof(StandardMaterialData) * kMaxMaterialCount;
+auto VkRhi::GetProbeBufferInfo() const -> const VkDescriptorBufferInfo & {
+  return m_probePool.bufferInfo;
+}
+
+auto VkRhi::CreateStorageBuffer(size_t structSize, uint32_t count)
+    -> StorageBufferResource {
+  const uint64_t bufferSize = structSize * count;
 
   BufferCreateInfo gpuInfo{.size = bufferSize,
                            .usage = EResourceUsage::StorageBuffer |
@@ -220,23 +226,27 @@ void VkRhi::CreateMaterialBuffer() {
                                              EMemoryProperty::HostVisible |
                                              EMemoryProperty::HostCoherent};
 
-  m_materialPool.handle = m_resourcePool->CreateBuffer(gpuInfo);
+  StorageBufferResource ret;
 
-  if (!m_materialPool.handle.IsValid()) {
+  ret.handle = m_resourcePool->CreateBuffer(gpuInfo);
+
+  if (!ret.handle.IsValid()) {
     avalon::Error("Failed to create Bindless Material Pool!");
-    return;
+    return {};
   }
 
-  auto *bufferRes = m_resourcePool->ResolveBuffer(m_materialPool.handle);
-  m_materialPool.buffer = bufferRes->buffer;
-  m_materialPool.memory = bufferRes->memory;
-  m_materialPool.size = bufferSize;
+  auto *bufferRes = m_resourcePool->ResolveBuffer(ret.handle);
+  ret.buffer = bufferRes->buffer;
+  ret.memory = bufferRes->memory;
+  ret.size = bufferSize;
 
-  m_materialPool.pHostAddress = MapMemory({m_materialPool.handle.id});
+  ret.pHostAddress = MapMemory({ret.handle.id});
 
-  m_materialPool.bufferInfo.buffer = m_materialPool.buffer;
-  m_materialPool.bufferInfo.offset = 0;
-  m_materialPool.bufferInfo.range = m_materialPool.size;
+  ret.bufferInfo.buffer = ret.buffer;
+  ret.bufferInfo.offset = 0;
+  ret.bufferInfo.range = ret.size;
+
+  return ret;
 }
 
 void VkRhi::UpdateMaterialBuffer(size_t offset, const void *data, size_t size) {
@@ -245,11 +255,14 @@ void VkRhi::UpdateMaterialBuffer(size_t offset, const void *data, size_t size) {
 
   std::memcpy(static_cast<uint8_t *>(m_materialPool.pHostAddress) + offset,
               data, size);
+}
 
-#ifndef NDEBUG
-  // DumpMaterial(offset / sizeof(StandardMaterialData));
+void VkRhi::UpdateProbeBuffer(size_t offset, const void *data, size_t size) {
+  AVALON_ASSERT(m_probePool.pHostAddress != nullptr);
+  AVALON_ASSERT(offset + size <= m_probePool.size);
 
-#endif // !NDEBUG
+  std::memcpy(static_cast<uint8_t *>(m_probePool.pHostAddress) + offset, data,
+              size);
 }
 
 auto VkRhi::RecreateSwapchain(uint32_t width, uint32_t height) -> ERhiResult {

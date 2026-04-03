@@ -66,6 +66,10 @@ struct MaterialData {
   float padding;
 };
 
+struct ProbeData {
+  float4x4 captureViews[6];
+};
+
 struct ModelData {
   float4x4 model;
   float4x4 normalMatrix;
@@ -87,10 +91,11 @@ struct StandardPushConstants {
 VK_PUSH_CONSTANT StandardPushConstants push;
 
 VK_BINDING(0, 0) StructuredBuffer<MaterialData> uMaterials
-    : register(t2, space0);
+    : register(t0, space0);
 
-VK_BINDING(1, 0) Texture2D uTextures[] : register(t0, space0);
+VK_BINDING(1, 0) Texture2D uTextures[] : register(t2, space0);
 VK_BINDING(2, 0) SamplerState uSamplers[] : register(s0, space0);
+VK_BINDING(3, 0) StructuredBuffer<ProbeData> uProbes : register(t1, space0);
 
 VK_BINDING(0, 1) ConstantBuffer<SceneGlobals> uSceneGlobals
     : register(b0, space1);

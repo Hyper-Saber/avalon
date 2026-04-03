@@ -33,6 +33,7 @@ public:
 
   void UpdateMaterialBuffer(size_t offset, const void *data,
                             size_t size) override;
+  void UpdateProbeBuffer(size_t offset, const void *data, size_t size) override;
 
   auto GetStaticSamplers() const -> const StaticSamplers & override;
   auto GetMainCommandBuffer() const -> ICommandBuffer * override;
@@ -86,9 +87,19 @@ public:
   uint32_t GetCurrentFrameIndex() override;
   uint32_t GetLastCompletedFrameIndex() override;
   auto GetMaterialBufferInfo() const -> const VkDescriptorBufferInfo & override;
+  auto GetProbeBufferInfo() const -> const VkDescriptorBufferInfo & override;
   void WaitIdle() override;
 
 private:
+  struct StorageBufferResource {
+    Handle<BufferResource> handle;
+    VkBuffer buffer = VK_NULL_HANDLE;
+    VkDeviceMemory memory = VK_NULL_HANDLE;
+    void *pHostAddress = nullptr;
+    VkDescriptorBufferInfo bufferInfo{};
+    size_t size = 0;
+  };
+
   void CreateUBOPool();
   auto CreateCommandPools() -> std::expected<void, ERhiResult>;
   auto CreateSyncObjects() -> std::expected<void, ERhiResult>;
@@ -97,22 +108,14 @@ private:
   void CreateCommandBuffer();
   void WarpSwapchainTextures();
 
-  void CreateMaterialBuffer();
+  auto CreateStorageBuffer(size_t structSize, uint32_t count)
+      -> StorageBufferResource;
 
 private:
   struct FrameSyncObject {
     VkSemaphore imageAvailableSemaphore{VK_NULL_HANDLE};
     VkSemaphore renderFinishedSemaphore{VK_NULL_HANDLE};
     VkFence m_inflightFence;
-  };
-
-  struct MaterialBufferResource {
-    Handle<BufferResource> handle;
-    VkBuffer buffer = VK_NULL_HANDLE;
-    VkDeviceMemory memory = VK_NULL_HANDLE;
-    void *pHostAddress = nullptr;
-    VkDescriptorBufferInfo bufferInfo{};
-    size_t size = 0;
   };
 
   Array<TextureHandle> m_swapchainTextures;
@@ -138,7 +141,8 @@ private:
   uint32_t m_currentFrame = 0;
   uint32_t m_maxFrameInFlight;
 
-  MaterialBufferResource m_materialPool;
+  StorageBufferResource m_materialPool;
+  StorageBufferResource m_probePool;
 
   TextureHandle m_defaultTexture;
 

@@ -1,4 +1,5 @@
 module;
+#include <cstdint>
 #include <debug/assert.hpp>
 #include <optional>
 module avalon.graphics;
@@ -67,6 +68,8 @@ auto RenderGraphBuilder::Write(StringId name, rhi::EResourceUsage usage)
   m_currentResource = m_graph.Write(*m_owner, m_desc);
 
   auto &node = m_graph.GetNode(m_owner);
+  node.viewMask = m_viewMask;
+  node.layerCount = m_viewMask == 0 ? m_desc.layers : 1;
   for (auto &request : node.outputs) {
     if (request.handle == m_currentResource) {
       request.loadOp = m_loadOp.value_or(rhi::EAttachmentLoadOp::Clear);
@@ -109,6 +112,21 @@ auto RenderGraphBuilder::SetFormat(rhi::EFormat format)
 auto RenderGraphBuilder::SetSamplerCount(rhi::ESampleCount count)
     -> RenderGraphBuilder & {
   m_desc.sampleCount = count;
+  return *this;
+}
+
+auto RenderGraphBuilder::SetLayers(uint32_t layers) -> RenderGraphBuilder & {
+  m_desc.layers = layers;
+  return *this;
+}
+
+auto RenderGraphBuilder::SetTextureType(rhi::ETextureType type)
+    -> RenderGraphBuilder & {
+  m_desc.textureType = type;
+  return *this;
+}
+
+auto RenderGraphBuilder::SetViewMask(uint32_t mask) -> RenderGraphBuilder & {
   return *this;
 }
 

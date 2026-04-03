@@ -60,18 +60,22 @@ struct VirtualTextureDesc {
   rhi::EFormat format = rhi::EFormat::Undefined;
   rhi::Extent2D extent{};
   rhi::ESampleCount sampleCount = rhi::ESampleCount::SampleCount1x;
+  uint32_t layers = 1;
+  rhi::ETextureType textureType = rhi::ETextureType::Texture2D;
 
   HashType GetHash() const noexcept {
     uint64_t sizePacked = (static_cast<uint64_t>(extent.width) << 32) |
                           static_cast<uint64_t>(extent.height);
     HashType h = Hash::Combine(Hash::kOffsetBasis, sizePacked);
 
+    h = Hash::Combine(h, static_cast<uint64_t>(layers));
+
     uint64_t attrPacked = 0;
     using std::to_underlying;
 
-    attrPacked |= (to_underlying(format) & 0x3FFULL);
-    attrPacked |= (to_underlying(sampleCount) & 0x0FULL) << 10;
-    attrPacked |= (to_underlying(usage) & 0xFFFF'FFFFULL) << 14;
+    attrPacked |= (to_underlying(format) & 0x3FFULL);            // 10 bits
+    attrPacked |= (to_underlying(sampleCount) & 0x0FULL) << 10;  // 4 bits
+    attrPacked |= (to_underlying(usage) & 0xFFFF'FFFFULL) << 14; // 32 bits
 
     return Hash::Combine(h, attrPacked);
   }
@@ -79,7 +83,8 @@ struct VirtualTextureDesc {
   bool operator==(const VirtualTextureDesc &other) const noexcept {
     return extent.width == other.extent.width &&
            extent.height == other.extent.height && format == other.format &&
-           sampleCount == other.sampleCount && usage == other.usage;
+           sampleCount == other.sampleCount && usage == other.usage &&
+           layers == other.layers;
   }
 };
 

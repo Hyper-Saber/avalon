@@ -11,8 +11,9 @@ import :light_component;
 import :camera_component;
 import :utils;
 import :visibility_system;
-import :extract_light_system;
+import :render_lighting_system;
 import :update_camera_projection_system;
+import :solar_system;
 
 export namespace avalon::scene {
 
@@ -20,9 +21,10 @@ class AVALON_SCENE_API Scene final : public mem::AutoDestroyable<Scene> {
 public:
   Scene() {
     m_world = MakeUnique<ecs::World>();
-    m_world->AddSystem<ecs::UpdateCameraProjectionSystem>();
-    m_world->AddSystem<ecs::VisibilitySystem>();
-    m_world->AddSystem<ecs::ExtractLightSystem>();
+    m_world->AddSystem<ecs::UpdateCameraProjectionSystem>()
+        .AddSystem<ecs::VisibilitySystem>()
+        .AddSystem<ecs::SolarSystem>()
+        .AddSystem<ecs::RenderLightingSystem>();
   }
 
   void Update(float dt) { m_world->Update(dt); }
@@ -45,6 +47,10 @@ public:
     ecs::TransformComponent transComp{};
     m_world->AddComponent<ecs::LightComponent>(entity, std::move(lightComp))
         .AddComponent<ecs::TransformComponent>(entity, transComp);
+
+    if (type == ELightType::Directional) {
+      m_world->AddComponent<ecs::SolarComponent>(entity);
+    }
 
     return entity;
   }

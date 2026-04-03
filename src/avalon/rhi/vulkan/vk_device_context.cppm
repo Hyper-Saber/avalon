@@ -384,9 +384,17 @@ private:
         // .bufferDeviceAddress = VK_TRUE,
     };
 
+    VkPhysicalDeviceVulkan11Features features11{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
+        .pNext = &features12,
+        .multiview = VK_TRUE,
+        .multiviewGeometryShader = VK_FALSE,
+        .multiviewTessellationShader = VK_FALSE,
+    };
+
     VkPhysicalDeviceFeatures2 features2{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-        .pNext = &features12,
+        .pNext = &features11,
         .features = m_config.features,
     };
 

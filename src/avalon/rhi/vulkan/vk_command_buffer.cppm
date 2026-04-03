@@ -51,15 +51,20 @@ public:
     for (const auto &col : info.colorAttachments) {
       auto *texRes = m_resourceProvider.GetTexture(col.texture);
 
-      vkColors.PushBack(
-          {.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-           .pNext = nullptr,
-           .imageView = texRes->imageView,
-           .imageLayout = ToVkImageLayout(col.layout),
-           .loadOp = ToVkLoadOp(col.loadOp),
-           .storeOp = ToVkStoreOp(col.storeOp),
-           .clearValue = {{{col.clearColor.r, col.clearColor.g,
-                            col.clearColor.b, col.clearColor.a}}}});
+      vkColors.PushBack({
+          .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+          .pNext = nullptr,
+          .imageView = texRes->imageView,
+          .imageLayout = ToVkImageLayout(col.layout),
+          .loadOp = ToVkLoadOp(col.loadOp),
+          .storeOp = ToVkStoreOp(col.storeOp),
+          .clearValue = {{{
+              col.clearColor.r,
+              col.clearColor.g,
+              col.clearColor.b,
+              col.clearColor.a,
+          }}},
+      });
     }
 
     VkRenderingAttachmentInfo vkDepth{};
@@ -89,6 +94,7 @@ public:
                        .extent = {info.renderArea.extent.width,
                                   info.renderArea.extent.height}},
         .layerCount = info.layerCount,
+        .viewMask = info.viewMask,
         .colorAttachmentCount = static_cast<uint32_t>(vkColors.GetSize()),
         .pColorAttachments = vkColors.GetData(),
         .pDepthAttachment = hasDepth ? &vkDepth : nullptr,

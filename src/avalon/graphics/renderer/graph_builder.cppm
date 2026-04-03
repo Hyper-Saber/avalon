@@ -1,4 +1,5 @@
 module;
+#include <cstdint>
 #include <optional>
 #include <utility>
 export module avalon.graphics:render_graph_builder;
@@ -39,6 +40,10 @@ public:
   auto SetRelativeExtent(float scale = 1.f) -> RenderGraphBuilder &;
   auto SetFormat(rhi::EFormat format) -> RenderGraphBuilder &;
   auto SetSamplerCount(rhi::ESampleCount count) -> RenderGraphBuilder &;
+  auto SetLayers(uint32_t layers) -> RenderGraphBuilder &;
+  auto SetTextureType(rhi::ETextureType type) -> RenderGraphBuilder &;
+
+  auto SetViewMask(uint32_t mask) -> RenderGraphBuilder &;
 
   auto SetLoadOp(rhi::EAttachmentLoadOp op) -> RenderGraphBuilder &;
   auto SetStoreOp(rhi::EAttachmentStoreOp op) -> RenderGraphBuilder &;
@@ -54,6 +59,7 @@ private:
   std::optional<rhi::EAttachmentLoadOp> m_loadOp;
   std::optional<rhi::EAttachmentStoreOp> m_storeOp;
   std::optional<ClearValue> m_clearValue;
+  uint32_t m_viewMask = 0;
 
   VirtualResourceHandle m_currentResource;
 };

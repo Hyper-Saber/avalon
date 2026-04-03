@@ -48,7 +48,7 @@ public:
         {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kMaxTextureDescriptor},
         {VK_DESCRIPTOR_TYPE_SAMPLER, kMaxSamplerDescriptor},
         {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kMaxStorageImageDescriptor},
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1},
+        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 2},
         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2048}};
 
     VkDescriptorPoolCreateInfo staticCI{

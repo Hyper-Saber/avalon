@@ -9,7 +9,7 @@ export namespace avalon::ecs {
 struct AVALON_SCENE_API CameraComponent {
   scene::EProjectionType projectionType = scene::EProjectionType::Perspective;
 
-  float fov = 60.f;
+  float fov = 75.f;
   float aspectRatio = 16.f / 9.f;
   float nearPlane = 0.1f;
 

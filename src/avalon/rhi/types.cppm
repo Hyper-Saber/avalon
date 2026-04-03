@@ -11,17 +11,6 @@ import avalon.core;
 
 export namespace avalon::rhi {
 
-constexpr uint32_t kInternalSetCount = 2;
-
-constexpr uint32_t kBindlessSet = 0;
-constexpr uint32_t kMaterialsBinding = 0;
-constexpr uint32_t kTexturesBinding = 1;
-constexpr uint32_t kSamplersBinding = 2;
-constexpr uint32_t kSceneGlobalsSet = 1;
-constexpr uint32_t kSceneGlobalsBinding = 0;
-
-constexpr uint32_t kMaxMaterialCount = 65535;
-
 using BufferHandle = Handle<class BufferTag>;
 using TextureHandle = Handle<class TextureTag>;
 using SamplerHandle = Handle<class SamplerTag>;
@@ -180,6 +169,12 @@ enum class EResourceUsage : uint32_t {
   TransferDst = 1 << 10,
 
   Present = 1 << 11
+};
+
+enum class ETextureType {
+  Texture2D,
+  TextureCube,
+  Texture2DArray,
 };
 
 enum class EDescriptorType : uint32_t {
@@ -456,6 +451,7 @@ struct TextureCreateInfo {
   EResourceUsage usage =
       EResourceUsage::ColorAttachment | EResourceUsage::ReadOnly;
   ESampleCount sampleCount = ESampleCount::SampleCount1x;
+  ETextureType textureType = ETextureType::Texture2D;
 };
 
 struct VertexBinding {
@@ -887,6 +883,8 @@ struct ColorAttachmentInfo {
   EAttachmentStoreOp storeOp = EAttachmentStoreOp::Store;
   Color clearColor{0.0f, 0.0f, 0.0f, 1.0f};
   EResourceLayout layout = EResourceLayout::ColorAttachment;
+  uint32_t layerCount = 1;
+  uint32_t viewMask = 0;
 };
 
 struct DepthStencilAttachmentInfo {
@@ -896,11 +894,14 @@ struct DepthStencilAttachmentInfo {
   float clearDepth = 1.0f;
   uint32_t clearStencil = 0;
   EResourceLayout layout = EResourceLayout::DepthStencilAttachment;
+  uint32_t layerCount = 1;
+  uint32_t viewMask = 0;
 };
 
 struct RenderingInfo {
   Rect2D renderArea;
   uint32_t layerCount{1};
+  uint32_t viewMask;
   Array<ColorAttachmentInfo> colorAttachments;
   std::optional<DepthStencilAttachmentInfo> depthStencil;
 };

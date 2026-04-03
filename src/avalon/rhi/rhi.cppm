@@ -25,6 +25,8 @@ public:
 
   virtual void UpdateMaterialBuffer(size_t offset, const void *data,
                                     size_t size) = 0;
+  virtual void UpdateProbeBuffer(size_t offset, const void *data,
+                                 size_t size) = 0;
 
   virtual auto GetStaticSamplers() const -> const StaticSamplers & = 0;
   virtual auto GetSwapchainImageFormat() const -> EFormat = 0;

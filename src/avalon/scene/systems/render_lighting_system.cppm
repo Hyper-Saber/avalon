@@ -1,6 +1,6 @@
 module;
 #include <utility>
-export module avalon.scene:extract_light_system;
+export module avalon.scene:render_lighting_system;
 
 import avalon.ecs;
 import avalon.graphics;
@@ -9,7 +9,8 @@ import :light_component;
 import :types;
 
 namespace avalon::ecs {
-class ExtractLightSystem final : public RenderSystemBase<ExtractLightSystem> {
+class RenderLightingSystem final
+    : public RenderSystemBase<RenderLightingSystem> {
 
   void OnCapture(World &world, graphics::SceneSnapshot &outSnapshot) override {
     auto view = world.GetView<TransformComponent, LightComponent>();

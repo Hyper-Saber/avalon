@@ -59,6 +59,12 @@ public:
             .descriptorCount = kMaxSamplerDescriptor,
             .stageFlags = VK_SHADER_STAGE_ALL,
         },
+        {
+            .binding = kProbesBinding,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .descriptorCount = 1,
+            .stageFlags = VK_SHADER_STAGE_ALL,
+        },
     };
 
     VkDescriptorBindingFlags bindingFlags[] = {
@@ -66,7 +72,10 @@ public:
             VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT,
         VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT |
             VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT,
-        VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT};
+        VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT,
+        VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT |
+            VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT,
+    };
 
     VkDescriptorSetLayoutBindingFlagsCreateInfo layoutFlags{
         .sType =
@@ -218,7 +227,7 @@ private:
 
     VkWriteDescriptorSet write{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                                .dstSet = m_bindlessSet,
-                               .dstBinding = 0,
+                               .dstBinding = kMaterialsBinding,
                                .dstArrayElement = 0,
                                .descriptorCount = 1,
                                .descriptorType =
@@ -234,7 +243,7 @@ private:
 
     VkWriteDescriptorSet write{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                                .dstSet = m_bindlessSet,
-                               .dstBinding = 1,
+                               .dstBinding = kTexturesBinding,
                                .dstArrayElement = index,
                                .descriptorCount = 1,
                                .descriptorType =
@@ -248,11 +257,26 @@ private:
 
     VkWriteDescriptorSet write{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                                .dstSet = m_bindlessSet,
-                               .dstBinding = 2,
+                               .dstBinding = kSamplersBinding,
                                .dstArrayElement = index,
                                .descriptorCount = 1,
                                .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
                                .pImageInfo = &samplerInfo};
+    vkUpdateDescriptorSets(m_device, 1, &write, 0, nullptr);
+  }
+
+  void UpdateProbeBufferDescriptor() {
+    VkDescriptorBufferInfo bufferInfo =
+        m_resourceProvider.GetProbeBufferInfo();
+
+    VkWriteDescriptorSet write{.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                               .dstSet = m_bindlessSet,
+                               .dstBinding = kProbesBinding,
+                               .dstArrayElement = 0,
+                               .descriptorCount = 1,
+                               .descriptorType =
+                                   VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                               .pBufferInfo = &bufferInfo};
     vkUpdateDescriptorSets(m_device, 1, &write, 0, nullptr);
   }
 

@@ -112,7 +112,6 @@ public:
 
   void RealizeResources(
       const HashMap<VirtualResourceHandle, ResourceTimeline> &timelines) {
-
     auto sortedHandles = timelines.GetKeys();
     std::ranges::sort(sortedHandles, [&](auto a, auto b) {
       return timelines.Get(a)->firstPassIndex <
@@ -150,16 +149,21 @@ public:
             .nameHash = vDesc.nameHash,
             .width = vDesc.extent.width,
             .height = vDesc.extent.height,
+            .layers = vDesc.layers,
             .format = vDesc.format,
             .usage = vDesc.usage,
             .sampleCount = vDesc.sampleCount,
+            .textureType = vDesc.textureType,
         };
 
         rhi::TextureHandle pHandle = m_rhi.CreateTexture(createInfo);
         m_vToPMap.Insert(vHandle.GetIndex(), pHandle);
 
-        PhysicalEntry newEntry{.handle = pHandle,
-                               .lastusedPassIndex = timeline.lastPassIndex};
+        PhysicalEntry newEntry{
+            .handle = pHandle,
+            .lastusedPassIndex = timeline.lastPassIndex,
+            .lastFrameUsed = currentFrame,
+        };
 
         if (auto *bucket = m_physicalCache.Get(descHash)) {
           bucket->PushBack(newEntry);
@@ -227,8 +231,8 @@ private:
       auto &bucket = entry.GetValue();
       bucket.RemoveIf([&](const auto &e) {
         if (currentFrame - e.lastFrameUsed > kThreshold) {
-          Debug("[Virtual Resource GC] Released. lastFrameUsed: {}",
-                e.lastFrameUsed);
+          Debug("[Virtual Resource GC] Released. lastFrameUsed: {}, handle: {}",
+                e.lastFrameUsed, e.handle.id);
           m_rhi.ReleaseTexture(e.handle);
           return true;
         }

@@ -122,6 +122,10 @@ auto Engine::Initialize(const EngineConfig &config,
   m_scene = MakeUnique<scene::Scene>();
 
   m_scene->GetWorld().AddSystem<ecs::PhysicsSystem>();
+
+  rhi::ProbeData data = graphics::CreateSkyboxProbeData();
+
+  m_rhi->UpdateProbeBuffer(0, &data, sizeof(rhi::ProbeData));
   m_userApp->OnInitialize(*m_scene.Get(), *m_rhi.Get(), {width, height});
   return {};
 }

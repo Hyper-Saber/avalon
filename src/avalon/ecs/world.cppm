@@ -41,12 +41,13 @@ public:
     return GetPool<T>().Contains(e);
   }
 
-  template <TSystem T, typename... Args> void AddSystem(Args &&...args) {
+  template <TSystem T, typename... Args> World &AddSystem(Args &&...args) {
     auto system = MakeUnique<T>(std::forward<Args>(args)...);
     if constexpr (std::is_base_of_v<IRenderSystem, T>) {
       m_renderSystems.PushBack(std::move(system));
     } else
       m_logicSystems.PushBack(std::move(system));
+    return *this;
   }
 
   auto GetMaxEntity() const { return m_entityConuter; }

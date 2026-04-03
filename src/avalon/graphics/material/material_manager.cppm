@@ -81,7 +81,7 @@ public:
       return m_defaultOpaqueInstance;
     }
 
-    AVALON_ASSERT(!m_freeIndices.IsEmpty() && "Out of material indices!");
+    AVALON_ASSERT(!m_freeIndices.IsEmpty());
     uint32_t gpuIdx = m_freeIndices.GetBack();
     m_freeIndices.PopBack();
 

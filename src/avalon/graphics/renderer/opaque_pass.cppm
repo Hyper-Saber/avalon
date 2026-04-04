@@ -22,6 +22,7 @@ public:
     m_depthHandle =
         builder.SetClearValue(ClearValue::DepthStencil(0, 0))
             .Write(kSceneDepth, rhi::EResourceUsage::DepthStencilAttachment);
+    m_skyboxHandle = builder.Read(kSkyboxCube, rhi::EResourceUsage::ReadOnly);
   }
 
   void OnCompile(rhi::IRhi &rhi) override {}
@@ -66,6 +67,11 @@ public:
           lastIBO = currentIBO;
         }
 
+        auto textureIndex =
+            context.rhi.GetBindlessManager().RegisterTextureCube(
+                context.GetPhysicalTexture(m_skyboxHandle));
+        packet.pushConstants[i].textureSlots[kSkyboxSlot] = textureIndex;
+
         cmd.PushConstants(rhi::EShaderStage::All, 0,
                           sizeof(StandardPushConstant),
                           &packet.pushConstants[i]);
@@ -78,6 +84,9 @@ public:
 private:
   VirtualResourceHandle m_colorHandle;
   VirtualResourceHandle m_depthHandle;
+  VirtualResourceHandle m_skyboxHandle;
+
+  MaterialInstance *m_materialInstance;
 };
 
 } // namespace avalon::graphics

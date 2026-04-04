@@ -1,3 +1,6 @@
+#ifndef AVALON_SCREEN_SPACE_HLSLI
+#define AVALON_SCREEN_SPACE_HLSLI
+
 struct VsOutput {
   float4 pos : SV_POSITION;
   float2 uv : TEXCOORD0;
@@ -46,3 +49,4 @@ VsOutput FullscreenSkybox(uint vertexId, float4x4 invProjection,
 
   return output;
 }
+#endif

@@ -9,8 +9,8 @@ namespace avalon::ecs {
 export struct SolarComponent {
   float latitude = 30.f;
   float declination = 0.0f;
-  float timeOfDay = 6.0f;
-  float timeMultiplier = 10.0f;
+  float timeOfDay = 12.0f;
+  float timeMultiplier = 30.0f;
 
   float intensity = 10.0f;
   Color color = Color(1.0f, 1.0f, 1.0f);
@@ -52,16 +52,16 @@ public:
 private:
   void UpdateAtmosphere(LightComponent &light, const SolarComponent &solar,
                         float sunHeight) {
-    float horizonFade = SmoothStep(-0.1f, 0.1f, sunHeight);
-    if (sunHeight > 0.0f) {
-      light.intensity =
-          solar.intensity * horizonFade * SmoothStep(0.0f, 0.2f, sunHeight);
+    float visibility = SmoothStep(-0.2f, 0.15f, sunHeight);
 
-      light.color = Color::Lerp(solar.horizonColor, solar.color,
-                                SmoothStep(0.0f, 0.4f, sunHeight));
+    float exposureComp = Lerp(2.0f, 1.0f, SmoothStep(0.0f, 0.3f, sunHeight));
+
+    if (sunHeight > -0.2f) {
+      light.intensity = solar.intensity * visibility * exposureComp;
+      light.color = solar.color;
     } else {
-      light.intensity = 0.05f;
-      light.color = Color(0.12f, 0.15f, 0.25f);
+      light.intensity = 0.02f;
+      light.color = Color(0.1f, 0.15f, 0.3f);
     }
   }
 };

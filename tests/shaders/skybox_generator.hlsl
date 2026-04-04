@@ -1,10 +1,10 @@
 #include "common.hlsli"
 #include "noise.hlsli"
+#include "sky_model.hlsli"
 
 struct VsOputput {
   float4 position : SV_Position;
   float3 viewDir : TEXCOORD0;
-  // uint viewId : SV_RenderTargetArrayIndex;
 };
 
 VsOputput VsMain(uint vertexId : SV_VertexID, uint viewId : SV_ViewID) {
@@ -23,8 +23,9 @@ VsOputput VsMain(uint vertexId : SV_VertexID, uint viewId : SV_ViewID) {
 }
 
 float4 FsMain(VsOputput input) : SV_Target {
-  float3 viewDir = normalize(input.viewDir);
-  float3 color = viewDir * 0.5 + 0.5;
-  float noise = (noise2d(input.position.xy) - 0.5) / 255.0;
-  return float4(color + noise, 1.0);
+  float3 dir = normalize(input.viewDir);
+  float3 sunDir = normalize(-uMainLight.posDir.xyz);
+
+  return ComputeSkyColor(dir, sunDir, kZenithColor, kHorizonColor,
+                         kGroundColor);
 }

@@ -355,6 +355,14 @@ template <> struct EnableBitmaskOperators<EPipelineStage> : std::true_type {};
 constexpr uint32_t kMaxTextureSlots = 7;
 constexpr uint32_t kInvalidTextureSlot = 0xFFFF;
 
+constexpr uint32_t kSkyboxSlot = 0;
+constexpr uint32_t kBaseColorSlot = 1;
+constexpr uint32_t kNormalSlot = 2;
+constexpr uint32_t kMetallicRoughnessSlot = 3;
+constexpr uint32_t kEmissiveSlot = 4;
+constexpr uint32_t kOcclusionSlot = 5;
+constexpr uint32_t kShadowSlot = 6;
+
 struct alignas(16) StandardPushConstant {
   Matrix4x4 model;
   Matrix4x4 normalMatrix;

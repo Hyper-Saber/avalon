@@ -15,11 +15,11 @@ class RenderContext final : public NonCopyable,
                             public ecs::IRenderDataSink {
 public:
   explicit RenderContext(rhi::IRhi &rhi, VirtualResourceManager &manager,
-                         const RenderPacket &packet)
+                         RenderPacket &packet)
       : rhi(rhi), m_resourceManager(manager), renderPacket(packet) {}
 
   rhi::IRhi &rhi;
-  const RenderPacket &renderPacket;
+  RenderPacket &renderPacket;
   PipelineRenderingInfo pipelineRenderingInfo;
   rhi::ICommandBuffer *cmd{nullptr};
   rhi::DescriptorSetHandle sceneGlobalsSet;

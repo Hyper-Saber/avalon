@@ -25,7 +25,6 @@
 
 ### 2. 渲染流程 (Render Graph)
 
-- **状态**: **已实现 (Stable)**。
 - **同步优化**: 自动分析资源读写依赖，精确注入 **Pipeline Barriers** 与 **Image Layout Transitions**。
 - **资源管理**: 自动化处理资源生命周期，支持显存复用（Aliasing）。
 
@@ -35,9 +34,16 @@
 
 | Set | Binding | Resource | Description |
 | :--- | :--- | :--- | :--- |
-| **Set 0** | 0 | `materialDatas[]` | **SSBO**: 全局材质属性池 (Color, PBR Params, etc.) |
-| | 1 | `textures[]` | **Bindless**: 全局贴图数组 |
-| | 2 | `samplers[]` | **Bindless**: 全局采样器池 |
+| **Set 0** | 0 | `samplers[]` | **Bindless**: 全局采样器池 |
+|  | 1 | `materialDatas` | **SSBO**: 全局材质属性池 (Color, PBR Params, etc.) |
+| | 2 | `probes` | **SSBO**: 全局探针池 |
+| | 3 | `envCubes[]` | **Bindless**: 全局环境贴图池 |
+| | 5 | `texture2DArrays[]` | **Bindless**: 全局材质数组池 |
+| | 4 | `volumes[]` | **Bindless**: 全局3D材质池 |
+| | 6 | `textures[]` | **Bindless**: 全局材质池 |
+| | 7 | `rwTextures[]` | **Bindless**: 全局StorageImage池 |
+| | 8 | `rwBuffers` | **SSBO**: 全局通用SSBO池 |
+| | 9 | `rwTextureArrays[]` | **Bindless**: 全局storageImageArray池 |
 | **Set 1** | 0 | `sceneGlobals` | **UBO**: 相机矩阵、环境光、投影参数 |
 
 ---
@@ -61,5 +67,6 @@
 - [ ] **光线追踪 (Ray Tracing)**: 接入 `VK_KHR_ray_tracing` 扩展，实现硬核阴影与反射。
 - [ ] **Async Compute**: 利用 Render Graph 实现自动异步计算分发。
 - [ ] **Meshlet Pipeline**: 探索基于任务着色器的现代渲染管线。
+- [ ] **Hot reload**: 在上层应用运行时提供编辑器模式,支持gameplay等上层模块的热重载。
 
 ---

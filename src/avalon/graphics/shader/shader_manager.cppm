@@ -19,20 +19,21 @@ public:
   AVALON_SHADER_API ~ShaderManager() override = default;
 
   auto AVALON_SHADER_API GetOrCreateShader(const Path &path) -> ShaderHandle {
-    auto pathHash = path.GetId();
+    auto vPath = Path(vfs::kShaderFolderVirtualPath) / path;
+    auto pathHash = vPath.GetId();
 
     if (auto handle = m_shaderCache.Get(pathHash)) {
       return *handle;
     }
 
     auto source = CreateEmptyBlob();
-    auto result = vfs::GetVfs().ReadFile(path, source);
+    auto result = vfs::GetVfs().ReadFile(vPath, source);
     if (result != vfs::EVfsError::None) {
       return {};
     }
 
     Path absPath;
-    vfs::GetVfs().GetAbsolute(path, absPath);
+    vfs::GetVfs().GetAbsolute(vPath, absPath);
 
     ShaderCompileDesc desc{
         .sourceCode = std::move(source),
@@ -53,11 +54,49 @@ public:
     return handle;
   }
 
+  auto AVALON_SHADER_API GetOrCreateComputeShader(
+      const Path &path, const char *entryPoint = "CsMain") -> ShaderHandle {
+    auto vPath = Path(vfs::kShaderFolderVirtualPath) / path;
+    auto pathHash = vPath.GetId();
+    if (auto handle = m_shaderCache.Get(pathHash))
+      return *handle;
+
+    auto source = CreateEmptyBlob();
+    if (vfs::GetVfs().ReadFile(vPath, source) != vfs::EVfsError::None)
+      return {};
+
+    Path absPath;
+    vfs::GetVfs().GetAbsolute(vPath, absPath);
+
+    ShaderCompileDesc desc{
+        .sourceCode = std::move(source),
+        .filePath = absPath,
+        .shaderStages = {{.entryPointName = entryPoint,
+                          .shaderStage = EShaderStage::Compute}},
+    };
+
+    auto binaryCode = m_compiler->Compile(desc);
+    auto handle = m_shaderPool.Create(std::move(binaryCode));
+    m_shaderCache.Insert(pathHash, handle);
+    CreateComputePipeline(handle);
+    return handle;
+  }
+
   auto AVALON_SHADER_API Resolve(ShaderHandle handle) -> const Shader * {
     return m_shaderPool.Resolve(handle);
   }
 
 private:
+  void CreateComputePipeline(ShaderHandle handle) {
+    auto pShader = Resolve(handle);
+    ComputePipelineCreateInfo info{
+        .stageInfo = *pShader->GetComputeStageInfo(),
+        .descriptorSetLayoutBindings = pShader->GetDescriptorSetLayouts(),
+    };
+
+    m_rhi.GetOrCreateComputePipeline(info);
+  }
+
   rhi::IRhi &m_rhi;
   UniquePtr<ShaderCompiler> m_compiler;
   HashMap<StringId, ShaderHandle> m_shaderCache;

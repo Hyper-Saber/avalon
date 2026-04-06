@@ -31,7 +31,30 @@ public:
       return *handle;
     }
 
-    auto pipeline = BuildPipeline(info);
+    auto pipeline = BuildGraphicsPipeline(info);
+    if (pipeline.IsValid())
+      m_pipelineCaches.Insert(key, pipeline);
+    return {pipeline.id};
+  }
+
+  auto GetOrCreate(const ComputePipelineCreateInfo &info)
+      -> Handle<PipelineResource> {
+    PipelineKey key{};
+    key.renderingHash = 0;
+    key.statePacked = 0;
+    key.shaderHash = info.stageInfo.GetHash();
+
+    HashType layoutHash = Hash::kOffsetBasis;
+    for (const auto &binding : info.descriptorSetLayoutBindings) {
+      layoutHash = Hash::Combine(layoutHash, binding.GetHash());
+    }
+    key.layoutHash = layoutHash;
+
+    if (auto handle = m_pipelineCaches.Get(key)) {
+      return *handle;
+    }
+
+    auto pipeline = BuildComputePipeline(info);
     if (pipeline.IsValid())
       m_pipelineCaches.Insert(key, pipeline);
     return {pipeline.id};
@@ -64,6 +87,125 @@ private:
       return Hash::Combine(hash, key.statePacked);
     }
   };
+
+  void ResolveDescriptorLayouts(Span<const DescriptorSetLayoutBinding> bindings,
+                                Array<VkDescriptorSetLayout> &outVkLayouts,
+                                Array<DescriptorSetLayoutMeta> &outMeta) {
+
+    auto bindlessLayout = m_resourceProvider.GetBindlessSetLayout();
+    auto globalSetLayout = m_resourceProvider.GetSceneGlobalSetLayout();
+
+    outVkLayouts.Clear();
+    outVkLayouts.Resize(kInternalSetCount);
+    outVkLayouts[kBindlessSet] = bindlessLayout;
+    outVkLayouts[kSceneGlobalsSet] = globalSetLayout;
+
+    if (bindings.IsEmpty())
+      return;
+
+    uint32_t startIdx = 0;
+    uint32_t currentSet = bindings[0].set;
+    uint32_t total = bindings.GetSize();
+
+    for (uint32_t i = 0; i <= total; ++i) {
+      bool isEnd = (i == total);
+      if (isEnd || bindings[i].set != currentSet) {
+        auto subSpan = bindings.Subspan(startIdx, i - startIdx);
+
+        while (outVkLayouts.GetSize() < currentSet) {
+          outVkLayouts.PushBack(m_descriptorSetLayoutCache->GetEmptyLayout());
+        }
+
+        Span<const VkDescriptorSetLayoutBinding> vkBindings;
+        auto setLayout =
+            m_descriptorSetLayoutCache->GetOrCreate(subSpan, vkBindings);
+
+        outVkLayouts.PushBack(setLayout);
+        outMeta.PushBack(
+            DescriptorSetLayoutMeta(subSpan, vkBindings, setLayout));
+
+        if (isEnd)
+          break;
+        currentSet = bindings[i].set;
+        startIdx = i;
+      }
+    }
+  }
+
+  auto BuildGraphicsPipeline(const PipelineCreateInfo &info)
+      -> Handle<PipelineResource> {
+    auto builder = PipelineBuilder();
+    builder.LoadStates(info).SetVertexInput(info.vertexBindings,
+                                            info.vertexInputAttributes);
+
+    for (const auto &stageInfo : info.stageInfos) {
+      auto module = m_shaderModuleCache->GetOrCreateShaderModule(stageInfo);
+      builder.AddShaderStage(stageInfo.stage, stageInfo.entryName, module);
+    }
+
+    Array<VkDescriptorSetLayout> vkSetLayouts;
+    Array<DescriptorSetLayoutMeta> meta;
+    ResolveDescriptorLayouts(info.descriptorSetLayoutBindings, vkSetLayouts,
+                             meta);
+
+    Array<VkPushConstantRange> vkRanges;
+    vkRanges.PushBack({
+        .stageFlags = VK_SHADER_STAGE_ALL,
+        .offset = 0,
+        .size = sizeof(StandardPushConstant),
+    });
+
+    auto layout =
+        m_pipelineLayoutCache->GetOrCreateLayout(vkSetLayouts, vkRanges);
+    auto pipeline = builder.Build(m_device, layout);
+
+    if (pipeline == VK_NULL_HANDLE)
+      return {};
+
+    return m_pipelinePool.Create(m_device, pipeline, layout, std::move(meta));
+  }
+
+  auto BuildComputePipeline(const ComputePipelineCreateInfo &info)
+      -> Handle<PipelineResource> {
+    VkShaderModule csModule =
+        m_shaderModuleCache->GetOrCreateShaderModule(info.stageInfo);
+
+    Array<VkDescriptorSetLayout> vkSetLayouts;
+    Array<DescriptorSetLayoutMeta> meta;
+    ResolveDescriptorLayouts(info.descriptorSetLayoutBindings, vkSetLayouts,
+                             meta);
+
+    Array<VkPushConstantRange> vkRanges;
+    vkRanges.PushBack({
+        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+        .offset = 0,
+        .size = sizeof(StandardPushConstant),
+    });
+
+    auto layout =
+        m_pipelineLayoutCache->GetOrCreateLayout(vkSetLayouts, vkRanges);
+
+    VkComputePipelineCreateInfo createInfo{
+        .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+        .stage =
+            {
+                .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                .stage = VK_SHADER_STAGE_COMPUTE_BIT,
+                .module = csModule,
+                .pName = info.stageInfo.entryName.GetData(),
+            },
+        .layout = layout,
+    };
+
+    VkPipeline vkPipeline = VK_NULL_HANDLE;
+    vkCreateComputePipelines(m_device, VK_NULL_HANDLE, 1, &createInfo, nullptr,
+                             &vkPipeline);
+
+    if (vkPipeline == VK_NULL_HANDLE)
+      return {};
+
+    return m_pipelinePool.Create(m_device, vkPipeline, layout, std::move(meta));
+  }
 
   auto CreateInfoToKey(const PipelineCreateInfo &info) -> PipelineKey {
     HashType renderingHash = Hash::kOffsetBasis;
@@ -111,95 +253,6 @@ private:
                        .statePacked = stateHash};
   }
 
-  auto BuildPipeline(const PipelineCreateInfo &info)
-      -> Handle<PipelineResource> {
-
-    auto builder = PipelineBuilder();
-    builder.LoadStates(info).SetVertexInput(info.vertexBindings,
-                                            info.vertexInputAttributes);
-
-    for (const auto &stageInfo : info.stageInfos) {
-      auto module = m_shaderModuleCache->GetOrCreateShaderModule(stageInfo);
-      builder.AddShaderStage(stageInfo.stage, stageInfo.entryName, module);
-    }
-
-    Array<DescriptorSetLayoutMeta> meta;
-
-    auto bindlessLayout = m_resourceProvider.GetBindlessSetLayout();
-    auto globalSetLayout = m_resourceProvider.GetSceneGlobalSetLayout();
-    AVALON_ASSERT(bindlessLayout != VK_NULL_HANDLE &&
-                  globalSetLayout != VK_NULL_HANDLE);
-    Array<VkDescriptorSetLayout> vkSetLayouts(kInternalSetCount);
-    vkSetLayouts[kBindlessSet] = bindlessLayout;
-    vkSetLayouts[kSceneGlobalsSet] = globalSetLayout;
-
-    if (!info.descriptorSetLayoutBindings.IsEmpty()) {
-      uint32_t startIdx = 0;
-      uint32_t currentSet = info.descriptorSetLayoutBindings[0].set;
-
-      AVALON_ASSERT_MSG(
-          currentSet >= kInternalSetCount,
-          String::Format("[Vulkan]: Set {} is reserved for internal usage! ",
-                         currentSet));
-
-      auto total = info.descriptorSetLayoutBindings.GetSize();
-      for (uint32_t i = 0; i <= total; ++i) {
-        bool isEnd = (i == total);
-        if (isEnd || info.descriptorSetLayoutBindings[i].set != currentSet) {
-          auto subSpan =
-              info.descriptorSetLayoutBindings.Subspan(startIdx, i - startIdx);
-
-          if (!subSpan.IsEmpty()) {
-            while (vkSetLayouts.GetSize() < currentSet) {
-              vkSetLayouts.PushBack(
-                  m_descriptorSetLayoutCache->GetEmptyLayout());
-            }
-
-            Span<const VkDescriptorSetLayoutBinding> vkBindings;
-            auto setLayout =
-                m_descriptorSetLayoutCache->GetOrCreate(subSpan, vkBindings);
-            if (setLayout == VK_NULL_HANDLE)
-              return {};
-
-            vkSetLayouts.PushBack(setLayout);
-            meta.PushBack(
-                DescriptorSetLayoutMeta(subSpan, vkBindings, setLayout));
-          }
-
-          if (isEnd)
-            break;
-          currentSet = info.descriptorSetLayoutBindings[i].set;
-          startIdx = i;
-        }
-      }
-    }
-
-    Array<VkPushConstantRange> vkRanges;
-    vkRanges.PushBack({
-        .stageFlags = VK_SHADER_STAGE_ALL,
-        .offset = 0,
-        .size = sizeof(StandardPushConstant),
-    });
-
-    auto layout =
-        m_pipelineLayoutCache->GetOrCreateLayout(vkSetLayouts, vkRanges);
-
-    auto pipeline = builder.Build(m_device, layout);
-    if (pipeline == VK_NULL_HANDLE)
-      return {};
-
-    auto handle =
-        m_pipelinePool.Create(m_device, pipeline, layout, std::move(meta));
-
-    Debug("[Vulkan]: Pipeline created! \n Id: {}, \n InputAssemblyState: \n{} "
-          "\n RasterizationState: \n{} \n DepthStencilState: \n{}\n ",
-          handle.id, info.inputAssemblyState.ToString().GetData(),
-          info.rasterizationState.ToString().GetData(),
-          info.depthStencilState.ToString().GetData());
-
-    return handle;
-  }
-
   VkDevice m_device;
   IRenderResourceProvider &m_resourceProvider;
   mem::ResourcePool<PipelineResource> m_pipelinePool;
@@ -209,4 +262,5 @@ private:
   UniquePtr<DescriptorSetLayoutCache> m_descriptorSetLayoutCache;
   UniquePtr<PipelineLayoutCache> m_pipelineLayoutCache;
 };
+
 } // namespace avalon::rhi

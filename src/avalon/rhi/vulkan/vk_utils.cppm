@@ -265,6 +265,17 @@ constexpr auto ToVkSampleCount(ESampleCount e) noexcept
   }
 }
 
+constexpr auto ToVkPipelineBindPoint(EPipelineBindPoint e) noexcept {
+  switch (e) {
+  case EPipelineBindPoint::graphics:
+    return VK_PIPELINE_BIND_POINT_GRAPHICS;
+  case EPipelineBindPoint::Compute:
+    return VK_PIPELINE_BIND_POINT_COMPUTE;
+  case EPipelineBindPoint::RayTrace:
+    return VK_PIPELINE_BIND_POINT_RAY_TRACING_NV;
+  }
+}
+
 constexpr auto ToVkCompareOp(ECompareOp compareOp) noexcept -> VkCompareOp {
   switch (compareOp) {
   case ECompareOp::Less:

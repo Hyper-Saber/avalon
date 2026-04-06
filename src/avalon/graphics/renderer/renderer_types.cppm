@@ -61,6 +61,7 @@ struct VirtualTextureDesc {
   rhi::Extent2D extent{};
   rhi::ESampleCount sampleCount = rhi::ESampleCount::SampleCount1x;
   uint32_t layerCount = 1;
+  uint32_t mipLevels = 1;
   rhi::ETextureType textureType = rhi::ETextureType::Texture2D;
 
   HashType GetHash() const noexcept {

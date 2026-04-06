@@ -70,8 +70,15 @@ enum class EFormat {
   D32_SFLOAT_S8_UINT,
 };
 
-enum class EImageFormat {
+enum class EPipelineBindPoint {
+  graphics,
+  Compute,
+  RayTrace,
+};
 
+enum class EPassType {
+  Graphics,
+  Compute,
 };
 
 enum class EVertexSemantic {
@@ -352,7 +359,7 @@ template <> struct EnableBitmaskOperators<EPipelineStage> : std::true_type {};
 
 //---------------------------------------------------------------------------------------------------------------------
 
-constexpr uint32_t kMaxTextureSlots = 7;
+constexpr uint32_t kMaxCustomSlots = 7;
 constexpr uint32_t kInvalidTextureSlot = 0xFFFF;
 
 constexpr uint32_t kSkyboxSlot = 0;
@@ -367,13 +374,14 @@ struct alignas(16) StandardPushConstant {
   Matrix4x4 model;
   Matrix4x4 normalMatrix;
   uint32_t materialIndex = 0;
-  uint32_t textureSlots[kMaxTextureSlots];
+  uint32_t customSlots[kMaxCustomSlots];
 };
 
 struct DeviceCapabilities {
   struct Limits {
     size_t minUniformBufferOffsetAlignment;
     size_t minStorageBufferOffsetAlignment;
+    size_t maxHostLocalVisibleMemorySize;
     float maxSamplerAnisotroy;
   } limits;
 };
@@ -460,6 +468,12 @@ struct TextureCreateInfo {
       EResourceUsage::ColorAttachment | EResourceUsage::ReadOnly;
   ESampleCount sampleCount = ESampleCount::SampleCount1x;
   ETextureType textureType = ETextureType::Texture2D;
+};
+
+struct ComputeGroupSize {
+  uint32_t x;
+  uint32_t y;
+  uint32_t z;
 };
 
 struct VertexBinding {
@@ -778,6 +792,11 @@ struct PipelineRenderingInfo {
   }
 };
 
+struct ComputePipelineCreateInfo {
+  const ShaderStageInfo &stageInfo;
+  Span<const DescriptorSetLayoutBinding> descriptorSetLayoutBindings;
+};
+
 struct PipelineCreateInfo {
   PipelineRenderingInfo renderingInfo;
 
@@ -796,7 +815,7 @@ struct PipelineCreateInfo {
   HashType GetHash() const noexcept;
 };
 
-struct RingAllocation {
+struct BufferAllocation {
   void *pHostAddress;
   uint32_t offset;
   BufferHandle buffer;
@@ -943,6 +962,7 @@ struct ImageCopyRegion {
   uint32_t dstMipLevel = 0;
   uint32_t srcLayer = 0;
   uint32_t dstLayer = 0;
+  uint32_t layerCount = 1;
 };
 
 struct StaticSamplers {

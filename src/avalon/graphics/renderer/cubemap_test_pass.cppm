@@ -47,7 +47,7 @@ public:
       auto textureIndex =
           context.rhi.GetBindlessManager().RegisterTextureCube(handle);
       StandardPushConstant constant;
-      constant.textureSlots[textureSlot] = textureIndex;
+      constant.customSlots[textureSlot] = textureIndex;
 
       cmd.PushConstants(rhi::EShaderStage::All, 0, sizeof(StandardPushConstant),
                         &constant);

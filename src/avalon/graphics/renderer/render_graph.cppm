@@ -21,6 +21,7 @@ public:
     auto &mm = GetMaterialManager();
     m_dummyPipline =
         mm.Resolve(mm.GetDefaultOpaque())->GetOrCreatePipeline(rhi, {});
+    m_dummyComputePipeline = rhi.GetDummyComputePipeline();
   }
 
   auto ImportExternalTexture(StringId name, rhi::TextureHandle physicalHandle,
@@ -130,18 +131,30 @@ public:
   }
 
   void Render(rhi::ICommandBuffer &cmd, RenderContext &context) {
-    struct PendingUsage {
-      rhi::EResourceUsage usage;
-      rhi::TextureHandle handle;
-      uint32_t layerCount;
-    };
-
     Array<PendingUsage> finalPendingUsages;
 
     bool isGlobalSetBinded = false;
+    bool isComputeGlobalSetBinded = false;
 
     for (uint32_t nodeIdx : m_executionQueue) {
       auto &node = m_nodes[nodeIdx];
+
+      HandleResourceTransitions(cmd, node, finalPendingUsages);
+
+      if (node.passType == rhi::EPassType::Compute) {
+        if (!isComputeGlobalSetBinded) [[unlikely]] {
+          cmd.BindPipeline(m_dummyComputePipeline,
+                           rhi::EPipelineBindPoint::Compute);
+          cmd.BindBindlessSet(rhi::EPipelineBindPoint::Compute);
+          cmd.BindDescriptorSet(kSceneGlobalsSet, {&context.sceneGlobalsSet, 1},
+                                {&context.sceneGlobalsSetDynamicOffset, 1},
+                                rhi::EPipelineBindPoint::Compute);
+          isComputeGlobalSetBinded = true;
+        }
+        node.pass->Execute(cmd, context);
+        continue;
+      }
+
       context.pipelineRenderingInfo.Clear();
       context.pipelineRenderingInfo.viewMask = node.viewMask;
       rhi::RenderingInfo renderingInfo{
@@ -155,15 +168,8 @@ public:
         if (!physicalHandle.IsValid())
           continue;
 
-        auto fixedUsage = output.usage;
-        if (fixedUsage == rhi::EResourceUsage::Present) {
-          fixedUsage = rhi::EResourceUsage::ColorAttachment;
-          finalPendingUsages.PushBack(
-              {output.usage, physicalHandle, output.layerCount});
-        }
-        cmd.Transition(physicalHandle, fixedUsage, output.layerCount);
-
-        auto resDesc = m_resourceManager.GetResourceDesc(output.handle);
+        auto &resDesc = m_resourceManager.GetResourceDesc(output.handle);
+        auto fixedUsage = FixUsage(output.initialUsage);
 
         if (IsDepthFormat(resDesc.format)) {
           renderingInfo.depthStencil = rhi::DepthStencilAttachmentInfo{
@@ -190,18 +196,8 @@ public:
               resDesc.format);
         }
       }
-
-      for (auto &input : node.inputs) {
-        if (input.usage == rhi::EResourceUsage::None)
-          continue;
-        auto physicalHandle = m_resourceManager.GetPhysical(input.handle);
-        if (physicalHandle.IsValid()) {
-          cmd.Transition(physicalHandle, input.usage, input.layerCount);
-        }
-      }
-
       cmd.BeginRendering(renderingInfo);
-      if (!isGlobalSetBinded) {
+      if (!isGlobalSetBinded) [[unlikely]] {
         cmd.BindPipeline(m_dummyPipline);
         cmd.BindBindlessSet();
         cmd.BindDescriptorSet(kSceneGlobalsSet, {&context.sceneGlobalsSet, 1},
@@ -221,7 +217,8 @@ public:
       cmd.SetScissor(node.renderArea);
       node.pass->Execute(cmd, context);
       for (auto &entry : finalPendingUsages) {
-        cmd.Transition(entry.handle, entry.usage, entry.layerCount);
+        cmd.Transition(entry.handle, entry.usage, entry.layerCount,
+                       entry.levelCount);
       }
       cmd.EndRendering();
     }
@@ -233,11 +230,10 @@ private:
   struct ResourceRequest {
     StringId nameHash;
     VirtualResourceHandle handle;
-    rhi::EResourceUsage usage = rhi::EResourceUsage::None;
+    rhi::EResourceUsage initialUsage = rhi::EResourceUsage::None;
     rhi::EAttachmentLoadOp loadOp = rhi::EAttachmentLoadOp::DontCare;
     rhi::EAttachmentStoreOp storeOp = rhi::EAttachmentStoreOp::DontCare;
     rhi::ClearValue clearValue;
-    uint32_t layerCount = 1;
   };
 
   struct PassNode {
@@ -248,8 +244,18 @@ private:
 
     Rect2D renderArea;
     uint32_t layerCount = 1;
+    uint32_t levelCount = 1;
     uint32_t viewMask = 0;
     bool isCulled = false;
+
+    rhi::EPassType passType = rhi::EPassType::Graphics;
+  };
+
+  struct PendingUsage {
+    rhi::EResourceUsage usage;
+    rhi::TextureHandle handle;
+    uint32_t layerCount;
+    uint32_t levelCount;
   };
 
   PassNode &GetNode(IRenderPass *pass) {
@@ -260,16 +266,17 @@ private:
   }
 
   template <TRenderPass T, typename... Args>
-  T &AddPass(StringId name, Args &&...args) {
+  T &AddPass(StringId name, rhi::EPassType type, Args &&...args) {
     auto pass = MakeUnique<T>(std::forward<Args>(args)...);
     T &passRef = *pass;
-    m_nodes.PushBack(PassNode{.nameHash = name, .pass = std::move(pass)});
+    m_nodes.PushBack(
+        PassNode{.nameHash = name, .pass = std::move(pass), .passType = type});
     m_nodeIndices.Insert(&passRef, m_nodes.GetSize() - 1);
     return passRef;
   }
 
-  auto Write(IRenderPass &owner, VirtualTextureDesc desc)
-      -> VirtualResourceHandle {
+  auto Write(IRenderPass &owner, VirtualTextureDesc desc,
+             rhi::EResourceUsage initialUsage) -> VirtualResourceHandle {
     auto handleIndex = m_resourceManager.GetOrCreateVirtualResouceIndex(desc);
     auto &node = GetNode(&owner);
     if (!m_resourceManager.IsFirstGeneration(handleIndex)) {
@@ -281,8 +288,11 @@ private:
       }
     }
     auto handle = m_resourceManager.IncreaseGeneration(handleIndex);
-    node.outputs.PushBack(
-        {.handle = handle, .usage = desc.usage, .layerCount = desc.layerCount});
+    node.outputs.PushBack({
+        .handle = handle,
+        .initialUsage = initialUsage,
+    });
+
     node.renderArea.extent = desc.extent;
     m_resourceManager.RefineUsage(handle, desc.usage);
     return handle;
@@ -292,9 +302,49 @@ private:
       -> VirtualResourceHandle {
     auto handle = m_resourceManager.GetVirtualResource(id);
     auto &node = GetNode(&owner);
-    node.inputs.PushBack({.handle = handle, .usage = usage});
+    node.inputs.PushBack({
+        .handle = handle,
+        .initialUsage = usage,
+    });
     m_resourceManager.RefineUsage(handle, usage);
     return handle;
+  }
+
+  void HandleResourceTransitions(ICommandBuffer &cmd, PassNode &node,
+                                 Array<PendingUsage> &finalPendingUsages) {
+    for (auto &output : node.outputs) {
+      auto physicalHandle = m_resourceManager.GetPhysical(output.handle);
+      if (!physicalHandle.IsValid())
+        continue;
+
+      auto &desc = m_resourceManager.GetResourceDesc(output.handle);
+      auto fixedUsage = FixUsage(output.initialUsage);
+      if (fixedUsage != output.initialUsage) {
+        finalPendingUsages.PushBack({output.initialUsage, physicalHandle,
+                                     desc.layerCount, desc.mipLevels});
+      }
+      cmd.Transition(physicalHandle, fixedUsage, desc.layerCount,
+                     desc.mipLevels);
+    }
+
+    for (auto &input : node.inputs) {
+      if (input.initialUsage == rhi::EResourceUsage::None)
+        continue;
+      auto physicalHandle = m_resourceManager.GetPhysical(input.handle);
+      if (physicalHandle.IsValid()) {
+        auto desc = m_resourceManager.GetResourceDesc(input.handle);
+        cmd.Transition(physicalHandle, input.initialUsage, desc.layerCount,
+                       desc.mipLevels);
+      }
+    }
+  }
+
+  auto FixUsage(rhi::EResourceUsage usage) -> rhi::EResourceUsage {
+    auto fixedUsage = usage;
+    if (fixedUsage == rhi::EResourceUsage::Present) {
+      fixedUsage = rhi::EResourceUsage::ColorAttachment;
+    }
+    return fixedUsage;
   }
 
   rhi::IRhi &m_rhi;
@@ -306,5 +356,6 @@ private:
   HashMap<StringId, VirtualTextureDesc> m_textureDescs;
 
   rhi::PipelineHandle m_dummyPipline;
+  rhi::PipelineHandle m_dummyComputePipeline;
 };
 } // namespace avalon::graphics

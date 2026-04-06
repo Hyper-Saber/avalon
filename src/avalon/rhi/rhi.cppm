@@ -21,6 +21,7 @@ public:
       -> ERhiResult = 0;
 
   virtual auto GetUBOPool() const -> class RingBufferPool & = 0;
+  virtual auto GetSSBOPool() const -> RingBufferPool & = 0;
   virtual auto GetBindlessManager() const -> class IBindlessManager & = 0;
 
   virtual void UpdateMaterialBuffer(size_t offset, const void *data,
@@ -45,6 +46,11 @@ public:
 
   virtual auto GetOrCreatePipeline(const PipelineCreateInfo &info)
       -> PipelineHandle = 0;
+
+  virtual auto GetOrCreateComputePipeline(const ComputePipelineCreateInfo &info)
+      -> PipelineHandle = 0;
+
+  virtual auto GetDummyComputePipeline() const -> PipelineHandle = 0;
 
   virtual auto CreateBuffer(const BufferCreateInfo &info) -> BufferHandle = 0;
   virtual void ReleaseBuffer(BufferHandle handle) = 0;

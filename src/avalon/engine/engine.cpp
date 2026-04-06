@@ -88,8 +88,6 @@ auto Engine::Initialize(const EngineConfig &config,
   }
 
   m_renderer = graphics::CreateRenderer(*m_rhi.Get());
-  m_defaultPipeline = MakeShared<graphics::ForwardPipeline>(*m_rhi.Get());
-  m_renderer->SetPipeline(m_defaultPipeline.Get());
 
   GetContext().RegisterService<graphics::ShaderManager>(
       EEngineService::ShaderManager, *m_rhi.Get());
@@ -100,34 +98,8 @@ auto Engine::Initialize(const EngineConfig &config,
   GetContext().RegisterService<input::InputManager>(
       EEngineService::InputManager);
 
-  auto &shaderManager = graphics::GetShaderManager();
-  auto &materialManager = graphics::GetMaterialManager();
-
-  auto shaderHandle = shaderManager.GetOrCreateShader(
-      Path(vfs::kShaderFolderVirtualPath) / StringView("lit.hlsl"));
-  auto materialHandle =
-      materialManager.CreateMaterial(shaderHandle, "Default"_id);
-  materialManager.SetDefaultOpaque(materialHandle);
-
-  shaderHandle = shaderManager.GetOrCreateShader(
-      Path(vfs::kShaderFolderVirtualPath) / StringView("blit.hlsl"));
-  materialHandle = materialManager.CreateMaterial(shaderHandle, "Blit"_id);
-  materialManager.SetDefaultBlit(materialHandle);
-
-  shaderHandle = shaderManager.GetOrCreateShader(
-      Path(vfs::kShaderFolderVirtualPath) / StringView("skybox.hlsl"));
-  materialHandle = materialManager.CreateMaterial(shaderHandle, "Skybox"_id);
-  materialManager.SetDefaultSkyBox(materialHandle);
-
-  shaderHandle =
-      shaderManager.GetOrCreateShader(Path(vfs::kShaderFolderVirtualPath) /
-                                      StringView("skybox_generator.hlsl"));
-  materialHandle = materialManager.CreateMaterial(shaderHandle, "SkyboxGen"_id);
-
-  shaderHandle = shaderManager.GetOrCreateShader(
-      Path(vfs::kShaderFolderVirtualPath) / StringView("cubemap_test.hlsl"));
-  materialHandle =
-      materialManager.CreateMaterial(shaderHandle, "CubemapTest"_id);
+  m_defaultPipeline = MakeShared<graphics::ForwardPipeline>(*m_rhi.Get());
+  m_renderer->SetPipeline(m_defaultPipeline.Get());
 
   m_scene = MakeUnique<scene::Scene>();
 

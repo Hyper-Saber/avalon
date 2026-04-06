@@ -27,7 +27,9 @@ public:
 
   bool Initialize() {
     auto alignment =
-        m_rhi.GetCapabilities().limits.minUniformBufferOffsetAlignment;
+        m_usage == EResourceUsage::UniformBuffer
+            ? m_rhi.GetCapabilities().limits.minUniformBufferOffsetAlignment
+            : m_rhi.GetCapabilities().limits.minStorageBufferOffsetAlignment;
     m_alignedSegmentSize = mem::AlignUp(m_segmentSize, alignment);
 
     size_t totalSize = m_alignedSegmentSize * m_rhi.GetMaxFrameInFlight();
@@ -50,10 +52,12 @@ public:
     m_allocatedSizeInFrame = 0;
     m_frameIndex = m_rhi.GetCurrentFrameIndex();
     m_alignment =
-        m_rhi.GetCapabilities().limits.minUniformBufferOffsetAlignment;
+        m_usage == EResourceUsage::UniformBuffer
+            ? m_rhi.GetCapabilities().limits.minUniformBufferOffsetAlignment
+            : m_rhi.GetCapabilities().limits.minStorageBufferOffsetAlignment;
   }
 
-  RingAllocation AllocateAligned(size_t size) {
+  BufferAllocation AllocateAligned(size_t size) {
     auto alignedSize = mem::AlignUp(size, m_alignment);
 
     size_t segmentBase = m_frameIndex * m_alignedSegmentSize;

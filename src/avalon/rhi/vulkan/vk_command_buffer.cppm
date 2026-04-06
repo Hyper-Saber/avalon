@@ -34,14 +34,20 @@ public:
     }
   }
 
-  void BindBindlessSet() override {
+  void Dispatch(uint32_t groupCountX, uint32_t groupCountY,
+                uint32_t groupCountZ) override {
+    FlushBarriers();
+    vkCmdDispatch(m_cmd, groupCountX, groupCountY, groupCountZ);
+  }
+
+  void BindBindlessSet(EPipelineBindPoint point) override {
     if (m_layout == VK_NULL_HANDLE)
       return;
 
     VkDescriptorSet bindlessSet = m_resourceProvider.GetBindlessSet();
     if (bindlessSet != VK_NULL_HANDLE) {
-      vkCmdBindDescriptorSets(m_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_layout,
-                              0, 1, &bindlessSet, 0, nullptr);
+      vkCmdBindDescriptorSets(m_cmd, ToVkPipelineBindPoint(point), m_layout, 0,
+                              1, &bindlessSet, 0, nullptr);
     }
   }
 
@@ -131,7 +137,7 @@ public:
 
   void End() override { vkEndCommandBuffer(m_cmd); }
 
-  void BindPipeline(PipelineHandle handle) override {
+  void BindPipeline(PipelineHandle handle, EPipelineBindPoint point) override {
     if (m_lastBoundPipeline == handle)
       return;
 
@@ -139,8 +145,7 @@ public:
     m_layout = res->pipelineLayout;
 
     VkPipeline pipeline = res->pipeline;
-    vkCmdBindPipeline(
-        m_cmd, VkPipelineBindPoint::VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+    vkCmdBindPipeline(m_cmd, ToVkPipelineBindPoint(point), pipeline);
     m_lastBoundPipeline = handle;
   }
 
@@ -178,7 +183,8 @@ public:
 
   void BindDescriptorSet(uint32_t firstSet,
                          Span<const DescriptorSetHandle> sets,
-                         Span<const uint32_t> dynamicOffsets) override {
+                         Span<const uint32_t> dynamicOffsets,
+                         EPipelineBindPoint point) override {
     AVALON_ASSERT_MSG(firstSet > 0,
                       "[Vulkan]: Set 0 was binded by static set!");
     Array<VkDescriptorSet> vkSets;
@@ -187,7 +193,7 @@ public:
       vkSets.PushBack(res->descriptorSet);
     }
 
-    vkCmdBindDescriptorSets(m_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_layout,
+    vkCmdBindDescriptorSets(m_cmd, ToVkPipelineBindPoint(point), m_layout,
                             firstSet, vkSets.GetSize(), vkSets.GetData(),
                             dynamicOffsets.GetSize(), dynamicOffsets.GetData());
   }
@@ -233,8 +239,9 @@ public:
   }
 
   void Transition(TextureHandle handle, EResourceUsage usage,
-                  uint32_t layerCount) override {
-    auto barrier = m_stateTracker.RequestSync(*this, handle, usage, layerCount);
+                  uint32_t layerCount, uint32_t levelCount = 1) override {
+    auto barrier = m_stateTracker.RequestSync(*this, handle, usage, layerCount,
+                                              levelCount);
     if (barrier.has_value()) {
       m_pendingBarriers.PushBack(barrier.value());
       m_isDirty = true;
@@ -288,15 +295,21 @@ public:
     auto dstTextureRes = m_resourceProvider.GetTexture({dst.id});
 
     VkImageCopy copyRegion{
-        .srcSubresource = {.aspectMask = srcTextureRes->aspectMask,
-                           .mipLevel = region.srcMipLevel,
-                           .baseArrayLayer = region.srcLayer,
-                           .layerCount = 1},
+        .srcSubresource =
+            {
+                .aspectMask = srcTextureRes->aspectMask,
+                .mipLevel = region.srcMipLevel,
+                .baseArrayLayer = region.srcLayer,
+                .layerCount = region.layerCount,
+            },
         .srcOffset = {region.srcOffset.x, region.srcOffset.y, 0},
-        .dstSubresource = {.aspectMask = dstTextureRes->aspectMask,
-                           .mipLevel = region.dstMipLevel,
-                           .baseArrayLayer = region.dstLayer,
-                           .layerCount = 1},
+        .dstSubresource =
+            {
+                .aspectMask = dstTextureRes->aspectMask,
+                .mipLevel = region.dstMipLevel,
+                .baseArrayLayer = region.dstLayer,
+                .layerCount = region.layerCount,
+            },
         .dstOffset = {region.dstOffset.x, region.dstOffset.y, 0},
         .extent = {region.extent.width, region.extent.height, 1}};
 

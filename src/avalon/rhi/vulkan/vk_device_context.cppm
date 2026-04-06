@@ -369,6 +369,7 @@ private:
         .pNext = nullptr,
         .synchronization2 = VK_TRUE,
         .dynamicRendering = VK_TRUE,
+        .maintenance4 = VK_TRUE,
     };
 
     VkPhysicalDeviceVulkan12Features features12{
@@ -378,9 +379,11 @@ private:
         .descriptorIndexing = VK_TRUE,
         .shaderSampledImageArrayNonUniformIndexing = VK_TRUE,
         .descriptorBindingSampledImageUpdateAfterBind = VK_TRUE,
+        .descriptorBindingStorageImageUpdateAfterBind = VK_TRUE,
         .descriptorBindingStorageBufferUpdateAfterBind = VK_TRUE,
         .descriptorBindingPartiallyBound = VK_TRUE,
         .runtimeDescriptorArray = VK_TRUE,
+        .scalarBlockLayout = VK_TRUE,
         // .bufferDeviceAddress = VK_TRUE,
     };
 
@@ -453,38 +456,51 @@ private:
     vkGetPhysicalDeviceQueueFamilyProperties(device, &count,
                                              properties.GetData());
 
-    uint32_t i = 0;
-    for (const auto &property : properties) {
-      if (requirement.isRequireGraphics &&
-          property.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+    for (uint32_t i = 0; i < count; i++) {
+      if (properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
         indices.graphicsFamily = i;
+        break;
       }
+    }
+
+    for (uint32_t i = 0; i < count; i++) {
+      const auto &prop = properties[i];
+
       if (requirement.isRequireCompute &&
-          property.queueFlags & VK_QUEUE_COMPUTE_BIT) {
-        indices.computeFamily = i;
+          (prop.queueFlags & VK_QUEUE_COMPUTE_BIT)) {
+        if (i != indices.graphicsFamily) {
+          indices.computeFamily = i;
+        } else if (!indices.computeFamily.has_value()) {
+          indices.computeFamily = i;
+        }
       }
-      if (requirement.isRequireTransfer) {
-        if ((property.queueFlags & VK_QUEUE_TRANSFER_BIT) &&
-            !(property.queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
+
+      if (requirement.isRequireTransfer &&
+          (prop.queueFlags & VK_QUEUE_TRANSFER_BIT)) {
+        bool isDedicated = !(prop.queueFlags & VK_QUEUE_GRAPHICS_BIT) &&
+                           !(prop.queueFlags & VK_QUEUE_COMPUTE_BIT);
+        if (isDedicated) {
           indices.transferFamily = i;
-        } else if (!indices.transferFamily.has_value() &&
-                   (property.queueFlags & VK_QUEUE_TRANSFER_BIT)) {
+        } else if (i != indices.graphicsFamily &&
+                   !indices.transferFamily.has_value()) {
+          indices.transferFamily = i;
+        } else if (!indices.transferFamily.has_value()) {
           indices.transferFamily = i;
         }
       }
+
       if (requirement.isRequirePresent) {
         VkBool32 isSupported;
         vkGetPhysicalDeviceSurfaceSupportKHR(device, i, m_surface,
                                              &isSupported);
         if (isSupported == VK_TRUE) {
-          indices.presentFamily = i;
+          if (i != indices.graphicsFamily) {
+            indices.presentFamily = i;
+          } else if (!indices.presentFamily.has_value()) {
+            indices.presentFamily = i;
+          }
         }
       }
-
-      if (indices.IsComplete(requirement)) {
-        break;
-      }
-      i++;
     }
 
     return indices;

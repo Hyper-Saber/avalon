@@ -1,4 +1,41 @@
 #include "common.hlsli"
+#include "pbr.hlsli"
+
+struct PBRSurface {
+  float3 albedo;
+  float metallic;
+  float roughness;
+  float3 normal;
+  float ao;
+};
+
+float3 CalculateDirectLight(PBRSurface surface, Light mainLight,
+                            float3 viewDir) {
+  float3 N = surface.normal;
+  float3 V = viewDir;
+  float3 L = normalize(-mainLight.posDir.xyz);
+  float3 H = normalize(V + L);
+  float NdotL = max(dot(N, L), 0.0);
+  float NdotV = max(dot(N, V), 0.0);
+
+  float3 F0 = float3(0.04, 0.04, 0.04);
+  F0 = lerp(F0, surface.albedo, surface.metallic);
+
+  float D = distributionGGX(N, H, surface.roughness);
+  float G = geometrySmith(NdotV, NdotL, surface.roughness);
+  float3 F = FresnelSchlick(max(dot(H, V), 0.0), F0);
+
+  float3 numerator = D * G * F;
+  float denominator = max(4.0 * NdotL * NdotV, 0.0001);
+  float3 specular = numerator / denominator;
+
+  float3 ks = F;
+  float3 kd = 1.0 - ks;
+  kd *= 1.0 - surface.metallic;
+
+  return (kd * surface.albedo / kPi + specular) * NdotL *
+         mainLight.colorIntensity.rgb * mainLight.colorIntensity.a;
+}
 
 struct VSInput {
   VK_LOCATION(0) float3 position : POSITION;
@@ -30,35 +67,18 @@ VSOutput VsMain(VSInput input) {
 }
 
 float4 FsMain(VSOutput input) : SV_Target {
-  float3 N = normalize(input.worldNormal);
-  float3 V = normalize(uCamera.cameraPosition.xyz - input.worldPos);
-  float3 L = normalize(-uMainLight.posDir.xyz);
+  PBRSurface surface;
+  surface.albedo = mMaterial.albedo.rgb;
+  surface.metallic = mMaterial.metallic;
+  surface.roughness = mMaterial.roughness;
+  surface.normal = normalize(input.worldNormal);
+  surface.ao = mMaterial.ao;
+  surface.roughness = max(surface.roughness, 0.05);
+  float3 direct = CalculateDirectLight(
+      surface, uMainLight,
+      normalize(uCamera.worldPosition.xyz - input.worldPos));
 
-  // float4 texColor = SampleBindless(mMaterial.baseColorTexIdx,
-  //                                  mMaterial.baseColorSamplerIdx, input.uv);
-  // float3 baseColor = texColor.rgb * input.color * mMaterial.baseColor.rgb;
-  float3 baseColor = input.color * mMaterial.baseColor.rgb;
-
-  float3 lightColor =
-      uMainLight.colorIntensity.rgb * uMainLight.colorIntensity.a;
-
-  float3 ambient = float3(0.01, 0.01, 0.05) * baseColor;
-
-  float3 H = normalize(L + V);
-
-  float3 F0 = float3(mMaterial.f0, mMaterial.f0, mMaterial.f0);
-  float3 F = F0 + (1.0 - F0) * pow(1.0 - max(dot(V, H), 0.0), 5.0);
-
-  float3 kD = (1.0 - F);
-
-  float dotNL = max(dot(N, L), 0.0);
-  float3 diffuse = kD * dotNL * lightColor * baseColor / kPi;
-
-  float shininess = max(mMaterial.shininess, 1.0);
-  float energyConservation = (shininess + 8.0) / (8.0 * kPi);
-  float spec = pow(max(dot(N, H), 0.0), shininess) * energyConservation;
-  float3 specular = spec * F * lightColor * mMaterial.specularColor.rgb;
-
-  return float4(ambient + diffuse + specular, 1);
-  // texColor.a * mMaterial.baseColor.a);
+  // float3 c = surface.normal;
+  // return float4(c, 1.0);
+  return float4(direct, 1.0);
 }

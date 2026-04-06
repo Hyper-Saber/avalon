@@ -22,15 +22,17 @@ public:
       : m_graph(graph), m_owner(&owner), m_rhi(rhi) {}
 
   template <TRenderPass T, typename... Args>
-  T &AddPass(StringId name, Args &&...args) {
-    auto &pass = m_graph.AddPass<T>(name, std::forward<Args>(args)...);
+  T &AddPass(StringId name, rhi::EPassType type = rhi::EPassType::Graphics,
+             Args &&...args) {
+    auto &pass = m_graph.AddPass<T>(name, type, std::forward<Args>(args)...);
     RenderGraphBuilder setupBuilder(m_graph, pass, m_rhi);
     pass.Setup(setupBuilder);
     return pass;
   }
 
   auto Write(StringId name,
-             rhi::EResourceUsage usage = rhi::EResourceUsage::ColorAttachment)
+             rhi::EResourceUsage usage = rhi::EResourceUsage::ColorAttachment,
+             rhi::EResourceUsage initialUsage = rhi::EResourceUsage::None)
       -> VirtualResourceHandle;
   auto Read(StringId name,
             rhi::EResourceUsage usage = rhi::EResourceUsage::ReadOnly)
@@ -41,6 +43,7 @@ public:
   auto SetFormat(rhi::EFormat format) -> RenderGraphBuilder &;
   auto SetSamplerCount(rhi::ESampleCount count) -> RenderGraphBuilder &;
   auto SetLayers(uint32_t layers) -> RenderGraphBuilder &;
+  auto SetMipLevels(uint32_t mipLevels) -> RenderGraphBuilder &;
   auto SetTextureType(rhi::ETextureType type) -> RenderGraphBuilder &;
 
   auto SetViewMask(uint32_t mask) -> RenderGraphBuilder &;

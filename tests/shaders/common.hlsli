@@ -1,6 +1,8 @@
 #ifndef AVALON_COMMON_HLSLI
 #define AVALON_COMMON_HLSLI
 
+#include "constants.hlsli"
+
 #define VK_BINDING(b, s) [[vk::binding(b, s)]]
 #define VK_PUSH_CONSTANT [[vk::push_constant]]
 #define VK_LOCATION(l) [[vk::location(l)]]
@@ -19,11 +21,6 @@
 
 #define mMaterial uMaterials[mMaterialIndex]
 
-#define kSizeOfPushConstant
-
-#define kPi 3.14159265359
-#define kEpsilon 1e-6
-
 struct Camera {
   float4x4 view;
   float4x4 projection;
@@ -31,7 +28,7 @@ struct Camera {
   float4x4 invView;
   float4x4 invProjection;
   float4x4 invViewProjection;
-  float4 cameraPosition;
+  float4 worldPosition;
 };
 
 struct Light {
@@ -58,12 +55,16 @@ struct SceneGlobals {
 };
 
 struct MaterialData {
-  float4 baseColor;
-  float4 specularColor;
-  float shininess;
-  float f0;
+  float4 albedo;
+  float metallic;
+  float roughness;
+  float ao;
+  float emissive;
+
+  uint albedoTex;
+  uint normalTex;
+  uint pbrTex;
   uint sampler;
-  float padding;
 };
 
 struct ProbeData {
@@ -77,7 +78,13 @@ struct ModelData {
 
 #ifndef CUSTOM_PUSH_TYPE
 struct DefaultCustomPush {
-  float padding[7];
+  uint skybox;
+  uint albedo;
+  uint normal;
+  uint metallicRoughness;
+  uint emissive;
+  uint occlusion;
+  uint shadow;
 };
 #define CUSTOM_PUSH_TYPE DefaultCustomPush
 #endif
@@ -98,16 +105,78 @@ VK_BINDING(3, 0) TextureCube uEnvCubes[] : register(t8, space0);
 VK_BINDING(4, 0) Texture2DArray uTextureArrays[] : register(t128, space0);
 VK_BINDING(5, 0) Texture3D uVolumes[] : register(t256, space0);
 VK_BINDING(6, 0) Texture2D uTextures[] : register(t512, space0);
+VK_BINDING(7, 0) RWTexture2D<float4> uRWTextures[] : register(u0, space0);
+VK_BINDING(8, 0) RWStructuredBuffer<float4> uRWBuffers
+    : register(u1024, space0);
+VK_BINDING(9, 0) RWTexture2DArray<float4> uRWTextureArrays[]
+    : register(u2048, space0);
 
 VK_BINDING(0, 1) ConstantBuffer<SceneGlobals> uSceneGlobals
     : register(b0, space1);
 
-float4 sampleTexture2d(uint textureIdx, uint samplerIdx, float2 uv) {
-  return uTextures[textureIdx].Sample(uSamplers[samplerIdx], uv);
+// ==========================================
+// Sample Helpers (Sampled Images / SRV)
+// ==========================================
+
+float4 sampleTexture2d(uint index, uint samplerIdx, float2 uv) {
+  return uTextures[index].Sample(uSamplers[samplerIdx], uv);
 }
 
-float4 sampleCube(uint cubeIndex, uint samplerIndex, float3 dir) {
-  return uEnvCubes[cubeIndex].Sample(uSamplers[samplerIndex], dir);
+float4 sampleTexture2dLod(uint index, uint samplerIdx, float2 uv, float lod) {
+  return uTextures[index].SampleLevel(uSamplers[samplerIdx], uv, lod);
+}
+
+float4 sampleCube(uint index, uint samplerIdx, float3 dir) {
+  return uEnvCubes[index].Sample(uSamplers[samplerIdx], dir);
+}
+
+float4 sampleCubeLod(uint index, uint samplerIdx, float3 dir, float lod) {
+  return uEnvCubes[index].SampleLevel(uSamplers[samplerIdx], dir, lod);
+}
+
+float4 sampleTextureArray(uint index, uint samplerIdx, float3 uvLayer) {
+  return uTextureArrays[index].Sample(uSamplers[samplerIdx], uvLayer);
+}
+
+float4 sampleTextureArrayLod(uint index, uint samplerIdx, float3 uvLayer,
+                             float lod) {
+  return uTextureArrays[index].SampleLevel(uSamplers[samplerIdx], uvLayer, lod);
+}
+
+float4 sampleVolume(uint index, uint samplerIdx, float3 uvw) {
+  return uVolumes[index].Sample(uSamplers[samplerIdx], uvw);
+}
+
+// ==========================================
+// Load Helpers (Point Fetch / Int Coordinates)
+// ==========================================
+
+float4 loadTexture2d(uint index, int2 texelCoord, uint mip = 0) {
+  return uTextures[index].Load(int3(texelCoord, mip));
+}
+
+float4 loadTextureArray(uint index, int3 texelCoordLayer, uint mip = 0) {
+  return uTextureArrays[index].Load(int4(texelCoordLayer, mip));
+}
+
+// ==========================================
+// Storage Helpers (Read/Write / UAV)
+// ==========================================
+
+void writeRWTexture2d(uint index, uint2 coord, float4 value) {
+  uRWTextures[index][coord] = value;
+}
+
+float4 loadRWTexture2d(uint index, uint2 coord) {
+  return uRWTextures[index][coord];
+}
+
+void writeRWTextureArray(uint index, uint3 coord, float4 value) {
+  uRWTextureArrays[index][coord] = value;
+}
+
+float4 loadRWTextureArray(uint index, uint3 coord) {
+  return uRWTextureArrays[index][coord];
 }
 
 #endif // AVALON_COMMON_HLSLI

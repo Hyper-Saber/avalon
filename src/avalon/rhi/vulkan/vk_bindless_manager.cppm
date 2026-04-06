@@ -11,6 +11,7 @@ import avalon.core;
 import avalon.rhi;
 import :types;
 import :descriptor_provider;
+import :utils;
 
 namespace {
 void InitializeFreeSlots(avalon::Array<uint32_t> &slots, uint32_t size) {
@@ -47,6 +48,9 @@ public:
     InitializeFreeSlots(m_textureCubeFreeSlots, kMaxTextureCubeDescriptor);
     InitializeFreeSlots(m_texture3DFreeSlots, kMaxTexture3DDescriptor);
     InitializeFreeSlots(m_texture2DArrayFreeSlots, kMaxTextureArrayDescriptor);
+    InitializeFreeSlots(m_rwTextureFreeSlots, kMaxRWTextureDescriptor);
+    InitializeFreeSlots(m_rwTextureArrayFreeSlots,
+                        kMaxRWTextureArrayDescriptor);
 
     VkDescriptorSetLayoutBinding bindings[] = {
         {.binding = kSamplersBinding,
@@ -76,7 +80,26 @@ public:
         {.binding = kTexturesBinding,
          .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
          .descriptorCount = kMaxTexture2DDescriptor,
-         .stageFlags = VK_SHADER_STAGE_ALL}};
+         .stageFlags = VK_SHADER_STAGE_ALL},
+        {
+            .binding = kMaxRWTextureDescriptor,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+            .descriptorCount = kMaxRWTextureDescriptor,
+            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+        },
+        {
+            .binding = kComputeBufferBinding,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .descriptorCount = 1,
+            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+        },
+        {
+            .binding = kRWTextureArraysBinding,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+            .descriptorCount = kMaxRWTextureArrayDescriptor,
+            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+        },
+    };
 
     VkDescriptorBindingFlags commonFlags =
         VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT |
@@ -88,7 +111,10 @@ public:
         commonFlags,                                 // Cube
         commonFlags,                                 // 3D
         commonFlags,                                 // Array
-        commonFlags                                  // 2D
+        commonFlags,                                 // 2D
+        commonFlags,                                 // RW Textures
+        VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT, // RW Buffers
+        commonFlags,                                 // RW TextureArray
     };
 
     VkDescriptorSetLayoutBindingFlagsCreateInfo layoutFlags{
@@ -122,17 +148,30 @@ public:
     return true;
   }
 
-  uint32_t RegisterTexture(TextureHandle handle) override {
-    return RegisterResource(handle, ResourceType::View2D);
+  uint32_t RegisterTexture(TextureHandle handle, EResourceUsage usage,
+                           int32_t mipLevel = kNoMiplevels) override {
+    return RegisterResource(handle, ResourceType::View2D, usage, mipLevel);
   }
-  uint32_t RegisterTexture3D(TextureHandle handle) override {
-    return RegisterResource(handle, ResourceType::View3D);
+  uint32_t RegisterTexture3D(TextureHandle handle, EResourceUsage usage,
+                             int32_t mipLevel = kNoMiplevels) override {
+    return RegisterResource(handle, ResourceType::View3D, usage, mipLevel);
   }
-  uint32_t RegisterTextureCube(TextureHandle handle) override {
-    return RegisterResource(handle, ResourceType::ViewCube);
+  uint32_t RegisterTextureCube(TextureHandle handle, EResourceUsage usage,
+                               int32_t mipLevel = kNoMiplevels) override {
+    return RegisterResource(handle, ResourceType::ViewCube, usage, mipLevel);
   }
-  uint32_t RegisterTextureArray(TextureHandle handle) override {
-    return RegisterResource(handle, ResourceType::ViewArray);
+  uint32_t RegisterTextureArray(TextureHandle handle, EResourceUsage usage,
+                                int32_t mipLevel = kNoMiplevels) override {
+    return RegisterResource(handle, ResourceType::ViewArray, usage, mipLevel);
+  }
+  uint32_t RegisterRWTexture(TextureHandle handle, EResourceUsage usage,
+                             int32_t mipLevel = kNoMiplevels) override {
+    return RegisterResource(handle, ResourceType::RWTexture, usage, mipLevel);
+  }
+  uint32_t RegisterRWTextureArray(TextureHandle handle, EResourceUsage usage,
+                                  int32_t mipLevel = kNoMiplevels) override {
+    return RegisterResource(handle, ResourceType::RWTextureArray, usage,
+                            mipLevel);
   }
 
   uint32_t RegisterSampler(SamplerHandle handle) override {
@@ -155,17 +194,29 @@ public:
     return index;
   }
 
-  void UnregisterTexture(TextureHandle h) override {
-    UnregisterResource(h, ResourceType::View2D);
+  void UnregisterTexture(TextureHandle h,
+                         int32_t mipLevel = kNoMiplevels) override {
+    UnregisterResource(h, ResourceType::View2D, mipLevel);
   }
-  void UnregisterTextureCube(TextureHandle h) override {
-    UnregisterResource(h, ResourceType::ViewCube);
+  void UnregisterTextureCube(TextureHandle h,
+                             int32_t mipLevel = kNoMiplevels) override {
+    UnregisterResource(h, ResourceType::ViewCube, mipLevel);
   }
-  void UnregisterTexture3D(TextureHandle h) override {
-    UnregisterResource(h, ResourceType::View3D);
+  void UnregisterTexture3D(TextureHandle h,
+                           int32_t mipLevel = kNoMiplevels) override {
+    UnregisterResource(h, ResourceType::View3D, mipLevel);
   }
-  void UnregisterTextureArray(TextureHandle h) override {
-    UnregisterResource(h, ResourceType::ViewArray);
+  void UnregisterTextureArray(TextureHandle h,
+                              int32_t miplevel = kNoMiplevels) override {
+    UnregisterResource(h, ResourceType::ViewArray, miplevel);
+  }
+  void UnregisterRWTexture(TextureHandle h,
+                           int32_t mipLevel = kNoMiplevels) override {
+    UnregisterResource(h, ResourceType::RWTexture, mipLevel);
+  }
+  void UnregisterRWTextureArray(TextureHandle h,
+                                int32_t mipLevel = kNoMiplevels) override {
+    UnregisterResource(h, ResourceType::RWTextureArray, mipLevel);
   }
 
   void ProcessPendingDeletions() {
@@ -189,8 +240,11 @@ public:
         case ResourceType::ViewArray:
           m_texture2DArrayFreeSlots.PushBack(item.index);
           break;
-        case ResourceType::Sampler:
-          m_samplerFreeSlots.PushBack(item.index);
+        case ResourceType::RWTexture:
+          m_rwTextureFreeSlots.PushBack(item.index);
+          break;
+        case ResourceType::RWTextureArray:
+          m_rwTextureArrayFreeSlots.PushBack(item.index);
           break;
         }
         m_pendingDeletions.RemoveAtSwap(i);
@@ -213,17 +267,44 @@ public:
   }
 
 private:
-  enum class ResourceType { View2D, View3D, ViewCube, ViewArray, Sampler };
+  enum class ResourceType {
+    View2D,
+    View3D,
+    ViewCube,
+    ViewArray,
+    RWTexture,
+    RWTextureArray
+  };
+
   struct PendingDeletion {
     uint32_t index;
     ResourceType type;
     uint64_t frameIndex;
   };
 
+  struct ResourceLookupKey {
+    TextureHandle handle;
+    int32_t mipLevel;
+
+    HashType GetHash() const noexcept {
+      uint64_t h = static_cast<uint64_t>(handle.GetIndex());
+
+      uint64_t m = static_cast<uint32_t>(mipLevel);
+
+      uint64_t packed = h | (m << 32);
+
+      return Hash::Combine(Hash::kOffsetBasis, packed);
+    }
+
+    bool operator==(const ResourceLookupKey &other) const noexcept {
+      return handle == other.handle && mipLevel == other.mipLevel;
+    }
+  };
+
   struct ResourcePool {
     uint32_t binding;
     Array<uint32_t> &freeSlots;
-    HashMap<TextureHandle, uint32_t> &lookup;
+    HashMap<ResourceLookupKey, uint32_t> &lookup;
   };
 
   ResourcePool GetPool(ResourceType type) {
@@ -235,42 +316,71 @@ private:
     case ResourceType::ViewArray:
       return {kTexture2DArrayBinding, m_texture2DArrayFreeSlots,
               m_texture2DArrayToSlot};
-    default:
+    case ResourceType::RWTexture:
+      return {kRWTexturesBinding, m_rwTextureFreeSlots, m_rwTextureToSlot};
+    case ResourceType::RWTextureArray:
+      return {kRWTextureArraysBinding, m_rwTextureArrayFreeSlots,
+              m_rwTextureArrayToSlot};
+    case ResourceType::View2D:
       return {kTexturesBinding, m_texture2DFreeSlots, m_texture2DToSlot};
     }
   }
 
-  uint32_t RegisterResource(TextureHandle handle, ResourceType type) {
+  uint32_t RegisterResource(TextureHandle handle, ResourceType type,
+                            EResourceUsage usage = EResourceUsage::ReadOnly,
+                            int32_t mipLevel = kNoMiplevels) {
     if (!handle.IsValid())
       return 0;
     std::lock_guard lock(m_mutex);
 
     auto pool = GetPool(type);
-    if (auto *cached = pool.lookup.Get(handle))
+    auto key = ResourceLookupKey{handle, mipLevel};
+    if (auto *cached = pool.lookup.Get(key))
       return *cached;
 
     uint32_t index = AllocateSlot(pool.freeSlots);
-    VkImageView view = m_resourceProvider.GetTexture(handle)->imageView;
+    auto textureRes = m_resourceProvider.GetTexture(handle);
+    VkImageView view = textureRes->imageView;
+
+    if (mipLevel != kNoMiplevels) {
+      view = m_resourceProvider.GetOrCreateMipStorageView(
+          handle, static_cast<uint32_t>(mipLevel));
+    }
 
     VkDescriptorImageInfo imageInfo{
         .imageView = view,
-        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
-    UpdateDescriptor(index, pool.binding, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+        .imageLayout = ToVkImageLayout(MapUsageToLayout(usage))};
+    UpdateDescriptor(index, pool.binding, MapResourceTypeToDescType(type),
                      nullptr, &imageInfo);
 
-    pool.lookup.Insert(handle, index);
+    pool.lookup.Insert(key, index);
     return index;
   }
 
-  void UnregisterResource(TextureHandle handle, ResourceType type) {
+  VkDescriptorType MapResourceTypeToDescType(ResourceType type) {
+    switch (type) {
+    case ResourceType::View2D:
+    case ResourceType::View3D:
+    case ResourceType::ViewCube:
+    case ResourceType::ViewArray:
+      return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    case ResourceType::RWTexture:
+    case ResourceType::RWTextureArray:
+      return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    }
+  }
+
+  void UnregisterResource(TextureHandle handle, ResourceType type,
+                          int32_t mipLevel = kNoMiplevels) {
     std::lock_guard lock(m_mutex);
     auto pool = GetPool(type);
-    if (auto *pIndex = pool.lookup.Get(handle)) {
+    auto key = ResourceLookupKey{handle, mipLevel};
+    if (auto *pIndex = pool.lookup.Get(key)) {
       m_pendingDeletions.PushBack(
           {.index = *pIndex,
            .type = type,
            .frameIndex = m_resourceProvider.GetCurrentFrameIndex()});
-      pool.lookup.Remove(handle);
+      pool.lookup.Remove(key);
     }
   }
 
@@ -337,9 +447,11 @@ private:
   DescriptorSetHandle m_sceneGlobalSetHandle;
 
   Array<uint32_t> m_texture2DFreeSlots, m_texture3DFreeSlots,
-      m_texture2DArrayFreeSlots, m_textureCubeFreeSlots, m_samplerFreeSlots;
-  HashMap<TextureHandle, uint32_t> m_texture2DToSlot, m_texture2DArrayToSlot,
-      m_texture3DToSlot, m_textureCubeToSlot;
+      m_texture2DArrayFreeSlots, m_textureCubeFreeSlots, m_samplerFreeSlots,
+      m_rwTextureFreeSlots, m_rwTextureArrayFreeSlots;
+  HashMap<ResourceLookupKey, uint32_t> m_texture2DToSlot,
+      m_texture2DArrayToSlot, m_texture3DToSlot, m_textureCubeToSlot,
+      m_rwTextureToSlot, m_rwTextureArrayToSlot;
   HashMap<SamplerHandle, uint32_t> m_samplerToSlot;
   Array<PendingDeletion> m_pendingDeletions;
   std::mutex m_mutex;

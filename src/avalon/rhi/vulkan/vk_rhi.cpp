@@ -44,9 +44,11 @@ VkRhi::~VkRhi() {
     vkDestroyCommandPool(m_deviceContext->GetDevice(), m_immTransferPool,
                          nullptr);
   UnmapMemory({m_materialPool.handle.id});
+  UnmapMemory({m_probePool.handle.id});
   m_descriptorProvider.Reset();
   m_bindlessManager.Reset();
   m_uboPool.Reset();
+  m_ssboPool.Reset();
   m_pipelineManager.Reset();
   m_resourcePool.Reset();
   m_swapchainContext.Reset();
@@ -78,9 +80,10 @@ auto VkRhi::Initialize(const DeviceRequirement &requirement,
 
   m_resourcePool = MakeUnique<ResourcePool>(*m_deviceContext.Get());
   CreateUBOPool();
+  CreateSSBOPool();
   m_materialPool =
-      CreateStorageBuffer(sizeof(StandardMaterialData), kMaxMaterialCount);
-  m_probePool = CreateStorageBuffer(sizeof(ProbeData), kMaxProbeCount);
+      CreateStorageBuffer(sizeof(StandardMaterialData) * kMaxMaterialCount);
+  m_probePool = CreateStorageBuffer(sizeof(ProbeData) * kMaxProbeCount);
   WarpSwapchainTextures();
   m_descriptorProvider =
       MakeUnique<DescriptorProvider>(m_deviceContext->GetDevice());
@@ -97,11 +100,23 @@ auto VkRhi::Initialize(const DeviceRequirement &requirement,
 void VkRhi::CreateUBOPool() {
   m_uboPool = MakeUnique<rhi::RingBufferPool>(
       *this, rhi::EResourceUsage::UniformBuffer,
-      rhi::EMemoryProperty::HostVisible | rhi::EMemoryProperty::HostCoherent,
+      rhi::EMemoryProperty::DeviceLocal | rhi::EMemoryProperty::HostVisible |
+          rhi::EMemoryProperty::HostCoherent,
       1024 * 1024 * 16);
 }
 
+void VkRhi::CreateSSBOPool() {
+  m_ssboPool = MakeUnique<rhi::RingBufferPool>(
+      *this, rhi::EResourceUsage::StorageBuffer,
+      rhi::EMemoryProperty::DeviceLocal | rhi::EMemoryProperty::HostVisible |
+          rhi::EMemoryProperty::HostCoherent,
+      kDynamicSSBOSize);
+}
+
 auto VkRhi::GetUBOPool() const -> RingBufferPool & { return *m_uboPool.Get(); }
+auto VkRhi::GetSSBOPool() const -> RingBufferPool & {
+  return *m_ssboPool.Get();
+}
 
 auto VkRhi::GetBindlessManager() const -> IBindlessManager & {
   return *m_bindlessManager.Get();
@@ -165,6 +180,15 @@ auto VkRhi::GetTexture(TextureHandle handle) -> const TextureResource * {
   return m_resourcePool->ResolveTexture({handle.id});
 }
 
+auto VkRhi::GetOrCreateMipStorageView(TextureHandle handle, uint32_t mipLevel)
+    -> VkImageView {
+  return m_resourcePool->GetOrCreateMipStorageView({handle.id}, mipLevel);
+}
+
+auto VkRhi::GetDummyComputePipeline() const -> PipelineHandle {
+  return m_dummyComputePipeline;
+}
+
 auto VkRhi::GetSampler(SamplerHandle handle) -> const SamplerResource * {
   return m_resourcePool->ResolveSampler({handle.id});
 }
@@ -216,10 +240,7 @@ auto VkRhi::GetProbeBufferInfo() const -> const VkDescriptorBufferInfo & {
   return m_probePool.bufferInfo;
 }
 
-auto VkRhi::CreateStorageBuffer(size_t structSize, uint32_t count)
-    -> StorageBufferResource {
-  const uint64_t bufferSize = structSize * count;
-
+auto VkRhi::CreateStorageBuffer(size_t bufferSize) -> StorageBufferResource {
   BufferCreateInfo gpuInfo{.size = bufferSize,
                            .usage = EResourceUsage::StorageBuffer |
                                     EResourceUsage::TransferDst,
@@ -333,6 +354,14 @@ auto VkRhi::CreateDescriptorWriter(PipelineHandle handle, uint32_t set)
 auto VkRhi::GetOrCreatePipeline(const PipelineCreateInfo &info)
     -> PipelineHandle {
   return {m_pipelineManager->GetOrCreate(info).id};
+}
+
+auto VkRhi::GetOrCreateComputePipeline(const ComputePipelineCreateInfo &info)
+    -> PipelineHandle {
+  PipelineHandle handle = {m_pipelineManager->GetOrCreate(info).id};
+  if (!m_dummyComputePipeline.IsValid()) [[unlikely]]
+    m_dummyComputePipeline = handle;
+  return handle;
 }
 
 void VkRhi::CreateCommandBuffer() {

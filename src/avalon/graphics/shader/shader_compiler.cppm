@@ -15,6 +15,15 @@ namespace {
 using namespace avalon;
 using namespace avalon::graphics;
 
+void ExtractComputeLocalSize(SpvReflectShaderModule* pModule, ReflectionData& outData) {
+    if (pModule->shader_stage == SPV_REFLECT_SHADER_STAGE_COMPUTE_BIT) {
+        auto entry = spvReflectGetEntryPoint(pModule, pModule->entry_point_name);
+        outData.localSizeX = entry->local_size.x;
+        outData.localSizeY = entry->local_size.y;
+        outData.localSizeZ = entry->local_size.z;
+    }
+}
+
 void ExtractVertexInputs(SpvReflectShaderModule *pModule,
                          ReflectionData &outReflectionData) {
   uint32_t count = 0;

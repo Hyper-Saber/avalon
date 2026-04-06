@@ -112,6 +112,11 @@ constexpr bool IsTexureDescriptor(EDescriptorType type) noexcept {
   }
 }
 
+bool IsAttachment(EResourceUsage usage) {
+  return HasFlag(usage, EResourceUsage::ColorAttachment |
+                            EResourceUsage::DepthStencilAttachment);
+}
+
 constexpr EResourceLayout MapUsageToLayout(EResourceUsage usage) noexcept {
   using enum EResourceUsage;
   if (usage == None)
@@ -169,7 +174,7 @@ constexpr EAccess MapUsageToAccess(EResourceUsage usage) noexcept {
 
   if (HasFlag(usage, UniformBuffer))
     access |= EAccess::ShaderRead;
-  if (HasFlag(usage, ReadOnly))
+  if (HasFlag(usage, ReadOnly) && !IsAttachment(usage))
     access |= EAccess::ShaderRead;
   if (HasFlag(usage, ReadWrite))
     access |= (EAccess::ShaderRead | EAccess::ShaderWrite);
@@ -192,7 +197,9 @@ constexpr EAccess MapUsageToAccess(EResourceUsage usage) noexcept {
   return access;
 }
 
-constexpr EPipelineStage MapUsageToStage(EResourceUsage usage) noexcept {
+constexpr EPipelineStage
+MapUsageToStage(EResourceUsage usage,
+                EPassType passType = EPassType::Graphics) noexcept {
   using enum EResourceUsage;
 
   if (usage == None)
@@ -206,18 +213,21 @@ constexpr EPipelineStage MapUsageToStage(EResourceUsage usage) noexcept {
   if (HasFlag(usage, VertexBuffer | IndexBuffer))
     stage |= EPipelineStage::VertexInput;
 
-  if (HasFlag(usage, UniformBuffer | ReadOnly | ReadWrite)) {
-    stage |= (EPipelineStage::VertexShader | EPipelineStage::FragmentShader |
-              EPipelineStage::ComputeShader);
+  if (HasFlag(usage, DepthStencilAttachment)) {
+    stage |= (EPipelineStage::EarlyFragmentTests |
+              EPipelineStage::LateFragmentTests);
   }
 
   if (HasFlag(usage, ColorAttachment)) {
     stage |= EPipelineStage::ColorAttachmentOutput;
   }
 
-  if (HasFlag(usage, DepthStencilAttachment)) {
-    stage |= (EPipelineStage::EarlyFragmentTests |
-              EPipelineStage::LateFragmentTests);
+  if (!IsAttachment(usage) &&
+      HasFlag(usage, UniformBuffer | ReadOnly | ReadWrite)) {
+    if (passType == EPassType::Graphics)
+      stage |= EPipelineStage::VertexShader | EPipelineStage::FragmentShader;
+    else
+      stage |= EPipelineStage::ComputeShader;
   }
 
   if (HasFlag(usage, TransferSrc | TransferDst)) {

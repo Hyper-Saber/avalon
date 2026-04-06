@@ -57,6 +57,8 @@ template <typename T> constexpr T SmoothStep(T edge0, T edge1, T value) {
   return t * t * (3 - 2 * t);
 }
 
+template <typename T> constexpr T Log2(T value) { return std::log2(value); }
+
 inline float Cos(float radians) { return std::cos(radians); }
 
 inline float Sin(float radians) { return std::sin(radians); }

@@ -17,6 +17,10 @@ struct ReflectionData {
   Array<ShaderDescriptorBinding> descBindings;
   Array<ShaderBufferMember> bufferMembers;
   Array<std::byte> defaultValuePool;
+
+  uint32_t localSizeX = 1;
+  uint32_t localSizeY = 1;
+  uint32_t localSizeZ = 1;
 };
 
 class ShaderBlobBuilder {
@@ -116,6 +120,10 @@ private:
         .defaultValuePoolSize =
             static_cast<uint32_t>(defaultValuePool.GetSize()),
         .defaultValuePoolOffset = relativeValuePoolOffset,
+
+        .localSizeX = data.localSizeX,
+        .localSizeY = data.localSizeY,
+        .localSizeZ = data.localSizeZ,
     };
 
     AppendRaw(&reflHeader, sizeof(ShaderReflectionHeader));
@@ -142,6 +150,14 @@ private:
     ReflectionData merged;
 
     for (const auto &stageData : m_pendingReflections) {
+
+      if (stageData.localSizeX > 1 || stageData.localSizeY > 1 ||
+          stageData.localSizeZ > 1) {
+        merged.localSizeX = stageData.localSizeX;
+        merged.localSizeY = stageData.localSizeY;
+        merged.localSizeZ = stageData.localSizeZ;
+      }
+
       for (const auto &pushConstant : stageData.pushConstantMembers) {
         // ShaderCustomPushConstantMember *pExistPushConstant = nullptr;
         // for (auto &mergedPushConstant : merged.pushConstantMembers) {

@@ -17,14 +17,6 @@ public:
 };
 
 template <typename T>
-class RenderPipelineBase : public RefCounted<T>, public IRenderPipeline {
-  // public:
-  // void Destroy() override {
-  //   T *pDerived = static_cast<T *>(this);
-  //   pDerived->~T();
-  //   mem::Allocator<T> alloc;
-  //   alloc.Deallocate(pDerived, 1);
-  // }
-};
+class RenderPipelineBase : public RefCounted<T>, public IRenderPipeline {};
 
 } // namespace avalon::graphics

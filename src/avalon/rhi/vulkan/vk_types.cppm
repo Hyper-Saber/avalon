@@ -103,6 +103,29 @@ struct BufferResource : public mem::AutoDestroyable<BufferResource> {
   }
 };
 
+struct TextureSubresourceKey {
+  uint32_t mipLevel;
+  uint32_t arrayLayer;
+  bool isArrayView;
+
+  HashType GetHash() const noexcept {
+    uint64_t packed = 0;
+
+    packed |= (static_cast<uint64_t>(mipLevel) & 0xFFFFULL);
+
+    packed |= (static_cast<uint64_t>(arrayLayer) & 0xFFFFULL) << 16;
+
+    packed |= (static_cast<uint64_t>(isArrayView ? 1ULL : 0ULL)) << 32;
+
+    return Hash::Combine(Hash::kOffsetBasis, packed);
+  }
+
+  bool operator==(const TextureSubresourceKey &other) const noexcept {
+    return mipLevel == other.mipLevel && arrayLayer == other.arrayLayer &&
+           isArrayView == other.isArrayView;
+  }
+};
+
 struct TextureResource : public mem::AutoDestroyable<TextureResource> {
   const VkDevice device{VK_NULL_HANDLE};
   const VkImage image{VK_NULL_HANDLE};
@@ -111,6 +134,8 @@ struct TextureResource : public mem::AutoDestroyable<TextureResource> {
   VkImageAspectFlags aspectMask;
   const TextureCreateInfo createInfo;
   const bool isSwapchainTexture = false;
+
+  HashMap<TextureSubresourceKey, VkImageView> subresourceViews;
 
   TextureResource(VkDevice device, VkImage image, VkImageView imageView,
                   VkDeviceMemory memory, const TextureCreateInfo &info,
@@ -132,6 +157,11 @@ struct TextureResource : public mem::AutoDestroyable<TextureResource> {
   }
 
   ~TextureResource() {
+    for (auto &entry : subresourceViews) {
+      vkDestroyImageView(device, entry.GetValue(), nullptr);
+    }
+    subresourceViews.Clear();
+
     vkDestroyImageView(device, imageView, nullptr);
     if (isSwapchainTexture)
       return;
@@ -204,6 +234,8 @@ public:
   virtual auto GetPipeline(PipelineHandle) -> const PipelineResource * = 0;
   virtual auto GetBuffer(BufferHandle) -> const BufferResource * = 0;
   virtual auto GetTexture(TextureHandle) -> const TextureResource * = 0;
+  virtual auto GetOrCreateMipStorageView(TextureHandle, uint32_t mipLevel)
+      -> VkImageView = 0;
   virtual auto GetSampler(SamplerHandle) -> const SamplerResource * = 0;
   virtual auto GetDescriptorSet(DescriptorSetHandle)
       -> const DescriptorSetResource * = 0;
@@ -216,8 +248,7 @@ public:
   virtual auto GetSwapchainExtent() const -> Extent2D = 0;
   virtual auto GetMaterialBufferInfo() const
       -> const VkDescriptorBufferInfo & = 0;
-  virtual auto GetProbeBufferInfo() const
-      -> const VkDescriptorBufferInfo & = 0;
+  virtual auto GetProbeBufferInfo() const -> const VkDescriptorBufferInfo & = 0;
 
   virtual uint32_t GetCurrentFrameIndex() = 0;
   virtual uint32_t GetLastCompletedFrameIndex() = 0;

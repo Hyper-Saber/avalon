@@ -35,19 +35,26 @@ public:
 
     auto memoryTypeIndex =
         FindMemoryType(memRequirements.memoryTypeBits,
-                       ToVkMemoryPropertyFlags(info.memoryProperty));
+                       ToVkMemoryPropertyFlags(info.memoryProperty), info.size);
 
     if (memoryTypeIndex == kInvalidMemoryTypeIndex &&
         (info.memoryProperty & EMemoryProperty::DeviceLocal) !=
             EMemoryProperty::None) {
       auto fallback = info.memoryProperty & ~EMemoryProperty::DeviceLocal;
-      if (fallback != EMemoryProperty::None) {
-        memoryTypeIndex = FindMemoryType(memRequirements.memoryTypeBits,
-                                         ToVkMemoryPropertyFlags(fallback));
-
-        Warn("[Vulkan] Failed to allocate DeviceLocal memory for buffer. "
-             "Falling back to System RAM (HostVisible).");
+      if (fallback == EMemoryProperty::None) {
+        fallback = EMemoryProperty::HostVisible | EMemoryProperty::HostCoherent;
       }
+      memoryTypeIndex =
+          FindMemoryType(memRequirements.memoryTypeBits,
+                         ToVkMemoryPropertyFlags(fallback), info.size);
+
+      Warn("[Vulkan] CRITICAL PERFORMANCE WARNING: Failed to allocate "
+           "DeviceLocal memory "
+           "for Buffer (Size: {:.2f} MB). The requested heap is either full or "
+           "under high pressure. "
+           "Falling back to System RAM (HostVisible). Expect increased PCIe "
+           "bus overhead.",
+           memRequirements.size / 1024.0 / 1024.0);
     }
 
     if (memoryTypeIndex == kInvalidMemoryTypeIndex) {
@@ -133,7 +140,8 @@ public:
     vkGetImageMemoryRequirements(m_deviceContext.GetDevice(), image,
                                  &requirement);
     auto memoryTypeIndex = FindMemoryType(requirement.memoryTypeBits,
-                                          VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+                                          VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                                          requirement.size, false);
 
     VkMemoryAllocateInfo allocInfo{
         .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
@@ -203,8 +211,60 @@ public:
       return {};
     }
 
-    return m_texturePool.Create(m_deviceContext.GetDevice(), image, view,
-                                pMemory, info);
+    auto handle = m_texturePool.Create(m_deviceContext.GetDevice(), image, view,
+                                       pMemory, info);
+    return handle;
+  }
+
+  auto GetOrCreateMipStorageView(Handle<TextureResource> handle,
+                                 uint32_t mipLevel) -> VkImageView {
+    auto *res = m_texturePool.Resolve(handle);
+    AVALON_ASSERT(res != nullptr && "Invalid texture handle");
+    AVALON_ASSERT(mipLevel < res->createInfo.mipLevels &&
+                  "[Vulkan]: Mip level out of range");
+
+    TextureSubresourceKey key{
+        .mipLevel = mipLevel,
+        .arrayLayer = 0,
+        .isArrayView = res->createInfo.textureType == ETextureType::TextureCube,
+    };
+
+    if (res->subresourceViews.Contains(key)) {
+      return res->subresourceViews[key];
+    }
+
+    VkImageViewType viewType = VK_IMAGE_VIEW_TYPE_2D;
+    if (res->createInfo.layerCount > 1) {
+      viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+    }
+
+    VkImageViewCreateInfo viewInfo{
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .image = res->image,
+        .viewType = viewType,
+        .format = ToVkFormat(res->createInfo.format),
+        .subresourceRange =
+            {
+                .aspectMask = res->aspectMask,
+                .baseMipLevel = mipLevel,
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = res->createInfo.layerCount,
+            },
+    };
+
+    VkImageView subView;
+    VkResult result =
+        vkCreateImageView(res->device, &viewInfo, nullptr, &subView);
+    if (result != VK_SUCCESS) {
+      avalon::Error(
+          "[Vulkan]: Failed to create subresource storage view for Mip {}",
+          mipLevel);
+      return VK_NULL_HANDLE;
+    }
+
+    res->subresourceViews[key] = subView;
+    return subView;
   }
 
   auto CreateSampler(const SamplerCreateInfo &info) -> Handle<SamplerResource> {
@@ -269,19 +329,51 @@ private:
   constexpr static uint32_t kInvalidMemoryTypeIndex = 0xFFFFFFFF;
 
   uint32_t FindMemoryType(uint32_t typeFilter,
-                          VkMemoryPropertyFlags propertyFlags) {
-    VkPhysicalDeviceMemoryProperties memProperties;
-    vkGetPhysicalDeviceMemoryProperties(m_deviceContext.GetPhysicalDevice(),
-                                        &memProperties);
+                          VkMemoryPropertyFlags propertyFlags,
+                          VkDeviceSize size, bool isBuffer = true) {
+    VkPhysicalDeviceMemoryBudgetPropertiesEXT budgetProps{
+        .sType =
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_BUDGET_PROPERTIES_EXT};
+    VkPhysicalDeviceMemoryProperties2 memProps2{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2,
+        .pNext = &budgetProps};
 
-    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+    vkGetPhysicalDeviceMemoryProperties2(m_deviceContext.GetPhysicalDevice(),
+                                         &memProps2);
+
+    for (uint32_t i = 0; i < memProps2.memoryProperties.memoryTypeCount; i++) {
       if ((typeFilter & (1 << i)) &&
-          (memProperties.memoryTypes[i].propertyFlags & propertyFlags) ==
-              propertyFlags) {
-        return i;
+          (memProps2.memoryProperties.memoryTypes[i].propertyFlags &
+           propertyFlags) == propertyFlags) {
+
+        uint32_t heapIndex =
+            memProps2.memoryProperties.memoryTypes[i].heapIndex;
+        VkDeviceSize budget = budgetProps.heapBudget[heapIndex];
+        VkDeviceSize usage = budgetProps.heapUsage[heapIndex];
+
+        VkDeviceSize safeMargin = 0;
+        if (isBuffer) {
+          VkDeviceSize totalHeapSize =
+              memProps2.memoryProperties.memoryHeaps[heapIndex].size;
+          safeMargin = Clamp(totalHeapSize / 10,
+                             static_cast<VkDeviceSize>(16 * 1024 * 1024),
+                             static_cast<VkDeviceSize>(128 * 1024 * 1024));
+        }
+
+        auto available = budget > usage ? budget - usage : 0;
+        if (size + safeMargin <= available) {
+          return i;
+        } else {
+          Warn("[Vulkan]: Memory type {} on Heap {} has enough space ({:.2f} "
+               "MB), "
+               "but failed to meet the Safe Margin requirement ({:.2f} MB). "
+               "Rejecting to prevent heap exhaustion.",
+               i, heapIndex, available / 1024.0 / 1024.0,
+               safeMargin / 1024.0 / 1024.0);
+        }
       }
     }
-    avalon::Error("Vulkan: Failed to find suitable memory type!");
+
     return kInvalidMemoryTypeIndex;
   }
 

@@ -44,6 +44,9 @@ RenderGraphBuilder::SpecifyTextureDefaultFormat(rhi::EResourceUsage usage) {
   if (HasFlag(usage, rhi::EResourceUsage::DepthStencilAttachment)) {
     return rhi::EFormat::D32_SFLOAT_S8_UINT;
   }
+  if (HasFlag(usage, rhi::EResourceUsage::ReadWrite)) {
+    return rhi::EFormat::R16G16B16A16_SFLOAT;
+  }
 
   AVALON_ASSERT_MSG(
       false, String::Format(
@@ -52,7 +55,8 @@ RenderGraphBuilder::SpecifyTextureDefaultFormat(rhi::EResourceUsage usage) {
   return rhi::EFormat::Undefined;
 }
 
-auto RenderGraphBuilder::Write(StringId name, rhi::EResourceUsage usage)
+auto RenderGraphBuilder::Write(StringId name, rhi::EResourceUsage usage,
+                               rhi::EResourceUsage initialUsage)
     -> VirtualResourceHandle {
   m_desc.nameHash = name;
   m_desc.usage = usage;
@@ -65,7 +69,9 @@ auto RenderGraphBuilder::Write(StringId name, rhi::EResourceUsage usage)
     m_desc.extent = m_rhi->GetSwapchainExtent();
   }
 
-  m_currentResource = m_graph.Write(*m_owner, m_desc);
+  m_currentResource = m_graph.Write(
+      *m_owner, m_desc,
+      initialUsage == rhi::EResourceUsage::None ? m_desc.usage : initialUsage);
 
   auto &node = m_graph.GetNode(m_owner);
   AVALON_ASSERT_MSG(node.viewMask == 0 || node.viewMask == m_viewMask,
@@ -122,6 +128,12 @@ auto RenderGraphBuilder::SetSamplerCount(rhi::ESampleCount count)
 
 auto RenderGraphBuilder::SetLayers(uint32_t layers) -> RenderGraphBuilder & {
   m_desc.layerCount = layers;
+  return *this;
+}
+
+auto RenderGraphBuilder::SetMipLevels(uint32_t mipLevels)
+    -> RenderGraphBuilder & {
+  m_desc.mipLevels = mipLevels;
   return *this;
 }
 

@@ -127,6 +127,8 @@ public:
     }
 
     for (auto &write : m_writes) {
+      Debug("descriptorType: {}",
+            write.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC);
       write.dstSet = set;
     }
 

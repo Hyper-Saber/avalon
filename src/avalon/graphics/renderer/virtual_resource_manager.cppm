@@ -34,22 +34,40 @@ public:
     if (pIndex != nullptr) {
       auto index = *pIndex;
       auto &exsitingDesc = m_virtualDescs[index];
+
       AVALON_ASSERT_MSG(
           exsitingDesc.extent == desc.extent,
           String::Format(
               "[RenderGraph]: Dimension mismatch for "
-              "the same virtual resource! exsitingDesc: {}, {}, desc: {}, {}",
+              "the same virtual resource! existing: {}x{}, new: {}x{}",
               exsitingDesc.extent.width, exsitingDesc.extent.height,
               desc.extent.width, desc.extent.height));
+
       AVALON_ASSERT_MSG(
           exsitingDesc.format == desc.format,
           "[RenderGraph]: Format mismatch for the same virtual resource!");
+
+      AVALON_ASSERT_MSG(
+          exsitingDesc.layerCount == desc.layerCount,
+          String::Format("[RenderGraph]: Layer count mismatch for resource "
+                         "'{}'! existing: {}, new: {}",
+                         desc.nameHash.Resolve(), exsitingDesc.layerCount,
+                         desc.layerCount));
+
+      AVALON_ASSERT_MSG(
+          exsitingDesc.mipLevels == desc.mipLevels,
+          String::Format("[RenderGraph]: Mipmap level mismatch for resource "
+                         "'{}'! existing: {}, new: {}",
+                         desc.nameHash.Resolve(), exsitingDesc.mipLevels,
+                         desc.mipLevels));
 
       if (std::to_underlying(desc.sampleCount) >
           std::to_underlying(exsitingDesc.sampleCount)) {
         exsitingDesc.sampleCount = desc.sampleCount;
       }
+
       exsitingDesc.usage |= desc.usage;
+
       return index;
     }
 
@@ -150,6 +168,7 @@ public:
             .width = vDesc.extent.width,
             .height = vDesc.extent.height,
             .layerCount = vDesc.layerCount,
+            .mipLevels = vDesc.mipLevels,
             .format = vDesc.format,
             .usage = vDesc.usage,
             .sampleCount = vDesc.sampleCount,
@@ -197,6 +216,7 @@ private:
                        const VirtualTextureDesc &desc) const {
     const auto &physicalCreateInfo =
         m_rhi.GetTextureCreateInfo(physicalTexture);
+
     if (physicalCreateInfo.width != desc.extent.width ||
         physicalCreateInfo.height != desc.extent.height ||
         physicalCreateInfo.format != desc.format) {
@@ -207,9 +227,18 @@ private:
       return false;
     }
 
+    if (physicalCreateInfo.layerCount != desc.layerCount) {
+      return false;
+    }
+
+    if (physicalCreateInfo.mipLevels != desc.mipLevels) {
+      return false;
+    }
+
     if ((physicalCreateInfo.usage & desc.usage) != desc.usage) {
       return false;
     }
+
     return true;
   }
 

@@ -82,6 +82,9 @@ struct ShaderReflectionHeader {
   uint32_t memberTableOffset;
   uint32_t defaultValuePoolSize;
   uint32_t defaultValuePoolOffset;
+  uint32_t localSizeX;
+  uint32_t localSizeY;
+  uint32_t localSizeZ;
 };
 
 #pragma pack(pop)
@@ -97,7 +100,7 @@ static_assert(sizeof(ShaderDescriptorBinding) == 44,
               "ShaderResourceBinding size mismatch!");
 static_assert(sizeof(ShaderInputAttribute) == 20,
               "ShaderInputAttribute size mismatch!");
-static_assert(sizeof(ShaderReflectionHeader) == 40,
+static_assert(sizeof(ShaderReflectionHeader) == 52,
               "ShaderReflectionHeader size mismatch!");
 
 static_assert(std::is_standard_layout_v<ShaderBlobHeader>,

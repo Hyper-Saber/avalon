@@ -12,6 +12,7 @@ import avalon.scene;
 import avalon.ecs;
 import avalon.graphics;
 import avalon.shader;
+import avalon.window;
 import :systems;
 import :components;
 import :input_system;
@@ -30,16 +31,17 @@ public:
     auto cube = scene.CreatePrimitive(graphics::EPrimitiveType::Cube);
     auto sphere = scene.CreatePrimitive(graphics::EPrimitiveType::Sphere);
     auto plane = scene.CreatePrimitive(graphics::EPrimitiveType::Plane);
+    world.AddComponent<ecs::SphereComponent>(sphere);
     world.AddComponent<ecs::CubeComponent>(cube);
 
     auto materialInstanceHandle = materialManager.CreateMaterialInstance(
         materialManager.GetDefaultOpaque());
     auto materialInstance = materialManager.Resolve(materialInstanceHandle);
-    materialInstance->SetProperty("uMaterials.baseColor"_id, Color::Red());
-    materialInstance->SetProperty("uMaterials.specularColor"_id,
-                                  Color::Yellow());
-    materialInstance->SetProperty("uMaterials.shininess"_id, 20.0f);
-    materialInstance->SetProperty("uMaterials.f0"_id, 0.04f);
+    materialInstance->SetProperty("uMaterials.albedo"_id, Color::Red());
+    materialInstance->SetProperty("uMaterials.metallic"_id, 0.9f);
+    materialInstance->SetProperty("uMaterials.roughness"_id, 0.1f);
+    materialInstance->SetProperty("uMaterials.ao"_id, 1.0f);
+
     auto renderComp = world.GetComponent<ecs::RenderComponent>(cube);
     renderComp->materialInstanceHandle = materialInstanceHandle;
     auto meshHandle = renderComp->meshHandle;
@@ -49,10 +51,10 @@ public:
     materialInstanceHandle = materialManager.CreateMaterialInstance(
         materialManager.GetDefaultOpaque());
     materialInstance = materialManager.Resolve(materialInstanceHandle);
-    materialInstance->SetProperty("uMaterials.baseColor"_id, Color::Blue());
-    materialInstance->SetProperty("uMaterials.specularColor"_id, Color::Cyan());
-    materialInstance->SetProperty("uMaterials.shininess"_id, 100.0f);
-    materialInstance->SetProperty("uMaterials.f0"_id, 0.4f);
+    materialInstance->SetProperty("uMaterials.albedo"_id, Color::Blue());
+    materialInstance->SetProperty("uMaterials.metallic"_id, 0.7f);
+    materialInstance->SetProperty("uMaterials.roughness"_id, 0.3f);
+    materialInstance->SetProperty("uMaterials.ao"_id, 1.0f);
 
     renderComp = world.GetComponent<ecs::RenderComponent>(sphere);
     renderComp->materialInstanceHandle = materialInstanceHandle;
@@ -63,10 +65,10 @@ public:
     materialInstanceHandle = materialManager.CreateMaterialInstance(
         materialManager.GetDefaultOpaque());
     materialInstance = materialManager.Resolve(materialInstanceHandle);
-    materialInstance->SetProperty("uMaterials.baseColor"_id, Color::White());
-    materialInstance->SetProperty("uMaterials.specularColor"_id, Color::Blue());
-    materialInstance->SetProperty("uMaterials.shininess"_id, 50.0f);
-    materialInstance->SetProperty("uMaterials.f0"_id, 0.1f);
+    materialInstance->SetProperty("uMaterials.albedo"_id, Color::White());
+    materialInstance->SetProperty("uMaterials.metallic"_id, 0.2f);
+    materialInstance->SetProperty("uMaterials.roughness"_id, 0.8f);
+    materialInstance->SetProperty("uMaterials.ao"_id, 1.0f);
 
     renderComp = world.GetComponent<ecs::RenderComponent>(plane);
     renderComp->materialInstanceHandle = materialInstanceHandle;
@@ -99,8 +101,15 @@ public:
     world.AddSystem<ecs::MoveCubeSystem>();
     world.AddSystem<ecs::InputSystem>();
 
-    input::GetInputManager().LoadMapping(
+    auto &inputManager = input::GetInputManager();
+
+    inputManager.LoadMapping(
         std::move(input::InputMapping::CreateDefaultDrone()));
+
+    inputManager.BindAction("IncreaseMetallic"_id, input::EGamepadButton::A);
+    inputManager.BindAction("DecreaseMetallic"_id, input::EGamepadButton::B);
+    inputManager.BindAction("IncreaseRoughness"_id, input::EGamepadButton::X);
+    inputManager.BindAction("DecreaseRoughness"_id, input::EGamepadButton::Y);
   }
 
 private:

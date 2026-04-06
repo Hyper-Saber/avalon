@@ -38,6 +38,22 @@ public:
     AVALON_ASSERT(m_shaderBlob->GetData() != nullptr)
   }
 
+  auto GetLocalSize() const noexcept -> rhi::ComputeGroupSize {
+    return {
+        m_reflection.pHeader->localSizeX,
+        m_reflection.pHeader->localSizeY,
+        m_reflection.pHeader->localSizeZ,
+    };
+  }
+
+  bool HasComputeStage() const noexcept {
+    for (const auto &info : m_stageInfos) {
+      if (info.stage == rhi::EShaderStage::Compute)
+        return true;
+    }
+    return false;
+  }
+
   auto GetDescriptorMetaData() const noexcept
       -> Span<const ShaderDescriptorBinding> {
     return {m_reflection.pBindings, m_reflection.pHeader->descBindingCount};
@@ -58,7 +74,8 @@ public:
     return begin[0];
   }
 
-  auto GetPushConstants() const -> Span<const ShaderCustomPushConstantTextureSlot> {
+  auto GetPushConstants() const
+      -> Span<const ShaderCustomPushConstantTextureSlot> {
     return {m_pushConstantRanges.GetData(), m_pushConstantRanges.GetSize()};
   }
 
@@ -70,6 +87,14 @@ public:
   auto GetDescriptorSetLayouts() const noexcept
       -> Span<const rhi::DescriptorSetLayoutBinding> {
     return {m_descriptorBindings.GetData(), m_descriptorBindings.GetSize()};
+  }
+
+  auto GetComputeStageInfo() const noexcept -> const rhi::ShaderStageInfo * {
+    for (const auto &info : m_stageInfos) {
+      if (info.stage == rhi::EShaderStage::Compute)
+        return &info;
+    }
+    return nullptr;
   }
 
   auto GetStageInfos() const noexcept -> Span<const rhi::ShaderStageInfo> {
@@ -139,6 +164,8 @@ private:
 
   void ParseVertexInput() {
     uint32_t attrCount = m_reflection.pHeader->inputAttrCount;
+    if (attrCount == 0)
+      return;
     m_vertexAttributes.Reserve(attrCount);
 
     for (uint32_t i = 0; i < attrCount; i++) {
@@ -179,8 +206,9 @@ private:
     if (m_reflection.pHeader->pushConstantCount == 0)
       return;
 
-    auto pPushTable = reinterpret_cast<const ShaderCustomPushConstantTextureSlot *>(
-        pReflBase + m_reflection.pHeader->pushConstantTableOffset);
+    auto pPushTable =
+        reinterpret_cast<const ShaderCustomPushConstantTextureSlot *>(
+            pReflBase + m_reflection.pHeader->pushConstantTableOffset);
 
     for (uint32_t i = 0; i < m_reflection.pHeader->pushConstantCount; i++) {
       const auto &pushConstants = pPushTable[i];

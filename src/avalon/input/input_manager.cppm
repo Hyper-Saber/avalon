@@ -28,8 +28,7 @@ public:
     };
   }
 
-  void BindAction(StringId name, EGamepadButton button,
-                  EMouseButton key = EMouseButton::None) {
+  void BindAction(StringId name, EGamepadButton button, EMouseButton key) {
     m_actions[name] = {
         .button = button,
         .key = EKeyCode::Unknown,

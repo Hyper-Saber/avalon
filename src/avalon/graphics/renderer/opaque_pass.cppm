@@ -22,7 +22,7 @@ public:
     m_depthHandle =
         builder.SetClearValue(ClearValue::DepthStencil(0, 0))
             .Write(kSceneDepth, rhi::EResourceUsage::DepthStencilAttachment);
-    m_skyboxHandle = builder.Read(kSkyboxCube, rhi::EResourceUsage::ReadOnly);
+    m_skyboxHandle = builder.Read(kSkyboxMipmap, rhi::EResourceUsage::ReadOnly);
   }
 
   void OnCompile(rhi::IRhi &rhi) override {}
@@ -70,7 +70,7 @@ public:
         auto textureIndex =
             context.rhi.GetBindlessManager().RegisterTextureCube(
                 context.GetPhysicalTexture(m_skyboxHandle));
-        packet.pushConstants[i].textureSlots[kSkyboxSlot] = textureIndex;
+        packet.pushConstants[i].customSlots[kSkyboxSlot] = textureIndex;
 
         cmd.PushConstants(rhi::EShaderStage::All, 0,
                           sizeof(StandardPushConstant),

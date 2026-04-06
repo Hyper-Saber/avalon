@@ -150,8 +150,8 @@ private:
                               .normalMatrix = ComputeNormalMatrix(worldMatrix),
                               .materialIndex = materialGpuIndex};
       auto textureSlots = materialInstance.GetTextureSlots();
-      AVALON_ASSERT(textureSlots.GetSize() <= kMaxTextureSlots);
-      std::memcpy(pc.textureSlots, textureSlots.GetData(),
+      AVALON_ASSERT(textureSlots.GetSize() <= kMaxCustomSlots);
+      std::memcpy(pc.customSlots, textureSlots.GetData(),
                   textureSlots.GetSize());
 
       packet.pushConstants.PushBack(pc);

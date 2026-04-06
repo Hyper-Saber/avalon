@@ -29,6 +29,7 @@ public:
                   uint32_t height) -> ERhiResult override;
 
   auto GetUBOPool() const -> RingBufferPool & override;
+  auto GetSSBOPool() const -> RingBufferPool & override;
   auto GetBindlessManager() const -> IBindlessManager & override;
 
   void UpdateMaterialBuffer(size_t offset, const void *data,
@@ -48,6 +49,10 @@ public:
   auto GetTextureCreateInfo(TextureHandle) const -> TextureCreateInfo override;
   auto GetOrCreatePipeline(const PipelineCreateInfo &desc)
       -> PipelineHandle override;
+  auto GetOrCreateComputePipeline(const ComputePipelineCreateInfo &info)
+      -> PipelineHandle override;
+
+  auto GetDummyComputePipeline() const -> PipelineHandle override;
 
   auto RecreateSwapchain(uint32_t width, uint32_t height)
       -> ERhiResult override;
@@ -75,6 +80,8 @@ public:
   auto GetPipeline(PipelineHandle) -> const PipelineResource * override;
   auto GetBuffer(BufferHandle) -> const BufferResource * override;
   auto GetTexture(TextureHandle) -> const TextureResource * override;
+  auto GetOrCreateMipStorageView(TextureHandle, uint32_t mipLevel)
+      -> VkImageView override;
   auto GetSampler(SamplerHandle) -> const SamplerResource * override;
   auto GetDescriptorSet(DescriptorSetHandle handle)
       -> const DescriptorSetResource * override;
@@ -101,6 +108,7 @@ private:
   };
 
   void CreateUBOPool();
+  void CreateSSBOPool();
   auto CreateCommandPools() -> std::expected<void, ERhiResult>;
   auto CreateSyncObjects() -> std::expected<void, ERhiResult>;
 
@@ -108,8 +116,7 @@ private:
   void CreateCommandBuffer();
   void WarpSwapchainTextures();
 
-  auto CreateStorageBuffer(size_t structSize, uint32_t count)
-      -> StorageBufferResource;
+  auto CreateStorageBuffer(size_t bufferSize) -> StorageBufferResource;
 
 private:
   struct FrameSyncObject {
@@ -123,6 +130,7 @@ private:
   StaticSamplers m_staticSamplers;
 
   UniquePtr<RingBufferPool> m_uboPool;
+  UniquePtr<RingBufferPool> m_ssboPool;
   UniquePtr<DescriptorProvider> m_descriptorProvider;
   UniquePtr<BindlessManager> m_bindlessManager;
   UniquePtr<DeviceContext> m_deviceContext;
@@ -143,6 +151,8 @@ private:
 
   StorageBufferResource m_materialPool;
   StorageBufferResource m_probePool;
+
+  PipelineHandle m_dummyComputePipeline;
 
   TextureHandle m_defaultTexture;
 

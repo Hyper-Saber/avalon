@@ -14,12 +14,14 @@ namespace avalon::graphics {
 
 class SkyboxGeneratorPass final : public RenderPass<SkyboxGeneratorPass> {
 public:
+  explicit SkyboxGeneratorPass(rhi::Extent2D extent) : m_extent(extent) {}
+
   void Setup(RenderGraphBuilder &builder) override {
     builder.SetViewMask(0x3F).SetLayers(6);
     m_cubeHandle =
         builder.SetLayers(6)
             .SetTextureType(rhi::ETextureType::TextureCube)
-            .SetExtent({1024, 1024})
+            .SetExtent(m_extent)
             .Write(kSkyboxCube, rhi::EResourceUsage::ColorAttachment);
   }
 
@@ -37,6 +39,7 @@ public:
   }
 
 private:
+  rhi::Extent2D m_extent;
   VirtualResourceHandle m_cubeHandle;
   Material *m_material = nullptr;
 };

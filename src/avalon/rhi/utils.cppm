@@ -336,6 +336,8 @@ constexpr StringView ToView(EFormat format) {
     return "R8G8B8A8_SRGB";
   case B8G8R8A8_SRGB:
     return "B8G8R8A8_SRGB";
+  case R16G16_SFLOAT:
+    return "R16G16_SFLOAT";
   case R16G16B16A16_SFLOAT:
     return "R16G16B16A16_SFLOAT";
   case D32_SFLOAT:
@@ -491,36 +493,33 @@ constexpr StringView ToView(EAttachmentLoadOp op) {
   }
 }
 
-constexpr StringView ToView(EResourceUsage usage) {
-  switch (usage) {
-  case EResourceUsage::None:
+constexpr String ToView(EResourceUsage usage) {
+  if (usage == EResourceUsage::None)
     return "None";
-  case EResourceUsage::VertexBuffer:
-    return "VertexBuffer";
-  case EResourceUsage::IndexBuffer:
-    return "IndexBuffer";
-  case EResourceUsage::IndirectBuffer:
-    return "IndirectBuffer";
-  case EResourceUsage::UniformBuffer:
-    return "UniformBuffer";
-  case EResourceUsage::StorageBuffer:
-    return "StorageBuffer";
-  case EResourceUsage::ReadOnly:
-    return "ReadOnly";
-  case EResourceUsage::ReadWrite:
-    return "ReadWrite";
-  case EResourceUsage::ColorAttachment:
-    return "ColorAttachment";
-  case EResourceUsage::DepthStencilAttachment:
-    return "DepthStencilAttachment";
-  case EResourceUsage::TransferSrc:
-    return "TransferSrc";
-  case EResourceUsage::TransferDst:
-    return "TransferDst";
-  case EResourceUsage::Present:
-    return "Present";
-    break;
-  }
+
+  String result = "";
+  auto AddFlag = [&](EResourceUsage flag, const char *name) {
+    if (HasFlag(usage, flag)) {
+      if (!result.IsEmpty())
+        result += " | ";
+      result += name;
+    }
+  };
+
+  AddFlag(EResourceUsage::VertexBuffer, "VertexBuffer");
+  AddFlag(EResourceUsage::IndexBuffer, "IndexBuffer");
+  AddFlag(EResourceUsage::IndirectBuffer, "IndirectBuffer");
+  AddFlag(EResourceUsage::UniformBuffer, "UniformBuffer");
+  AddFlag(EResourceUsage::StorageBuffer, "StorageBuffer");
+  AddFlag(EResourceUsage::ReadOnly, "ReadOnly");
+  AddFlag(EResourceUsage::ReadWrite, "ReadWrite");
+  AddFlag(EResourceUsage::ColorAttachment, "ColorAttachment");
+  AddFlag(EResourceUsage::DepthStencilAttachment, "DepthStencilAttachment");
+  AddFlag(EResourceUsage::TransferSrc, "TransferSrc");
+  AddFlag(EResourceUsage::TransferDst, "TransferDst");
+  AddFlag(EResourceUsage::Present, "Present");
+
+  return result.IsEmpty() ? "Unknown" : result;
 }
 
 constexpr StringView ToView(EAttachmentStoreOp op) {

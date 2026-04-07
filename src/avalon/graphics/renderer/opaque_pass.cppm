@@ -22,7 +22,9 @@ public:
     m_depthHandle =
         builder.SetClearValue(ClearValue::DepthStencil(0, 0))
             .Write(kSceneDepth, rhi::EResourceUsage::DepthStencilAttachment);
-    m_skyboxHandle = builder.Read(kSkyboxMipmap, rhi::EResourceUsage::ReadOnly);
+    m_prefilteredHandle =
+        builder.Read("SkyboxMipmap"_id, rhi::EResourceUsage::ReadOnly);
+    m_brdfLudHandle = builder.Read("BRDFLut"_id);
   }
 
   void OnCompile(rhi::IRhi &rhi) override {}
@@ -67,10 +69,18 @@ public:
           lastIBO = currentIBO;
         }
 
-        auto textureIndex =
-            context.rhi.GetBindlessManager().RegisterTextureCube(
-                context.GetPhysicalTexture(m_skyboxHandle));
-        packet.pushConstants[i].customSlots[kSkyboxSlot] = textureIndex;
+        auto prefiteredTexture =
+            context.GetPhysicalTexture(m_prefilteredHandle);
+
+        auto &bindlessManager = context.rhi.GetBindlessManager();
+        auto prefilteredIndex =
+            bindlessManager.RegisterTextureCube(prefiteredTexture);
+        auto brdfLutIndex = bindlessManager.RegisterTexture(
+            context.GetPhysicalTexture(m_brdfLudHandle));
+
+        packet.pushConstants[i].customSlots[kSkyboxPrefilteredSlot] =
+            prefilteredIndex;
+        packet.pushConstants[i].customSlots[kBRDFLutSlot] = brdfLutIndex;
 
         cmd.PushConstants(rhi::EShaderStage::All, 0,
                           sizeof(StandardPushConstant),
@@ -84,7 +94,9 @@ public:
 private:
   VirtualResourceHandle m_colorHandle;
   VirtualResourceHandle m_depthHandle;
-  VirtualResourceHandle m_skyboxHandle;
+  VirtualResourceHandle m_irradianceHandle;
+  VirtualResourceHandle m_prefilteredHandle;
+  VirtualResourceHandle m_brdfLudHandle;
 
   MaterialInstance *m_materialInstance;
 };

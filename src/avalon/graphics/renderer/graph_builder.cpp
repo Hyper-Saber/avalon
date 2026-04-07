@@ -97,9 +97,12 @@ auto RenderGraphBuilder::Write(StringId name, rhi::EResourceUsage usage,
   return m_currentResource;
 }
 
-auto RenderGraphBuilder::Read(StringId name, rhi::EResourceUsage usage)
+auto RenderGraphBuilder::Read(StringId name, rhi::EResourceUsage usage,
+                              rhi::EResourceUsage initialUsage)
     -> VirtualResourceHandle {
-  return m_graph.Read(*m_owner, name, usage);
+  initialUsage =
+      initialUsage == rhi::EResourceUsage::None ? usage : initialUsage;
+  return m_graph.Read(*m_owner, name, usage, initialUsage);
 }
 
 auto RenderGraphBuilder::SetExtent(const rhi::Extent2D &extent)
@@ -163,6 +166,13 @@ auto RenderGraphBuilder::SetStoreOp(rhi::EAttachmentStoreOp op)
 auto RenderGraphBuilder::SetClearValue(rhi::ClearValue value)
     -> RenderGraphBuilder & {
   m_clearValue = value;
+  return *this;
+}
+
+auto RenderGraphBuilder::ImportExternalTexture(
+    StringId name, rhi::TextureHandle physicalHandle, VirtualTextureDesc desc)
+    -> RenderGraphBuilder & {
+  m_graph.ImportExternalTexture(name, physicalHandle, desc);
   return *this;
 }
 

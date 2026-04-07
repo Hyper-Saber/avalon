@@ -137,7 +137,7 @@ public:
 
   void End() override { vkEndCommandBuffer(m_cmd); }
 
-  void BindPipeline(PipelineHandle handle, EPipelineBindPoint point) override {
+  void BindPipeline(PipelineHandle handle) override {
     if (m_lastBoundPipeline == handle)
       return;
 
@@ -145,7 +145,7 @@ public:
     m_layout = res->pipelineLayout;
 
     VkPipeline pipeline = res->pipeline;
-    vkCmdBindPipeline(m_cmd, ToVkPipelineBindPoint(point), pipeline);
+    vkCmdBindPipeline(m_cmd, ToVkPipelineBindPoint(res->bindPoint), pipeline);
     m_lastBoundPipeline = handle;
   }
 
@@ -318,6 +318,23 @@ public:
                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
   }
 
+  void ClearColor(TextureHandle handle, ClearValue value) override {
+    FlushBarriers();
+    auto res = m_resourceProvider.GetTexture({handle.id});
+    auto color = value.color;
+    VkClearColorValue clearColor = {{color.r, color.g, color.b, color.a}};
+    VkImageSubresourceRange range = {
+        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        .baseMipLevel = 0,
+        .levelCount = res->createInfo.mipLevels,
+        .baseArrayLayer = 0,
+        .layerCount = res->createInfo.layerCount,
+    };
+    vkCmdClearColorImage(m_cmd, res->image,
+                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clearColor, 1,
+                         &range);
+  }
+
 private:
   void FlushBarriers() {
     if (!m_isDirty)
@@ -356,6 +373,9 @@ private:
               .layerCount = b.layerCount,
           }};
       vkBarriers.PushBack(vkBarrier);
+      // Debug("Transition layout texture:{}, src: {}, dest: {}",
+      //       reinterpret_cast<uint64_t>(textureRes->image),
+      //       ToView(b.oldLayout), ToView(b.newLayout));
     }
 
     VkDependencyInfo depInfo{

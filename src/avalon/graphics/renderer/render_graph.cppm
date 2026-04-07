@@ -131,6 +131,9 @@ public:
   }
 
   void Render(rhi::ICommandBuffer &cmd, RenderContext &context) {
+    // Debug("-------------------------------render graph "
+    //       "begin------------------------------------");
+
     Array<PendingUsage> finalPendingUsages;
 
     bool isGlobalSetBinded = false;
@@ -143,8 +146,7 @@ public:
 
       if (node.passType == rhi::EPassType::Compute) {
         if (!isComputeGlobalSetBinded) [[unlikely]] {
-          cmd.BindPipeline(m_dummyComputePipeline,
-                           rhi::EPipelineBindPoint::Compute);
+          cmd.BindPipeline(m_dummyComputePipeline);
           cmd.BindBindlessSet(rhi::EPipelineBindPoint::Compute);
           cmd.BindDescriptorSet(kSceneGlobalsSet, {&context.sceneGlobalsSet, 1},
                                 {&context.sceneGlobalsSetDynamicOffset, 1},
@@ -222,6 +224,9 @@ public:
       }
       cmd.EndRendering();
     }
+
+    // Debug("-------------------------------render graph "
+    //       "end------------------------------------");
   }
 
   friend class RenderGraphBuilder;
@@ -283,12 +288,14 @@ private:
       auto handle = m_resourceManager.GetVirtualResource(handleIndex);
       if (!handle.IsExternal()) {
         node.inputs.PushBack({
+            .nameHash = desc.nameHash,
             .handle = m_resourceManager.GetVirtualResource(handleIndex),
         });
       }
     }
     auto handle = m_resourceManager.IncreaseGeneration(handleIndex);
     node.outputs.PushBack({
+        .nameHash = desc.nameHash,
         .handle = handle,
         .initialUsage = initialUsage,
     });
@@ -298,13 +305,14 @@ private:
     return handle;
   }
 
-  auto Read(IRenderPass &owner, StringId id, rhi::EResourceUsage usage)
-      -> VirtualResourceHandle {
+  auto Read(IRenderPass &owner, StringId id, rhi::EResourceUsage usage,
+            rhi::EResourceUsage initialUsage) -> VirtualResourceHandle {
     auto handle = m_resourceManager.GetVirtualResource(id);
     auto &node = GetNode(&owner);
     node.inputs.PushBack({
+        .nameHash = id,
         .handle = handle,
-        .initialUsage = usage,
+        .initialUsage = initialUsage,
     });
     m_resourceManager.RefineUsage(handle, usage);
     return handle;
@@ -323,6 +331,13 @@ private:
         finalPendingUsages.PushBack({output.initialUsage, physicalHandle,
                                      desc.layerCount, desc.mipLevels});
       }
+
+      // Debug(
+      //     "Transitioning resource {}({}): to {}. layerCount: {}, mipLevels:
+      //     {}", output.nameHash.Resolve(),
+      //     m_resourceManager.GetPhysical(output.handle).id,
+      //     ToView(fixedUsage), desc.layerCount, desc.mipLevels);
+
       cmd.Transition(physicalHandle, fixedUsage, desc.layerCount,
                      desc.mipLevels);
     }
@@ -333,6 +348,11 @@ private:
       auto physicalHandle = m_resourceManager.GetPhysical(input.handle);
       if (physicalHandle.IsValid()) {
         auto desc = m_resourceManager.GetResourceDesc(input.handle);
+        // Debug("Transitioning resource {}({}): to {}. layerCount: {}, "
+        //       "mipLevels: {}",
+        //       input.nameHash.Resolve(),
+        //       m_resourceManager.GetPhysical(input.handle).id,
+        //       ToView(input.initialUsage), desc.layerCount, desc.mipLevels);
         cmd.Transition(physicalHandle, input.initialUsage, desc.layerCount,
                        desc.mipLevels);
       }

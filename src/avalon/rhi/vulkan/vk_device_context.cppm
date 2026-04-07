@@ -384,7 +384,7 @@ private:
         .descriptorBindingPartiallyBound = VK_TRUE,
         .runtimeDescriptorArray = VK_TRUE,
         .scalarBlockLayout = VK_TRUE,
-        // .bufferDeviceAddress = VK_TRUE,
+        .bufferDeviceAddress = VK_TRUE,
     };
 
     VkPhysicalDeviceVulkan11Features features11{

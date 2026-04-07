@@ -204,7 +204,8 @@ private:
     if (vkPipeline == VK_NULL_HANDLE)
       return {};
 
-    return m_pipelinePool.Create(m_device, vkPipeline, layout, std::move(meta));
+    return m_pipelinePool.Create(m_device, vkPipeline, layout, std::move(meta),
+                                 EPipelineBindPoint::Compute);
   }
 
   auto CreateInfoToKey(const PipelineCreateInfo &info) -> PipelineKey {

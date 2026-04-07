@@ -65,13 +65,14 @@ enum class EFormat {
   R8G8B8_SRGB,
   R8G8B8A8_SRGB,
   B8G8R8A8_SRGB,
+  R16G16_SFLOAT,
   R16G16B16A16_SFLOAT,
   D32_SFLOAT,
   D32_SFLOAT_S8_UINT,
 };
 
 enum class EPipelineBindPoint {
-  graphics,
+  Graphics,
   Compute,
   RayTrace,
 };
@@ -360,15 +361,12 @@ template <> struct EnableBitmaskOperators<EPipelineStage> : std::true_type {};
 //---------------------------------------------------------------------------------------------------------------------
 
 constexpr uint32_t kMaxCustomSlots = 7;
+constexpr uint32_t kPushConstantFloatSize = 32 + 1 + kMaxCustomSlots;
 constexpr uint32_t kInvalidTextureSlot = 0xFFFF;
 
-constexpr uint32_t kSkyboxSlot = 0;
-constexpr uint32_t kBaseColorSlot = 1;
-constexpr uint32_t kNormalSlot = 2;
-constexpr uint32_t kMetallicRoughnessSlot = 3;
-constexpr uint32_t kEmissiveSlot = 4;
-constexpr uint32_t kOcclusionSlot = 5;
-constexpr uint32_t kShadowSlot = 6;
+constexpr uint32_t kSkyboxIrradianceSlot = 0;
+constexpr uint32_t kSkyboxPrefilteredSlot = 1;
+constexpr uint32_t kBRDFLutSlot = 2;
 
 struct alignas(16) StandardPushConstant {
   Matrix4x4 model;

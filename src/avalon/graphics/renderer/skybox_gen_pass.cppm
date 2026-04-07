@@ -22,7 +22,7 @@ public:
         builder.SetLayers(6)
             .SetTextureType(rhi::ETextureType::TextureCube)
             .SetExtent(m_extent)
-            .Write(kSkyboxCube, rhi::EResourceUsage::ColorAttachment);
+            .Write("Skybox"_id, rhi::EResourceUsage::ColorAttachment);
   }
 
   void OnCompile(rhi::IRhi &rhi) override {

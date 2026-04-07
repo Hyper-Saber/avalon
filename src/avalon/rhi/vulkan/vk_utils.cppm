@@ -114,6 +114,8 @@ constexpr auto ToVkFormat(EFormat format) noexcept -> VkFormat {
     return VkFormat::VK_FORMAT_R8G8B8A8_SRGB;
   case EFormat::B8G8R8A8_SRGB:
     return VkFormat::VK_FORMAT_B8G8R8A8_SRGB;
+  case EFormat::R16G16_SFLOAT:
+    return VkFormat::VK_FORMAT_R16G16_SFLOAT;
   case EFormat::R16G16B16A16_SFLOAT:
     return VkFormat::VK_FORMAT_R16G16B16A16_SFLOAT;
   case EFormat::D32_SFLOAT:
@@ -267,7 +269,7 @@ constexpr auto ToVkSampleCount(ESampleCount e) noexcept
 
 constexpr auto ToVkPipelineBindPoint(EPipelineBindPoint e) noexcept {
   switch (e) {
-  case EPipelineBindPoint::graphics:
+  case EPipelineBindPoint::Graphics:
     return VK_PIPELINE_BIND_POINT_GRAPHICS;
   case EPipelineBindPoint::Compute:
     return VK_PIPELINE_BIND_POINT_COMPUTE;

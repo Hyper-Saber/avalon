@@ -15,12 +15,6 @@
 #define uDeltaTime uSceneGlobals.time.deltaTime
 #define uResolution uSceneGlobals.resolution
 
-#define mModel push.model.model
-#define mNormalMatrix push.model.normalMatrix
-#define mMaterialIndex push.materialIdx
-
-#define mMaterial uMaterials[mMaterialIndex]
-
 struct Camera {
   float4x4 view;
   float4x4 projection;
@@ -71,31 +65,32 @@ struct ProbeData {
   float4x4 captureViews[6];
 };
 
+#ifndef CUSTOM_PUSH_TYPE
+
+#define mModel push.model.model
+#define mNormalMatrix push.model.normalMatrix
+#define mMaterialIndex push.materialIdx
+
+#define mMaterial uMaterials[mMaterialIndex]
+
 struct ModelData {
   float4x4 model;
   float4x4 normalMatrix;
 };
 
-#ifndef CUSTOM_PUSH_TYPE
-struct DefaultCustomPush {
-  uint skybox;
-  uint albedo;
-  uint normal;
-  uint metallicRoughness;
-  uint emissive;
-  uint occlusion;
-  uint shadow;
-};
-#define CUSTOM_PUSH_TYPE DefaultCustomPush
-#endif
-
 struct StandardPushConstants {
   ModelData model;
   uint materialIdx;
-  CUSTOM_PUSH_TYPE custom;
+  uint irradianceMap;
+  uint prefilterMap;
+  uint brdfLut;
+  uint paddings[kPushConstantFloatSize - 36];
 };
 
-VK_PUSH_CONSTANT StandardPushConstants push;
+#define CUSTOM_PUSH_TYPE StandardPushConstants
+#endif
+
+VK_PUSH_CONSTANT CUSTOM_PUSH_TYPE push;
 
 VK_BINDING(0, 0) SamplerState uSamplers[] : register(s0, space0);
 VK_BINDING(1, 0) StructuredBuffer<MaterialData> uMaterials
@@ -106,8 +101,7 @@ VK_BINDING(4, 0) Texture2DArray uTextureArrays[] : register(t128, space0);
 VK_BINDING(5, 0) Texture3D uVolumes[] : register(t256, space0);
 VK_BINDING(6, 0) Texture2D uTextures[] : register(t512, space0);
 VK_BINDING(7, 0) RWTexture2D<float4> uRWTextures[] : register(u0, space0);
-VK_BINDING(8, 0) RWStructuredBuffer<float4> uRWBuffers
-    : register(u1024, space0);
+VK_BINDING(8, 0) RWByteAddressBuffer uGeneralSSBO : register(u1024, space0);
 VK_BINDING(9, 0) RWTexture2DArray<float4> uRWTextureArrays[]
     : register(u2048, space0);
 

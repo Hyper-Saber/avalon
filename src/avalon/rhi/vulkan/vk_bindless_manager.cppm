@@ -82,7 +82,7 @@ public:
          .descriptorCount = kMaxTexture2DDescriptor,
          .stageFlags = VK_SHADER_STAGE_ALL},
         {
-            .binding = kMaxRWTextureDescriptor,
+            .binding = kRWTexturesBinding,
             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
             .descriptorCount = kMaxRWTextureDescriptor,
             .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,

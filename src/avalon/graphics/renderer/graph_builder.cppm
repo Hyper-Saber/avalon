@@ -35,7 +35,8 @@ public:
              rhi::EResourceUsage initialUsage = rhi::EResourceUsage::None)
       -> VirtualResourceHandle;
   auto Read(StringId name,
-            rhi::EResourceUsage usage = rhi::EResourceUsage::ReadOnly)
+            rhi::EResourceUsage usage = rhi::EResourceUsage::ReadOnly,
+            rhi::EResourceUsage initialUsage = rhi::EResourceUsage::None)
       -> VirtualResourceHandle;
 
   auto SetExtent(const rhi::Extent2D &extent) -> RenderGraphBuilder &;
@@ -51,6 +52,9 @@ public:
   auto SetLoadOp(rhi::EAttachmentLoadOp op) -> RenderGraphBuilder &;
   auto SetStoreOp(rhi::EAttachmentStoreOp op) -> RenderGraphBuilder &;
   auto SetClearValue(rhi::ClearValue value) -> RenderGraphBuilder &;
+
+  auto ImportExternalTexture(StringId name, rhi::TextureHandle physicalHandle,
+                             VirtualTextureDesc desc) -> RenderGraphBuilder &;
 
 private:
   rhi::EFormat SpecifyTextureDefaultFormat(rhi::EResourceUsage usage);

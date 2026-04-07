@@ -1,6 +1,8 @@
+#include "constants.hlsli"
 struct BlitCustom {
   uint sceneColor;
-  uint padding[6];
+  uint sampler;
+  uint padding[kPushConstantFloatSize - 2];
 };
 
 #define CUSTOM_PUSH_TYPE BlitCustom
@@ -12,7 +14,6 @@ VsOutput VsMain(uint vertexID : SV_VertexID) {
 }
 
 float4 FsMain(VsOutput input) : SV_Target {
-  float4 color =
-      sampleTexture2d(push.custom.sceneColor, mMaterial.sampler, input.uv);
+  float4 color = sampleTexture2d(push.sceneColor, push.sampler, input.uv);
   return color;
 }

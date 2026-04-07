@@ -2,8 +2,8 @@
 #define AVALON_CONSTANTS_HLSLI
 
 #define kPi 3.14159265359
-#define kEpsilon 1e-6
+#define kEpsilon 1e-8
 
-#define kMaxCustomSlots 7
+#define kPushConstantFloatSize 40
 
 #endif

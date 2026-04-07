@@ -29,18 +29,18 @@ struct CustomPush {
   uint sampleCount = push.sampleCount;
 
   for(uint i = 0; i < sampleCount; i++) {
-    float VdotH = max(dot(V, H), 0.0);
-
     float2 Xi = hammersley(i, sampleCount);
     float3 H = importanceSampleGGX(Xi, N, roughness);
-    float3 L = normalize(2.0 * dot(V, H) * H - V);
+
+    float VdotH = max(dot(V, H), 0.0);
+
+    float3 L = normalize(2.0 * VdotH * H - V);
 
     float NdotL = max(L.z, 0.0);
     float NdotH = max(H.z, 0.0);
 
     if(NdotL > 0.0) {
-      float G = geometrySmith(NdotV, NdotL, roughness);
-      float G_Vis = (G * VdotH) / max((NdotH * NdotV), kEpsilon);
+      float G_Vis = visibilitySmithJoint(NdotV, NdotL, roughness);
       float Fc = pow(1.0 - VdotH, 5.0);
 
       A += (1.0 - Fc) * G_Vis;

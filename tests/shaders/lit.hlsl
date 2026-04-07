@@ -54,12 +54,10 @@ float3 calculateDirectLight(PBRSurface surface, Light mainLight,
   F0 = lerp(F0, surface.albedo, surface.metallic);
 
   float D = distributionGGX(N, H, surface.roughness);
-  float G = geometrySmith(NdotV, NdotL, surface.roughness);
+  float G_Vis = visibilitySmithJoint(NdotV, NdotL, surface.roughness);
   float3 F = fresnelSchlick(max(dot(H, V), 0.0), F0);
 
-  float3 numerator = D * G * F;
-  float denominator = max(4.0 * NdotL * NdotV, 0.0001);
-  float3 specular = numerator / denominator;
+  float3 specular = D * F * G_Vis;
 
   float3 ks = F;
   float3 kd = 1.0 - ks;

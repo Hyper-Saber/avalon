@@ -30,6 +30,16 @@ float geometrySmith(float NdotV, float NdotL, float roughness) {
   return ggx1 * ggx2;
 }
 
+float visibilitySmithJoint(float NdotV, float NdotL, float roughness) {
+  float a = roughness * roughness;
+  float a2 = a * a;
+
+  float gv = NdotL * sqrt(NdotV * NdotV * (1.0 - a2) + a2);
+  float gl = NdotV * sqrt(NdotL * NdotL * (1.0 - a2) + a2);
+
+  return 0.5 / max(gv + gl, kEpsilon);
+}
+
 float3 fresnelSchlick(float NdotV, float3 F0) {
   return F0 + (1.0 - F0) * pow(1.0 - NdotV, 5.0);
 }

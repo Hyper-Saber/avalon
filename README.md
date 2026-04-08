@@ -60,7 +60,8 @@
 
 ### 🛠️ 开发中 (In Progress)
 
-- [ ] **PBR 材质系统**: 基于 Cook-Torrance 模型，整合进目前的 Bindless SSBO 布局。
+- [ ] **PBR 材质系统**: 基于BRDF, D项使用GGX。
+- [ ] **Async Compute Transfer**: 修改commandbuffer,提供异步传输计算的选项。
 
 ### 🚀 远期目标 (Future)
 

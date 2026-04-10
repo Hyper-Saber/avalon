@@ -27,7 +27,7 @@ public:
 
   bool Initialize() {
     auto alignment =
-        m_usage == EResourceUsage::UniformBuffer
+        HasFlag(m_usage, EResourceUsage::UniformBuffer)
             ? m_rhi.GetCapabilities().limits.minUniformBufferOffsetAlignment
             : m_rhi.GetCapabilities().limits.minStorageBufferOffsetAlignment;
     m_alignedSegmentSize = mem::AlignUp(m_segmentSize, alignment);
@@ -52,7 +52,7 @@ public:
     m_allocatedSizeInFrame = 0;
     m_frameIndex = m_rhi.GetCurrentFrameIndex();
     m_alignment =
-        m_usage == EResourceUsage::UniformBuffer
+        HasFlag(m_usage, EResourceUsage::UniformBuffer)
             ? m_rhi.GetCapabilities().limits.minUniformBufferOffsetAlignment
             : m_rhi.GetCapabilities().limits.minStorageBufferOffsetAlignment;
   }
@@ -71,15 +71,28 @@ public:
         static_cast<uint32_t>(segmentBase + m_allocatedSizeInFrame);
     m_allocatedSizeInFrame += alignedSize;
 
-    return {
+    BufferAllocation allocation{
         .pHostAddress = m_mappedPtr + finalOffset,
-        .offset = finalOffset,
         .buffer = m_handle,
+        .offset = finalOffset,
+        .size = static_cast<uint32_t>(alignedSize),
     };
+
+#ifdef AVALON_DEBUG
+    m_lastAllocation = allocation;
+#endif
+
+    return allocation;
   }
 
   auto GetBufferHandle() const { return m_handle; }
   auto GetSegmentSize() const { return m_alignedSegmentSize; }
+
+#ifdef AVALON_DEBUG
+  auto DEBUG_GetLastAllocation() -> BufferAllocation & {
+    return m_lastAllocation;
+  }
+#endif
 
 private:
   IRhi &m_rhi;
@@ -93,6 +106,10 @@ private:
 
   BufferHandle m_handle;
   uint8_t *m_mappedPtr = nullptr;
+
+#ifdef AVALON_DEBUG
+  BufferAllocation m_lastAllocation;
+#endif
 };
 
 } // namespace avalon::rhi

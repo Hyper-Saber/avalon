@@ -30,14 +30,21 @@ public:
     return pass;
   }
 
-  auto Write(StringId name,
-             rhi::EResourceUsage usage = rhi::EResourceUsage::ColorAttachment,
-             rhi::EResourceUsage initialUsage = rhi::EResourceUsage::None)
+  auto Write(StringId name, rhi::EResourceUsage usage,
+             EResourceUsage initialUsage, EShaderStage stage)
       -> VirtualResourceHandle;
-  auto Read(StringId name,
-            rhi::EResourceUsage usage = rhi::EResourceUsage::ReadOnly,
-            rhi::EResourceUsage initialUsage = rhi::EResourceUsage::None)
+  auto Read(StringId name, rhi::EResourceUsage usage,
+            rhi::EResourceUsage initialUsage, EShaderStage stage)
       -> VirtualResourceHandle;
+
+  auto WriteAttachment(StringId name, rhi::EResourceUsage usage)
+      -> VirtualResourceHandle;
+
+  auto WriteBuffer(StringId name, rhi::EResourceUsage usage,
+                   rhi::EResourceUsage initialUsage, uint32_t size,
+                   EShaderStage stage) -> VirtualResourceHandle;
+  auto ReadBuffer(StringId name, rhi::EResourceUsage initialUsage,
+                  EShaderStage stage) -> VirtualResourceHandle;
 
   auto SetExtent(const rhi::Extent2D &extent) -> RenderGraphBuilder &;
   auto SetRelativeExtent(float scale = 1.f) -> RenderGraphBuilder &;

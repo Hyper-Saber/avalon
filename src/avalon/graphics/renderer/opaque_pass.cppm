@@ -18,13 +18,19 @@ public:
   void Setup(RenderGraphBuilder &builder) override {
     m_colorHandle =
         builder.SetClearValue(ClearValue::Color(0, 0, 0.01))
-            .Write(kSceneColor, rhi::EResourceUsage::ColorAttachment);
+            .WriteAttachment(kSceneColor, rhi::EResourceUsage::ColorAttachment);
     m_depthHandle =
         builder.SetClearValue(ClearValue::DepthStencil(0, 0))
-            .Write(kSceneDepth, rhi::EResourceUsage::DepthStencilAttachment);
+            .WriteAttachment(kSceneDepth,
+                             EResourceUsage::DepthStencilAttachment);
     m_prefilteredHandle =
-        builder.Read("SkyboxMipmap"_id, rhi::EResourceUsage::ReadOnly);
-    m_brdfLudHandle = builder.Read("BRDFLut"_id);
+        builder.Read("SkyboxPrefiltered"_id, EResourceUsage::ReadOnly,
+                     EResourceUsage::ReadOnly, EShaderStage::Fragment);
+    m_skyboxSHHandle = builder.ReadBuffer(
+        "SkyboxSH"_id, EResourceUsage::ReadOnly, EShaderStage::Fragment);
+    m_brdfLudHandle =
+        builder.Read("BRDFLut"_id, EResourceUsage::ReadOnly,
+                     EResourceUsage::ReadOnly, EShaderStage::Fragment);
   }
 
   void OnCompile(rhi::IRhi &rhi) override {}
@@ -69,19 +75,23 @@ public:
           lastIBO = currentIBO;
         }
 
-        auto prefiteredTexture =
+        auto prefilteredTexture =
             context.GetPhysicalTexture(m_prefilteredHandle);
+        auto allocation = context.GetPhysicalBufferAllocation(m_skyboxSHHandle);
 
         auto &bindlessManager = context.rhi.GetBindlessManager();
         auto prefilteredIndex =
-            bindlessManager.RegisterTextureCube(prefiteredTexture);
+            bindlessManager.RegisterTextureCube(prefilteredTexture);
         auto brdfLutIndex = bindlessManager.RegisterTexture(
             context.GetPhysicalTexture(m_brdfLudHandle));
 
         packet.pushConstants[i].customSlots[kSkyboxPrefilteredSlot] =
             prefilteredIndex;
         packet.pushConstants[i].customSlots[kBRDFLutSlot] = brdfLutIndex;
+        packet.pushConstants[i].customSlots[kSkyboxSHSlot] = allocation.offset;
 
+        // Debug("begin opaque pass, buffer: {}, offset: {}, size: {}",
+        // allocation.buffer.id, allocation.offset, allocation.size);
         cmd.PushConstants(rhi::EShaderStage::All, 0,
                           sizeof(StandardPushConstant),
                           &packet.pushConstants[i]);
@@ -94,7 +104,7 @@ public:
 private:
   VirtualResourceHandle m_colorHandle;
   VirtualResourceHandle m_depthHandle;
-  VirtualResourceHandle m_irradianceHandle;
+  VirtualResourceHandle m_skyboxSHHandle;
   VirtualResourceHandle m_prefilteredHandle;
   VirtualResourceHandle m_brdfLudHandle;
 

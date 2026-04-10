@@ -12,7 +12,7 @@ struct FullscreenVertexAttribute {
   float2 uv;
 };
 
-FullscreenVertexAttribute GenerateVertices(uint vertexId) {
+FullscreenVertexAttribute generateVertices(uint vertexId) {
   FullscreenVertexAttribute output;
   static const float2 uvTable[3] = {float2(0, 0), float2(0, 2), float2(2, 0)};
 
@@ -23,9 +23,9 @@ FullscreenVertexAttribute GenerateVertices(uint vertexId) {
   return output;
 }
 
-VsOutput FullscreenBase(uint vertexId) {
+VsOutput fullscreenBase(uint vertexId) {
   VsOutput output;
-  FullscreenVertexAttribute attribute = GenerateVertices(vertexId);
+  FullscreenVertexAttribute attribute = generateVertices(vertexId);
 
   output.uv = attribute.uv;
   output.pos = attribute.pos;
@@ -33,10 +33,10 @@ VsOutput FullscreenBase(uint vertexId) {
   return output;
 }
 
-VsOutput FullscreenSkybox(uint vertexId, float4x4 invProjection,
+VsOutput fullscreenSkybox(uint vertexId, float4x4 invProjection,
                           float4x4 invView) {
   VsOutput output;
-  FullscreenVertexAttribute attribute = GenerateVertices(vertexId);
+  FullscreenVertexAttribute attribute = generateVertices(vertexId);
 
   output.uv = attribute.uv;
   output.pos = attribute.pos;

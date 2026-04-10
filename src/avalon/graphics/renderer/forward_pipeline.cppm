@@ -1,5 +1,7 @@
 module;
+#include <cstddef>
 #include <cstdint>
+#include <cstring>
 export module avalon.graphics:forward_pipeline;
 
 import avalon.core;
@@ -13,8 +15,22 @@ import :opaque_pass;
 import :skybox_pass;
 import :blit_pass;
 import :skybox_gen_pass;
-import :cubemap_mip_gen_pass;
+import :prefilter_pass;
+import :sh_pass;
 import :brdf_lut_gen_pass;
+import :buffer_copy_pass;
+import :types;
+
+import :cubemap_test;
+
+namespace {
+constexpr uint32_t kSkyboxSize = 256;
+struct FaceData {
+  Vec4 right;
+  Vec4 up;
+  Vec4 forward;
+};
+} // namespace
 
 export namespace avalon::graphics {
 
@@ -28,21 +44,12 @@ public:
     rhi::ProbeData data = graphics::CreateSkyboxProbeData();
     m_rhi.UpdateProbeBuffer(0, &data, sizeof(rhi::ProbeData));
 
-    struct FaceData {
-      Vec4 right;
-      Vec4 up;
-      Vec4 forward;
-    } faces[6];
-
     uint32_t i = 0;
     for (auto &view : data.captureViews) {
-      faces[i].right = Vec4::FromVec3(view.GetRight());
-      faces[i].up = Vec4::FromVec3(view.GetUp());
-      faces[i++].forward = Vec4::FromVec3(view.GetBack());
+      m_faces[i].right = Vec4::FromVec3(view.GetRight());
+      m_faces[i].up = Vec4::FromVec3(view.GetUp());
+      m_faces[i++].forward = Vec4::FromVec3(view.GetForward());
     }
-
-    auto allocation = m_rhi.GetSSBOPool().AllocateAligned(sizeof(FaceData) * 6);
-    m_faceDataOffset = allocation.offset;
 
     auto &shaderManager = graphics::GetShaderManager();
     auto &materialManager = graphics::GetMaterialManager();
@@ -64,10 +71,18 @@ public:
     materialHandle =
         materialManager.CreateMaterial(shaderHandle, "SkyboxGen"_id);
 
+    shaderHandle = shaderManager.GetOrCreateShader("cubemap_test.hlsl");
+    materialHandle =
+        materialManager.CreateMaterial(shaderHandle, "CubemapTest"_id);
+
     m_brdfLutGenShader =
         shaderManager.GetOrCreateComputeShader("brdf_lut_gen.hlsl");
     m_mipGenShader =
-        shaderManager.GetOrCreateComputeShader("cubemap_mip_gen.hlsl");
+        shaderManager.GetOrCreateComputeShader("cubemap_prefilter.hlsl");
+    m_shShader =
+        shaderManager.GetOrCreateComputeShader("cubemap_sh_projection.hlsl");
+    m_finalizeSHShader =
+        shaderManager.GetOrCreateComputeShader("finalize_sh.hlsl");
 
     TextureCreateInfo info{
         .nameHash = "BRDFLut"_id,
@@ -85,6 +100,22 @@ public:
     };
     m_brdfLut = m_rhi.CreateTexture(info);
 
+    TextureCreateInfo testInfo{
+        .nameHash = "TestTexture"_id,
+        .width = 8,
+        .height = 8,
+        .format = rhi::EFormat::R16G16B16A16_SFLOAT,
+        .usage = rhi::EResourceUsage::ReadWrite | rhi::EResourceUsage::ReadOnly,
+    };
+
+    m_testTextureDesc = {
+        .nameHash = "TestTexture"_id,
+        .usage = rhi::EResourceUsage::ReadWrite | rhi::EResourceUsage::ReadOnly,
+        .format = rhi::EFormat::R16G16B16A16_SFLOAT,
+        .extent = {8, 8},
+    };
+    m_testTexture = m_rhi.CreateTexture(testInfo);
+
     // TODO:: create physical pipeline
 
     return true;
@@ -96,6 +127,8 @@ public:
 
     builder.ImportExternalTexture(m_brdfLutDesc.nameHash, m_brdfLut,
                                   m_brdfLutDesc);
+    builder.ImportExternalTexture(m_testTextureDesc.nameHash, m_testTexture,
+                                  m_testTextureDesc);
 
     if (m_isFisrtFrame) [[unlikely]] {
       builder.AddPass<BRDFLutGenPass>("BRDFLutGen"_id, EPassType::Compute,
@@ -103,13 +136,24 @@ public:
       m_isFisrtFrame = false;
     }
 
-    rhi::Extent2D skyboxExtent = {1024, 1024};
     builder.AddPass<SkyboxGeneratorPass>("SkyboxGen"_id, EPassType::Graphics,
                                          skyboxExtent);
+
+    auto allocation = m_rhi.GetSSBOPool().AllocateAligned(sizeof(FaceData) * 6);
+    std::memcpy(allocation.pHostAddress, &m_faces, sizeof(FaceData) * 6);
     builder.AddPass<CubemapMipGenPass>(
-        "SkyboxMipmapGen"_id, rhi::EPassType::Compute, m_mipGenShader,
-        m_faceDataOffset, skyboxExtent, "Skybox"_id, "SkyboxMipmap"_id);
+        "SkyboxPrefilter"_id, rhi::EPassType::Compute, m_mipGenShader,
+        allocation.offset, skyboxExtent, m_mipLevels, "Skybox"_id,
+        "SkyboxPrefiltered"_id);
+    builder.AddPass<SHPass>("SkyboxSH"_id, rhi::EPassType::Compute, m_shShader,
+                            m_finalizeSHShader, skyboxExtent,
+                            "SkyboxPrefiltered"_id, "SkyboxSH"_id);
+    // builder.AddPass<BufferCopyPass>("BufferCopy"_id, rhi::EPassType::Compute,
+    //                                 "SkyboxSH"_id, "SceneGlobals"_id,
+    //                                 sizeof(CubemapSH), 0,
+    //                                 offsetof(SceneGlobals, skyboxSH));
     builder.AddPass<OpaquePass>("Opaque"_id);
+    // builder.AddPass<CubemapTestPass>("CubemapTest"_id);
     builder.AddPass<SkyboxPass>("Skybox"_id);
     builder.AddPass<BlitPass>("Blit"_id);
   }
@@ -119,11 +163,18 @@ private:
 
   VirtualTextureDesc m_brdfLutDesc;
   TextureHandle m_brdfLut;
+  VirtualTextureDesc m_testTextureDesc;
+  TextureHandle m_testTexture;
 
+  rhi::Extent2D skyboxExtent = {kSkyboxSize, kSkyboxSize};
+  uint32_t m_mipLevels = Log2(kSkyboxSize / 2) + 1;
   rhi::IRhi &m_rhi;
-  uint32_t m_faceDataOffset;
   ShaderHandle m_mipGenShader;
   ShaderHandle m_brdfLutGenShader;
+  ShaderHandle m_shShader;
+  ShaderHandle m_finalizeSHShader;
+
+  FaceData m_faces[6];
 };
 
 } // namespace avalon::graphics

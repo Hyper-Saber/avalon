@@ -252,6 +252,8 @@ public:
   virtual auto GetMaterialBufferInfo() const
       -> const VkDescriptorBufferInfo & = 0;
   virtual auto GetProbeBufferInfo() const -> const VkDescriptorBufferInfo & = 0;
+  virtual auto GetGeneralSSBOInfo() const
+      -> const VkDescriptorBufferInfo & = 0;
 
   virtual uint32_t GetCurrentFrameIndex() = 0;
   virtual uint32_t GetLastCompletedFrameIndex() = 0;

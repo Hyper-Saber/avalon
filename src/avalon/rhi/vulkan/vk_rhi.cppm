@@ -95,6 +95,7 @@ public:
   uint32_t GetLastCompletedFrameIndex() override;
   auto GetMaterialBufferInfo() const -> const VkDescriptorBufferInfo & override;
   auto GetProbeBufferInfo() const -> const VkDescriptorBufferInfo & override;
+  auto GetGeneralSSBOInfo() const -> const VkDescriptorBufferInfo & override;
   void WaitIdle() override;
 
 private:
@@ -131,6 +132,10 @@ private:
 
   UniquePtr<RingBufferPool> m_uboPool;
   UniquePtr<RingBufferPool> m_ssboPool;
+
+  VkDescriptorBufferInfo m_ssboDescriptorInfo;
+
+
   UniquePtr<DescriptorProvider> m_descriptorProvider;
   UniquePtr<BindlessManager> m_bindlessManager;
   UniquePtr<DeviceContext> m_deviceContext;

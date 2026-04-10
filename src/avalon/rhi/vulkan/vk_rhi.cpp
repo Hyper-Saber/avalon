@@ -99,18 +99,29 @@ auto VkRhi::Initialize(const DeviceRequirement &requirement,
 
 void VkRhi::CreateUBOPool() {
   m_uboPool = MakeUnique<rhi::RingBufferPool>(
-      *this, rhi::EResourceUsage::UniformBuffer,
-      rhi::EMemoryProperty::DeviceLocal | rhi::EMemoryProperty::HostVisible |
-          rhi::EMemoryProperty::HostCoherent,
+      *this,
+      EResourceUsage::UniformBuffer | EResourceUsage::TransferSrc |
+          EResourceUsage::TransferDst,
+      EMemoryProperty::DeviceLocal | EMemoryProperty::HostVisible |
+          EMemoryProperty::HostCoherent,
       1024 * 1024 * 16);
 }
 
 void VkRhi::CreateSSBOPool() {
   m_ssboPool = MakeUnique<rhi::RingBufferPool>(
-      *this, rhi::EResourceUsage::StorageBuffer,
-      rhi::EMemoryProperty::DeviceLocal | rhi::EMemoryProperty::HostVisible |
-          rhi::EMemoryProperty::HostCoherent,
+      *this,
+      EResourceUsage::StorageBuffer | EResourceUsage::TransferSrc |
+          EResourceUsage::TransferDst,
+      EMemoryProperty::DeviceLocal | EMemoryProperty::HostVisible |
+          EMemoryProperty::HostCoherent,
       kDynamicSSBOSize);
+
+  auto pRes = m_resourcePool->ResolveBuffer({m_ssboPool->GetBufferHandle().id});
+   m_ssboDescriptorInfo = {
+    .buffer = pRes->buffer,
+    .offset = 0,
+    .range = pRes->size,
+  };
 }
 
 auto VkRhi::GetUBOPool() const -> RingBufferPool & { return *m_uboPool.Get(); }
@@ -238,6 +249,10 @@ auto VkRhi::GetMaterialBufferInfo() const -> const VkDescriptorBufferInfo & {
 
 auto VkRhi::GetProbeBufferInfo() const -> const VkDescriptorBufferInfo & {
   return m_probePool.bufferInfo;
+}
+
+auto VkRhi::GetGeneralSSBOInfo() const -> const VkDescriptorBufferInfo & {
+  return m_ssboDescriptorInfo;
 }
 
 auto VkRhi::CreateStorageBuffer(size_t bufferSize) -> StorageBufferResource {
@@ -454,6 +469,7 @@ void VkRhi::UnmapMemory(BufferHandle handle) {
 
 void VkRhi::Submit(ICommandBuffer &cmd) {
   auto &commandBuffer = static_cast<CommandBuffer &>(cmd);
+
   auto vkCmd = commandBuffer.GetRaw();
   VkPipelineStageFlags pipelineStageFlags[] = {
       VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT};
@@ -501,6 +517,7 @@ auto VkRhi::BeginFrame() -> ERhiResult {
                      m_frameCommandPools[m_currentFrame], 0);
 
   m_uboPool->ResetPool();
+  m_ssboPool->ResetPool();
   m_descriptorProvider->Flip();
   m_bindlessManager->ProcessPendingDeletions();
   return {};

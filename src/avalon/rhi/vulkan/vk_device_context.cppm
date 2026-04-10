@@ -51,7 +51,6 @@ debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 // }
 //
 auto GetSurfaceExtension() -> Array<const char *> {
-  // 1. 获取系统支持的所有实例扩展
   uint32_t extensionCount = 0;
   vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
   Array<VkExtensionProperties> availableExtensions(extensionCount);
@@ -364,9 +363,16 @@ private:
       queueCreateInfos.PushBack(createInfo);
     }
 
+    VkPhysicalDeviceShaderAtomicFloatFeaturesEXT atomicFloatFeature{
+        .sType =
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_FLOAT_FEATURES_EXT,
+        .pNext = nullptr,
+        .shaderBufferFloat32AtomicAdd = VK_TRUE,
+    };
+
     VkPhysicalDeviceVulkan13Features features13{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
-        .pNext = nullptr,
+        .pNext = &atomicFloatFeature,
         .synchronization2 = VK_TRUE,
         .dynamicRendering = VK_TRUE,
         .maintenance4 = VK_TRUE,
@@ -395,15 +401,16 @@ private:
         .multiviewTessellationShader = VK_FALSE,
     };
 
+    m_config.features.fragmentStoresAndAtomics = VK_TRUE;
+
     VkPhysicalDeviceFeatures2 features2{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
         .pNext = &features11,
         .features = m_config.features,
     };
 
-    if constexpr (debug::kIsDebug) {
-      m_config.extensions.PushBack("VK_GOOGLE_user_type");
-    }
+    m_config.extensions.PushBack("VK_GOOGLE_user_type");
+    m_config.extensions.PushBack(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME);
 
     VkDeviceCreateInfo createInfo{
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
@@ -468,6 +475,7 @@ private:
 
       if (requirement.isRequireCompute &&
           (prop.queueFlags & VK_QUEUE_COMPUTE_BIT)) {
+        indices.computeFamily = i;
         if (i != indices.graphicsFamily) {
           indices.computeFamily = i;
         } else if (!indices.computeFamily.has_value()) {

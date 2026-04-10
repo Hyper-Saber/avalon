@@ -70,6 +70,14 @@ public:
         .memoryTypeIndex = memoryTypeIndex,
     };
 
+    VkMemoryAllocateFlagsInfo flagsInfo{};
+    if (HasFlag(info.usage, EResourceUsage::StorageBuffer)) {
+      flagsInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
+      flagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+
+      allocInfo.pNext = &flagsInfo;
+    }
+
     VkDeviceMemory bufferMemory;
     if (vkAllocateMemory(m_deviceContext.GetDevice(), &allocInfo, nullptr,
                          &bufferMemory) != VK_SUCCESS) {

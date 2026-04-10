@@ -21,6 +21,27 @@ using MeshHandle = Handle<Mesh>;
 using MaterialHandle = Handle<Material>;
 using MaterialInstanceHandle = Handle<MaterialInstance>;
 
+struct CubemapSH {
+  Vec4 coefficients[9];
+  float weight;
+  Vec3 padding;
+};
+
+struct Resolution {
+  float width;
+  float height;
+  float invWidth;
+  float invHeight;
+};
+
+struct SceneGlobals {
+  RenderView camera;
+  LightData lightData;
+  GlobalTime time;
+  Resolution resolution;
+  CubemapSH skyboxSH{};
+};
+
 struct Plane {
   Vec3 normal;
   float distance;

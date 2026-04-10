@@ -22,7 +22,7 @@ constexpr uint32_t kSceneGlobalsSet = 1;
 constexpr uint32_t kSceneGlobalsBinding = 0;
 
 constexpr uint32_t kRWTexturesBinding = 7;
-constexpr uint32_t kComputeBufferBinding = 8;
+constexpr uint32_t kGeneralSSBOBinding = 8;
 constexpr uint32_t kRWTextureArraysBinding = 9;
 
 constexpr uint32_t kMaxRWTextureDescriptor = 1024;
@@ -96,10 +96,8 @@ public:
 
   virtual uint32_t RegisterSampler(SamplerHandle) = 0;
 
-  virtual uint32_t
-  RegisterRWTexture(TextureHandle handle,
-                    EResourceUsage usage = EResourceUsage::ReadOnly,
-                    int32_t mipLevel = kNoMiplevels) = 0;
+  virtual uint32_t RegisterRWTexture(TextureHandle handle, EResourceUsage usage,
+                                     int32_t mipLevel = kNoMiplevels) = 0;
   virtual void UnregisterRWTexture(TextureHandle handle, int32_t mipLevel) = 0;
 
   virtual uint32_t

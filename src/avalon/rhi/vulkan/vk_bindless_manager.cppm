@@ -85,19 +85,19 @@ public:
             .binding = kRWTexturesBinding,
             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
             .descriptorCount = kMaxRWTextureDescriptor,
-            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+            .stageFlags = VK_SHADER_STAGE_ALL,
         },
         {
-            .binding = kComputeBufferBinding,
+            .binding = kGeneralSSBOBinding,
             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
             .descriptorCount = 1,
-            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+            .stageFlags = VK_SHADER_STAGE_ALL,
         },
         {
             .binding = kRWTextureArraysBinding,
             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
             .descriptorCount = kMaxRWTextureArrayDescriptor,
-            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+            .stageFlags = VK_SHADER_STAGE_ALL,
         },
     };
 
@@ -142,6 +142,7 @@ public:
 
     UpdateMaterialBufferDescriptor();
     UpdateProbeBufferDescriptor();
+    UpdateGeneralSSBODescriptor();
 
     CreateSceneGlobalsLayout();
 
@@ -414,6 +415,12 @@ private:
   void UpdateProbeBufferDescriptor() {
     VkDescriptorBufferInfo info = m_resourceProvider.GetProbeBufferInfo();
     UpdateDescriptor(0, kProbesBinding, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                     &info, nullptr);
+  }
+
+  void UpdateGeneralSSBODescriptor() {
+    VkDescriptorBufferInfo info = m_resourceProvider.GetGeneralSSBOInfo();
+    UpdateDescriptor(0, kGeneralSSBOBinding, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                      &info, nullptr);
   }
 

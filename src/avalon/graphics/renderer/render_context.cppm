@@ -1,5 +1,6 @@
 module;
 #include <cstdint>
+#include <debug/assert.hpp>
 export module avalon.graphics:render_context;
 
 import avalon.core;
@@ -10,9 +11,10 @@ import :virtual_resource_manager;
 
 export namespace avalon::graphics {
 
-class RenderContext final : public NonCopyable,
-                            public mem::AutoDestroyable<RenderContext>,
-                            public ecs::IRenderDataSink {
+class AVALON_GRAPHICS_API RenderContext final
+    : public NonCopyable,
+      public mem::AutoDestroyable<RenderContext>,
+      public ecs::IRenderDataSink {
 public:
   explicit RenderContext(rhi::IRhi &rhi, VirtualResourceManager &manager,
                          RenderPacket &packet)
@@ -28,7 +30,14 @@ public:
   auto GetPhysicalTexture(VirtualResourceHandle handle) const
       -> rhi::TextureHandle {
 
-    return m_resourceManager.GetPhysical(handle);
+    return m_resourceManager.GetPhysicalTexture(handle);
+  }
+
+  auto GetPhysicalBufferAllocation(VirtualResourceHandle handle) const
+      -> rhi::BufferAllocation {
+    auto alloc = m_resourceManager.GetPhysicalBufferAllocation(handle);
+    AVALON_ASSERT(alloc.has_value());
+    return alloc.value();
   }
 
 private:

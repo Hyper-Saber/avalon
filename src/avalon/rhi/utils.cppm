@@ -157,7 +157,8 @@ constexpr bool IsWriteUsage(EResourceUsage usage) noexcept {
   return HasFlag(usage, writeMask);
 }
 
-constexpr EAccess MapUsageToAccess(EResourceUsage usage) noexcept {
+constexpr EAccess MapUsageToAccess(EResourceUsage usage,
+                                   bool isTexture) noexcept {
   using enum EResourceUsage;
 
   if (usage == None)
@@ -165,77 +166,93 @@ constexpr EAccess MapUsageToAccess(EResourceUsage usage) noexcept {
 
   EAccess access = EAccess::None;
 
-  if (HasFlag(usage, VertexBuffer))
-    access |= EAccess::MemoryRead;
-  if (HasFlag(usage, IndexBuffer))
-    access |= EAccess::MemoryRead;
-  if (HasFlag(usage, IndirectBuffer))
-    access |= EAccess::MemoryRead;
-
-  if (HasFlag(usage, UniformBuffer))
-    access |= EAccess::ShaderRead;
-  if (HasFlag(usage, ReadOnly) && !IsAttachment(usage))
-    access |= EAccess::ShaderRead;
-  if (HasFlag(usage, ReadWrite))
-    access |= (EAccess::ShaderRead | EAccess::ShaderWrite);
-
-  if (HasFlag(usage, ColorAttachment)) {
-    access |= (EAccess::ColorRead | EAccess::ColorWrite);
+  if (HasFlag(usage, Host) && HasFlag(usage, ReadOnly)) {
+    return EAccess::HostRead;
   }
-  if (HasFlag(usage, DepthStencilAttachment)) {
-    access |= (EAccess::DepthStencilRead | EAccess::DepthStencilWrite);
+
+  if (HasFlag(usage, Host) && HasFlag(usage, ReadWrite)) {
+    return EAccess::HostWrite | EAccess::HostRead;
   }
 
   if (HasFlag(usage, TransferSrc))
-    access |= EAccess::TransferRead;
+    return EAccess::TransferRead;
   if (HasFlag(usage, TransferDst))
-    access |= EAccess::TransferWrite;
+    return EAccess::TransferWrite;
 
-  if (HasFlag(usage, Present))
-    access |= EAccess::None;
+  if (isTexture) {
+    if (HasFlag(usage, ReadOnly) && !IsAttachment(usage))
+      return EAccess::TextureRead;
+    if (HasFlag(usage, ReadWrite))
+      return EAccess::StorageRead | EAccess::StorageWrite;
+
+    if (HasFlag(usage, ColorAttachment)) {
+      return EAccess::ColorRead | EAccess::ColorWrite;
+    }
+    if (HasFlag(usage, DepthStencilAttachment)) {
+      return EAccess::DepthStencilRead | EAccess::DepthStencilWrite;
+    }
+  } else {
+    if (HasFlag(usage, VertexBuffer))
+      access |= EAccess::VertexAttributeRead;
+    if (HasFlag(usage, IndexBuffer))
+      access |= EAccess::IndexRead;
+    if (HasFlag(usage, IndirectBuffer))
+      access |= EAccess::IndirectCommandRead;
+
+    if (HasFlag(usage, UniformBuffer))
+      return access | EAccess::UniformRead;
+
+    if (HasFlag(usage, ReadOnly))
+      return access | EAccess::StorageRead;
+    if (HasFlag(usage, ReadWrite))
+      return access | EAccess::StorageRead | EAccess::StorageWrite;
+  }
 
   return access;
 }
 
-constexpr EPipelineStage
-MapUsageToStage(EResourceUsage usage,
-                EPassType passType = EPassType::Graphics) noexcept {
+constexpr EPipelineStage MapUsageToStage(EResourceUsage usage,
+                                         EShaderStage shaderStage) noexcept {
   using enum EResourceUsage;
 
   if (usage == None)
     return EPipelineStage::None;
-
   EPipelineStage stage = EPipelineStage::None;
 
+  if (HasFlag(usage, EResourceUsage::Host)) {
+    return EPipelineStage::Host;
+  }
+
+  if (HasFlag(usage, TransferSrc | TransferDst)) {
+    return EPipelineStage::Transfer;
+  }
+
+  if (HasFlag(usage, Present)) {
+    return EPipelineStage::BottomOfPipe;
+  }
+
+  if (HasFlag(usage, DepthStencilAttachment)) {
+    return (EPipelineStage::EarlyFragmentTests |
+            EPipelineStage::LateFragmentTests);
+  }
+
+  if (HasFlag(usage, ColorAttachment)) {
+    return EPipelineStage::ColorAttachmentOutput;
+  }
+
   if (HasFlag(usage, IndirectBuffer))
-    stage |= EPipelineStage::DrawIndirect;
+    return EPipelineStage::DrawIndirect;
 
   if (HasFlag(usage, VertexBuffer | IndexBuffer))
     stage |= EPipelineStage::VertexInput;
 
-  if (HasFlag(usage, DepthStencilAttachment)) {
-    stage |= (EPipelineStage::EarlyFragmentTests |
-              EPipelineStage::LateFragmentTests);
-  }
-
-  if (HasFlag(usage, ColorAttachment)) {
-    stage |= EPipelineStage::ColorAttachmentOutput;
-  }
-
-  if (!IsAttachment(usage) &&
-      HasFlag(usage, UniformBuffer | ReadOnly | ReadWrite)) {
-    if (passType == EPassType::Graphics)
-      stage |= EPipelineStage::VertexShader | EPipelineStage::FragmentShader;
-    else
+  if (!IsAttachment(usage) && HasFlag(usage, ReadOnly | ReadWrite)) {
+    if (HasFlag(shaderStage, EShaderStage::Vertex))
+      stage |= EPipelineStage::VertexShader;
+    else if (HasFlag(shaderStage, EShaderStage::Fragment))
+      stage |= EPipelineStage::FragmentShader;
+    else if (HasFlag(shaderStage, EShaderStage::Compute))
       stage |= EPipelineStage::ComputeShader;
-  }
-
-  if (HasFlag(usage, TransferSrc | TransferDst)) {
-    stage |= EPipelineStage::Transfer;
-  }
-
-  if (HasFlag(usage, Present)) {
-    stage |= EPipelineStage::BottomOfPipe;
   }
 
   return stage;
@@ -518,6 +535,77 @@ constexpr String ToView(EResourceUsage usage) {
   AddFlag(EResourceUsage::TransferSrc, "TransferSrc");
   AddFlag(EResourceUsage::TransferDst, "TransferDst");
   AddFlag(EResourceUsage::Present, "Present");
+  AddFlag(EResourceUsage::SceneGlobals, "SceneGlobals");
+
+  return result.IsEmpty() ? "Unknown" : result;
+}
+
+constexpr String ToView(EPipelineStage stage) {
+  if (stage == EPipelineStage::None)
+    return "None";
+
+  String result = "";
+  auto AddFlag = [&](EPipelineStage flag, const char *name) {
+    if (HasFlag(stage, flag)) {
+      if (!result.IsEmpty())
+        result += " | ";
+      result += name;
+    }
+  };
+
+  AddFlag(EPipelineStage::TopOfPipe, "TopOfPipe");
+  AddFlag(EPipelineStage::BottomOfPipe, "BottomOfPipe");
+  AddFlag(EPipelineStage::DrawIndirect, "DrawIndirect");
+  AddFlag(EPipelineStage::VertexInput, "VertexInput");
+  AddFlag(EPipelineStage::VertexShader, "VertexShader");
+  AddFlag(EPipelineStage::TessControlShader, "TessControlShader");
+  AddFlag(EPipelineStage::TessEvaluationShader, "TessEvaluationShader");
+  AddFlag(EPipelineStage::GeometryShader, "GeometryShader");
+  AddFlag(EPipelineStage::FragmentShader, "FragmentShader");
+  AddFlag(EPipelineStage::ComputeShader, "ComputeShader");
+  AddFlag(EPipelineStage::EarlyFragmentTests, "EarlyFragmentTests");
+  AddFlag(EPipelineStage::LateFragmentTests, "LateFragmentTests");
+  AddFlag(EPipelineStage::ColorAttachmentOutput, "ColorAttachmentOutput");
+  AddFlag(EPipelineStage::Transfer, "Transfer");
+  AddFlag(EPipelineStage::Clear, "Clear");
+  AddFlag(EPipelineStage::Host, "Host");
+  AddFlag(EPipelineStage::AllGraphics, "AllGraphics");
+  AddFlag(EPipelineStage::AllCommands, "AllCommands");
+  AddFlag(EPipelineStage::RayTracingShader, "RayTracingShader");
+
+  return result.IsEmpty() ? "Unknown" : result;
+}
+
+constexpr String ToView(EAccess access) {
+  if (access == EAccess::None)
+    return "None";
+
+  String result = "";
+  auto AddFlag = [&](EAccess flag, const char *name) {
+    if (HasFlag(access, flag)) {
+      if (!result.IsEmpty())
+        result += " | ";
+      result += name;
+    }
+  };
+
+  AddFlag(EAccess::ColorRead, "ColorRead");
+  AddFlag(EAccess::ColorWrite, "ColorWrite");
+  AddFlag(EAccess::DepthStencilRead, "DepthStencilRead");
+  AddFlag(EAccess::DepthStencilWrite, "DepthStencilWrite");
+  AddFlag(EAccess::TextureRead, "TextureRead");
+  AddFlag(EAccess::TransferRead, "TransferRead");
+  AddFlag(EAccess::TransferWrite, "TransferWrite");
+  AddFlag(EAccess::MemoryRead, "MemoryRead");
+  AddFlag(EAccess::MemoryWrite, "MemoryWrite");
+  AddFlag(EAccess::IndirectCommandRead, "IndirectCommandRead");
+  AddFlag(EAccess::IndexRead, "IndexRead");
+  AddFlag(EAccess::VertexAttributeRead, "VertexAttributeRead");
+  AddFlag(EAccess::UniformRead, "UniformRead");
+  AddFlag(EAccess::StorageRead, "StorageRead");
+  AddFlag(EAccess::StorageWrite, "StorageWrite");
+  AddFlag(EAccess::HostWrite, "HostWrite");
+  AddFlag(EAccess::HostRead, "HostRead");
 
   return result.IsEmpty() ? "Unknown" : result;
 }

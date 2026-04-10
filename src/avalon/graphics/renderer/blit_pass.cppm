@@ -18,8 +18,11 @@ export class AVALON_GRAPHICS_API BlitPass final : public RenderPass<BlitPass> {
 public:
   void Setup(RenderGraphBuilder &builder) override {
     m_outputHandle =
-        builder.Write(kSwapchainColor, rhi::EResourceUsage::Present);
-    m_inputHandle = builder.Read(kSceneColor, rhi::EResourceUsage::ReadOnly);
+        builder.Write(kSwapchainColor, rhi::EResourceUsage::Present,
+                      rhi::EResourceUsage::Present, EShaderStage::Fragment);
+    m_inputHandle =
+        builder.Read(kSceneColor, rhi::EResourceUsage::ReadOnly,
+                     rhi::EResourceUsage::ReadOnly, EShaderStage::Fragment);
   }
 
   void OnCompile(rhi::IRhi &rhi) override {

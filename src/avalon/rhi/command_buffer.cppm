@@ -33,11 +33,13 @@ public:
 
   virtual void PushConstants(EShaderStage stage, uint32_t offset, uint32_t size,
                              const void *pData) = 0;
+  virtual void FillBuffer(BufferHandle handle, uint32_t offset, uint32_t size,
+                          uint32_t data) = 0;
 
   virtual void UpdateBuffer(BufferHandle handle, uint64_t offset,
                             const void *pData, uint64_t size) = 0;
   virtual void CopyBuffer(BufferHandle src, BufferHandle dst,
-                          const BufferCopy &region) = 0;
+                          const BufferCopyRegion &region) = 0;
   virtual void Draw(uint32_t vertexCount, uint32_t instanceCount,
                     uint32_t firstVertex, uint32_t firstInstance) = 0;
   virtual void DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
@@ -45,11 +47,16 @@ public:
                            uint32_t firstInstance) = 0;
 
   virtual void Transition(TextureHandle handle, EResourceUsage usage,
-                          uint32_t layerCount, uint32_t levelCount) = 0;
-  virtual void PipelineBarrier(const ImageBarrier &barrier) = 0;
+                          uint32_t layerCount, uint32_t levelCount,
+                          EShaderStage) = 0;
+  virtual void SyncBuffer(BufferHandle handle, EResourceUsage usage,
+                          uint32_t offset, uint32_t size, EShaderStage) = 0;
+  virtual void PipelineBarrier(Span<const ImageBarrier> barriers) = 0;
   virtual void CopyImage(TextureHandle src, TextureHandle dst,
                          const ImageCopyRegion &region) = 0;
 
+  virtual void Blit(TextureHandle src, TextureHandle dst,
+                    ImageBlitRegion region) = 0;
   virtual void ClearColor(TextureHandle handle, ClearValue value) = 0;
 };
 } // namespace avalon::rhi

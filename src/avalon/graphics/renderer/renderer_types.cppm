@@ -13,20 +13,6 @@ export namespace avalon::graphics {
 
 constexpr StringId kOpaquePassName = "OpaquePass"_id;
 
-struct Resolution {
-  float width;
-  float height;
-  float invWidth;
-  float invHeight;
-};
-
-struct SceneGlobals {
-  RenderView camera;
-  LightData lightData;
-  GlobalTime time;
-  Resolution resolution;
-};
-
 struct RenderBatch {
   MaterialHandle material;
   uint32_t firstInstance = 0;

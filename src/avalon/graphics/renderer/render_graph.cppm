@@ -28,18 +28,21 @@ public:
                              VirtualTextureDesc desc) -> VirtualResourceHandle {
     auto index =
         m_resourceManager.ImportExternalTexture(name, physicalHandle, desc);
-    auto handle = m_resourceManager.GetVirtualResource(index);
-    m_resourceManager.RefineUsage(handle, desc.usage);
+    auto handle = m_resourceManager.GetVirtualTexture(index);
 
     return handle;
   }
 
   void Compile() {
     HashMap<VirtualResourceHandle, uint32_t> producerMap;
+    HashMap<VirtualResourceHandle, uint32_t> bufferProducerMap;
 
     for (uint32_t i = 0; i < m_nodes.GetSize(); i++) {
-      for (auto request : m_nodes[i].outputs) {
-        producerMap.Insert(request.handle, i);
+      for (auto &output : m_nodes[i].outputs) {
+        producerMap.Insert(output.handle, i);
+      }
+      for (auto &output : m_nodes[i].bufferOutputs) {
+        bufferProducerMap.Insert(output.handle, i);
       }
     }
 
@@ -52,20 +55,31 @@ public:
         return;
 
       node.isCulled = false;
-      for (auto request : node.inputs) {
+      // Debug("Mark node {} active", node.nameHash.Resolve());
+      for (auto &request : node.inputs) {
         if (producerMap.Contains(request.handle)) {
           self(*producerMap.Get(request.handle));
+        }
+      }
+      for (auto &input : node.bufferInputs) {
+        if (bufferProducerMap.Contains(input.handle)) {
+          self(*bufferProducerMap.Get(input.handle));
         }
       }
     };
 
     for (uint32_t i = 0; i < m_nodes.GetSize(); i++) {
       bool hasSideEffect =
-          std::ranges::any_of(m_nodes[i].outputs, [&](auto request) {
+          std::ranges::any_of(
+              m_nodes[i].outputs,
+              [&](auto request) { return request.handle.IsExternal(); }) ||
+          std::ranges::any_of(m_nodes[i].bufferOutputs, [&](auto request) {
             return request.handle.IsExternal();
           });
-      if (hasSideEffect)
+      if (hasSideEffect) {
+        // Debug("Side node: {}", m_nodes[i].nameHash.Resolve());
         MarkNodeActive(i);
+      }
     }
 
     // kahn sort
@@ -76,6 +90,12 @@ public:
         continue;
       for (auto request : m_nodes[i].inputs) {
         if (auto *pProducerIndex = producerMap.Get(request.handle)) {
+          adjacencyList[*pProducerIndex].PushBack(i);
+          inDegrees[i]++;
+        }
+      }
+      for (auto request : m_nodes[i].bufferInputs) {
+        if (auto *pProducerIndex = bufferProducerMap.Get(request.handle)) {
           adjacencyList[*pProducerIndex].PushBack(i);
           inDegrees[i]++;
         }
@@ -122,7 +142,7 @@ public:
       for (auto request : node.outputs)
         RegisterUsage(request.handle);
     }
-    m_resourceManager.RealizeResources(timelines);
+    m_resourceManager.RealizeTextures(timelines);
 
     for (auto &nodeIndex : m_executionQueue) {
       auto &node = m_nodes[nodeIndex];
@@ -141,6 +161,8 @@ public:
 
     for (uint32_t nodeIdx : m_executionQueue) {
       auto &node = m_nodes[nodeIdx];
+
+      // Debug("{}", node.nameHash.Resolve());
 
       HandleResourceTransitions(cmd, node, finalPendingUsages);
 
@@ -166,11 +188,12 @@ public:
       };
 
       for (auto &output : node.outputs) {
-        auto physicalHandle = m_resourceManager.GetPhysical(output.handle);
+        auto physicalHandle =
+            m_resourceManager.GetPhysicalTexture(output.handle);
         if (!physicalHandle.IsValid())
           continue;
 
-        auto &resDesc = m_resourceManager.GetResourceDesc(output.handle);
+        auto &resDesc = m_resourceManager.GetTextureDesc(output.handle);
         auto fixedUsage = FixUsage(output.initialUsage);
 
         if (IsDepthFormat(resDesc.format)) {
@@ -217,14 +240,16 @@ public:
 
       cmd.SetViewport(port);
       cmd.SetScissor(node.renderArea);
+
       node.pass->Execute(cmd, context);
+
       for (auto &entry : finalPendingUsages) {
         cmd.Transition(entry.handle, entry.usage, entry.layerCount,
-                       entry.levelCount);
+                       entry.levelCount, entry.stage);
       }
+
       cmd.EndRendering();
     }
-
     // Debug("-------------------------------render graph "
     //       "end------------------------------------");
   }
@@ -232,20 +257,30 @@ public:
   friend class RenderGraphBuilder;
 
 private:
-  struct ResourceRequest {
+  struct textureRequest {
     StringId nameHash;
     VirtualResourceHandle handle;
     rhi::EResourceUsage initialUsage = rhi::EResourceUsage::None;
+    EShaderStage stage;
     rhi::EAttachmentLoadOp loadOp = rhi::EAttachmentLoadOp::DontCare;
     rhi::EAttachmentStoreOp storeOp = rhi::EAttachmentStoreOp::DontCare;
     rhi::ClearValue clearValue;
   };
 
+  struct BufferRequest {
+    StringId nameHash;
+    VirtualResourceHandle handle;
+    rhi::EResourceUsage initialUsage = rhi::EResourceUsage::None;
+    EShaderStage stage;
+  };
+
   struct PassNode {
     StringId nameHash;
     UniquePtr<IRenderPass> pass;
-    Array<ResourceRequest> inputs;
-    Array<ResourceRequest> outputs;
+    Array<textureRequest> inputs;
+    Array<textureRequest> outputs;
+    Array<BufferRequest> bufferInputs;
+    Array<BufferRequest> bufferOutputs;
 
     Rect2D renderArea;
     uint32_t layerCount = 1;
@@ -261,6 +296,7 @@ private:
     rhi::TextureHandle handle;
     uint32_t layerCount;
     uint32_t levelCount;
+    EShaderStage stage;
   };
 
   PassNode &GetNode(IRenderPass *pass) {
@@ -281,55 +317,100 @@ private:
   }
 
   auto Write(IRenderPass &owner, VirtualTextureDesc desc,
-             rhi::EResourceUsage initialUsage) -> VirtualResourceHandle {
-    auto handleIndex = m_resourceManager.GetOrCreateVirtualResouceIndex(desc);
+             rhi::EResourceUsage initialUsage, EShaderStage stage)
+      -> VirtualResourceHandle {
+
+    auto handleIndex =
+        m_resourceManager.GetOrCreateVirtualTextureResouceIndex(desc);
     auto &node = GetNode(&owner);
-    if (!m_resourceManager.IsFirstGeneration(handleIndex)) {
-      auto handle = m_resourceManager.GetVirtualResource(handleIndex);
+    if (!m_resourceManager.IsFirstTextureGeneration(handleIndex)) {
+      auto handle = m_resourceManager.GetVirtualTexture(handleIndex);
       if (!handle.IsExternal()) {
         node.inputs.PushBack({
             .nameHash = desc.nameHash,
-            .handle = m_resourceManager.GetVirtualResource(handleIndex),
+            .handle = m_resourceManager.GetVirtualTexture(handleIndex),
         });
       }
     }
-    auto handle = m_resourceManager.IncreaseGeneration(handleIndex);
+    auto handle = m_resourceManager.IncreaseTextureGeneration(handleIndex);
     node.outputs.PushBack({
         .nameHash = desc.nameHash,
         .handle = handle,
         .initialUsage = initialUsage,
+        .stage = stage,
     });
 
     node.renderArea.extent = desc.extent;
-    m_resourceManager.RefineUsage(handle, desc.usage);
+    m_resourceManager.RefineTextureUsage(handle, desc.usage);
     return handle;
   }
 
   auto Read(IRenderPass &owner, StringId id, rhi::EResourceUsage usage,
-            rhi::EResourceUsage initialUsage) -> VirtualResourceHandle {
+            rhi::EResourceUsage initialUsage, EShaderStage stage)
+      -> VirtualResourceHandle {
     auto handle = m_resourceManager.GetVirtualResource(id);
     auto &node = GetNode(&owner);
     node.inputs.PushBack({
         .nameHash = id,
         .handle = handle,
         .initialUsage = initialUsage,
+        .stage = stage,
     });
-    m_resourceManager.RefineUsage(handle, usage);
+    m_resourceManager.RefineTextureUsage(handle, usage);
+    return handle;
+  }
+
+  auto WriteBuffer(IRenderPass &owner, StringId nameHash,
+                   rhi::EResourceUsage usage, rhi::EResourceUsage initialUsage,
+                   uint32_t size, EShaderStage stage) -> VirtualResourceHandle {
+    auto index =
+        m_resourceManager.GetOrCreateVirtualBufferIndex(nameHash, usage, size);
+    auto &node = GetNode(&owner);
+    if (!m_resourceManager.IsFirstBufferGeneration(index)) {
+      auto handle = m_resourceManager.GetVirtualBuffer(index);
+      if (!handle.IsExternal()) {
+        node.bufferInputs.PushBack({
+            .nameHash = nameHash,
+            .handle = handle,
+        });
+      }
+    }
+    auto handle = m_resourceManager.IncreaseBufferGeneration(index);
+    node.bufferOutputs.PushBack({
+        .nameHash = nameHash,
+        .handle = handle,
+        .initialUsage = initialUsage,
+        .stage = stage,
+    });
+    return handle;
+  }
+
+  auto ReadBuffer(IRenderPass &owner, StringId nameHash,
+                  rhi::EResourceUsage initialUsage, EShaderStage stage) {
+    auto handle = m_resourceManager.GetVirtualBuffer(nameHash);
+    auto &node = GetNode(&owner);
+    node.bufferInputs.PushBack({
+        .nameHash = nameHash,
+        .handle = handle,
+        .initialUsage = initialUsage,
+        .stage = stage,
+    });
     return handle;
   }
 
   void HandleResourceTransitions(ICommandBuffer &cmd, PassNode &node,
                                  Array<PendingUsage> &finalPendingUsages) {
     for (auto &output : node.outputs) {
-      auto physicalHandle = m_resourceManager.GetPhysical(output.handle);
+      auto physicalHandle = m_resourceManager.GetPhysicalTexture(output.handle);
       if (!physicalHandle.IsValid())
         continue;
 
-      auto &desc = m_resourceManager.GetResourceDesc(output.handle);
+      auto &desc = m_resourceManager.GetTextureDesc(output.handle);
       auto fixedUsage = FixUsage(output.initialUsage);
       if (fixedUsage != output.initialUsage) {
         finalPendingUsages.PushBack({output.initialUsage, physicalHandle,
-                                     desc.layerCount, desc.mipLevels});
+                                     desc.layerCount, desc.mipLevels,
+                                     output.stage});
       }
 
       // Debug(
@@ -339,22 +420,40 @@ private:
       //     ToView(fixedUsage), desc.layerCount, desc.mipLevels);
 
       cmd.Transition(physicalHandle, fixedUsage, desc.layerCount,
-                     desc.mipLevels);
+                     desc.mipLevels, output.stage);
     }
 
     for (auto &input : node.inputs) {
       if (input.initialUsage == rhi::EResourceUsage::None)
         continue;
-      auto physicalHandle = m_resourceManager.GetPhysical(input.handle);
+      auto physicalHandle = m_resourceManager.GetPhysicalTexture(input.handle);
       if (physicalHandle.IsValid()) {
-        auto desc = m_resourceManager.GetResourceDesc(input.handle);
+        auto desc = m_resourceManager.GetTextureDesc(input.handle);
         // Debug("Transitioning resource {}({}): to {}. layerCount: {}, "
         //       "mipLevels: {}",
         //       input.nameHash.Resolve(),
         //       m_resourceManager.GetPhysical(input.handle).id,
         //       ToView(input.initialUsage), desc.layerCount, desc.mipLevels);
         cmd.Transition(physicalHandle, input.initialUsage, desc.layerCount,
-                       desc.mipLevels);
+                       desc.mipLevels, input.stage);
+      }
+    }
+
+    for (auto &output : node.bufferOutputs) {
+      auto allocation =
+          m_resourceManager.GetPhysicalBufferAllocation(output.handle);
+      if (allocation.has_value()) {
+        cmd.SyncBuffer(allocation->buffer, output.initialUsage,
+                       allocation->offset, allocation->size, output.stage);
+      }
+    }
+
+    for (auto &input : node.bufferInputs) {
+      auto allocation =
+          m_resourceManager.GetPhysicalBufferAllocation(input.handle);
+      if (allocation.has_value()) {
+        cmd.SyncBuffer(allocation->buffer, input.initialUsage,
+                       allocation->offset, allocation->size, input.stage);
       }
     }
   }

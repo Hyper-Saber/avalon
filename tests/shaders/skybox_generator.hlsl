@@ -26,6 +26,6 @@ float4 FsMain(VsOputput input) : SV_Target {
   float3 dir = normalize(input.viewDir);
   float3 sunDir = normalize(-uMainLight.posDir.xyz);
 
-  return ComputeSkyColor(dir, sunDir, kZenithColor, kHorizonColor,
+  return computeSkyColor(dir, sunDir, kZenithColor, kHorizonColor,
                          kGroundColor);
 }

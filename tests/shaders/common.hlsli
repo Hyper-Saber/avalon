@@ -41,11 +41,16 @@ struct GlobalTime {
   float deltaTime;
 };
 
+struct CubemapSH {
+  float4 coefficients[9];
+};
+
 struct SceneGlobals {
   Camera camera;
   Light light;
   GlobalTime time;
   float4 resolution;
+  CubemapSH skyboxSH;
 };
 
 struct MaterialData {
@@ -81,7 +86,7 @@ struct ModelData {
 struct StandardPushConstants {
   ModelData model;
   uint materialIdx;
-  uint irradianceMap;
+  uint skyboxSHOffset;
   uint prefilterMap;
   uint brdfLut;
   uint paddings[kPushConstantFloatSize - 36];
@@ -172,5 +177,20 @@ void writeRWTextureArray(uint index, uint3 coord, float4 value) {
 float4 loadRWTextureArray(uint index, uint3 coord) {
   return uRWTextureArrays[index][coord];
 }
+
+#define ATOMIC_ADD_FLOAT(buffer, addr, val)                                    \
+  do {                                                                         \
+    uint _actual;                                                              \
+    uint _expected;                                                            \
+    _actual = buffer.Load(addr);                                               \
+    [loop] for(int _i = 0; _i < 64; ++_i) {                                    \
+      _expected = _actual;                                                     \
+      float _newVal = asfloat(_expected) + (val);                              \
+      buffer.InterlockedCompareExchange(addr, _expected, asuint(_newVal),      \
+                                        _actual);                              \
+      if(_actual == _expected)                                                 \
+        break;                                                                 \
+    }                                                                          \
+  } while(0)
 
 #endif // AVALON_COMMON_HLSLI

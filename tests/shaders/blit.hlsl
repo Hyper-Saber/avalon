@@ -10,7 +10,7 @@ struct BlitCustom {
 #include "screen_space.hlsli"
 
 VsOutput VsMain(uint vertexID : SV_VertexID) {
-  return FullscreenBase(vertexID);
+  return fullscreenBase(vertexID);
 }
 
 float4 FsMain(VsOutput input) : SV_Target {

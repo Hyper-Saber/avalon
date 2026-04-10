@@ -16,28 +16,30 @@ namespace avalon::graphics {
 rhi::EFormat
 RenderGraphBuilder::SpecifyTextureDefaultFormat(rhi::EResourceUsage usage) {
   switch (usage) {
-  case avalon::rhi::EResourceUsage::None:
-  case avalon::rhi::EResourceUsage::VertexBuffer:
-  case avalon::rhi::EResourceUsage::IndexBuffer:
-  case avalon::rhi::EResourceUsage::IndirectBuffer:
-  case avalon::rhi::EResourceUsage::UniformBuffer:
-  case avalon::rhi::EResourceUsage::StorageBuffer:
+  case EResourceUsage::Host:
+  case EResourceUsage::None:
+  case EResourceUsage::VertexBuffer:
+  case EResourceUsage::IndexBuffer:
+  case EResourceUsage::IndirectBuffer:
+  case EResourceUsage::UniformBuffer:
+  case EResourceUsage::StorageBuffer:
+  case EResourceUsage::SceneGlobals:
     AVALON_ASSERT_MSG(false,
                       String::Format("[RenderGraph] Unsupported usage {}, try "
                                      "SpecifyBufferDefaultFormat instead!",
                                      ToView(usage)));
     break;
-  case avalon::rhi::EResourceUsage::ReadOnly:
-  case avalon::rhi::EResourceUsage::ReadWrite:
-  case avalon::rhi::EResourceUsage::ColorAttachment:
-    return rhi::EFormat::R16G16B16A16_SFLOAT;
-  case avalon::rhi::EResourceUsage::TransferSrc:
-    return rhi::EFormat::R16G16B16A16_SFLOAT;
-  case avalon::rhi::EResourceUsage::TransferDst:
-    return rhi::EFormat::R16G16B16A16_SFLOAT;
-  case avalon::rhi::EResourceUsage::DepthStencilAttachment:
-    return rhi::EFormat::D32_SFLOAT_S8_UINT;
-  case avalon::rhi::EResourceUsage::Present:
+  case EResourceUsage::ReadOnly:
+  case EResourceUsage::ReadWrite:
+  case EResourceUsage::ColorAttachment:
+    return EFormat::R16G16B16A16_SFLOAT;
+  case EResourceUsage::TransferSrc:
+    return EFormat::R16G16B16A16_SFLOAT;
+  case EResourceUsage::TransferDst:
+    return EFormat::R16G16B16A16_SFLOAT;
+  case EResourceUsage::DepthStencilAttachment:
+    return EFormat::D32_SFLOAT_S8_UINT;
+  case EResourceUsage::Present:
     return m_rhi->GetSwapchainImageFormat();
   }
 
@@ -56,8 +58,8 @@ RenderGraphBuilder::SpecifyTextureDefaultFormat(rhi::EResourceUsage usage) {
 }
 
 auto RenderGraphBuilder::Write(StringId name, rhi::EResourceUsage usage,
-                               rhi::EResourceUsage initialUsage)
-    -> VirtualResourceHandle {
+                               rhi::EResourceUsage initialUsage,
+                               EShaderStage stage) -> VirtualResourceHandle {
   m_desc.nameHash = name;
   m_desc.usage = usage;
 
@@ -71,7 +73,8 @@ auto RenderGraphBuilder::Write(StringId name, rhi::EResourceUsage usage,
 
   m_currentResource = m_graph.Write(
       *m_owner, m_desc,
-      initialUsage == rhi::EResourceUsage::None ? m_desc.usage : initialUsage);
+      initialUsage == rhi::EResourceUsage::None ? m_desc.usage : initialUsage,
+      stage);
 
   auto &node = m_graph.GetNode(m_owner);
   AVALON_ASSERT_MSG(node.viewMask == 0 || node.viewMask == m_viewMask,
@@ -98,11 +101,30 @@ auto RenderGraphBuilder::Write(StringId name, rhi::EResourceUsage usage,
 }
 
 auto RenderGraphBuilder::Read(StringId name, rhi::EResourceUsage usage,
-                              rhi::EResourceUsage initialUsage)
-    -> VirtualResourceHandle {
+                              rhi::EResourceUsage initialUsage,
+                              EShaderStage stage) -> VirtualResourceHandle {
   initialUsage =
       initialUsage == rhi::EResourceUsage::None ? usage : initialUsage;
-  return m_graph.Read(*m_owner, name, usage, initialUsage);
+  return m_graph.Read(*m_owner, name, usage, initialUsage, stage);
+}
+
+auto RenderGraphBuilder::WriteAttachment(StringId name, EResourceUsage usage)
+    -> VirtualResourceHandle {
+  return Write(name, usage, usage, EShaderStage::None);
+}
+
+auto RenderGraphBuilder::WriteBuffer(StringId name, rhi::EResourceUsage usage,
+                                     rhi::EResourceUsage initialUsage,
+                                     uint32_t size, EShaderStage stage)
+    -> VirtualResourceHandle {
+  return m_graph.WriteBuffer(*m_owner, name, usage, initialUsage, size, stage);
+}
+
+auto RenderGraphBuilder::ReadBuffer(StringId name,
+                                    rhi::EResourceUsage initialUsage,
+                                    EShaderStage stage)
+    -> VirtualResourceHandle {
+  return m_graph.ReadBuffer(*m_owner, name, initialUsage, stage);
 }
 
 auto RenderGraphBuilder::SetExtent(const rhi::Extent2D &extent)

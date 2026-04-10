@@ -210,8 +210,15 @@ public:
     vkCmdUpdateBuffer(m_cmd, buffer, offset, size, pData);
   }
 
+  void FillBuffer(BufferHandle handle, uint32_t offset, uint32_t size,
+                  uint32_t data) override {
+    FlushBarriers();
+    auto buffer = m_resourceProvider.GetBuffer(handle)->buffer;
+    vkCmdFillBuffer(m_cmd, buffer, offset, size, data);
+  }
+
   void CopyBuffer(BufferHandle src, BufferHandle dst,
-                  const BufferCopy &region) override {
+                  const BufferCopyRegion &region) override {
     auto srcBuffer = m_resourceProvider.GetBuffer(src)->buffer;
     auto dstBuffer = m_resourceProvider.GetBuffer(dst)->buffer;
 
@@ -239,39 +246,63 @@ public:
   }
 
   void Transition(TextureHandle handle, EResourceUsage usage,
-                  uint32_t layerCount, uint32_t levelCount = 1) override {
+                  uint32_t layerCount, uint32_t levelCount,
+                  EShaderStage stage) override {
     auto barrier = m_stateTracker.RequestSync(*this, handle, usage, layerCount,
-                                              levelCount);
+                                              levelCount, stage);
     if (barrier.has_value()) {
-      m_pendingBarriers.PushBack(barrier.value());
+      m_pendingImageBarriers.PushBack(barrier.value());
       m_isDirty = true;
     }
   }
 
-  void PipelineBarrier(const ImageBarrier &barrier) override {
-    auto *texture = m_resourceProvider.GetTexture(barrier.texture);
+  void SyncBuffer(BufferHandle handle, EResourceUsage usage, uint32_t offset,
+                  uint32_t size, EShaderStage stage) override {
+    auto barrier =
+        m_stateTracker.RequestSync(*this, handle, usage, offset, size, stage);
 
-    VkImageMemoryBarrier2 vkBarrier{
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-        .pNext = nullptr,
-        .srcStageMask = ToVkPipelineStageFlags(barrier.srcStage),
-        .srcAccessMask = ToVkAccessFlags(barrier.srcAccess),
-        .dstStageMask = ToVkPipelineStageFlags(barrier.dstStage),
-        .dstAccessMask = ToVkAccessFlags(barrier.dstAccess),
-        .oldLayout = ToVkImageLayout(barrier.oldLayout),
-        .newLayout = ToVkImageLayout(barrier.newLayout),
-        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .image = texture->image,
-        .subresourceRange =
-            {
-                .aspectMask = texture->aspectMask,
-                .baseMipLevel = barrier.baseMipLevel,
-                .levelCount = barrier.levelCount,
-                .baseArrayLayer = barrier.baseArrayLayer,
-                .layerCount = barrier.layerCount,
-            },
-    };
+    if (barrier.has_value()) {
+      m_pendingBufferBarriers.PushBack(barrier.value());
+      m_isDirty = true;
+    }
+  }
+
+  void PipelineBarrier(Span<const ImageBarrier> barriers) override {
+    Array<VkImageMemoryBarrier2> vkBarriers;
+    TextureHandle lastHandle;
+    VkImageAspectFlags aspectMask;
+    VkImage image;
+    for (auto &barrier : barriers) {
+      if (barrier.texture != lastHandle) {
+        lastHandle = barrier.texture;
+        auto pRes = m_resourceProvider.GetTexture(barrier.texture);
+        image = pRes->image;
+        aspectMask = pRes->aspectMask;
+      }
+
+      VkImageMemoryBarrier2 vkBarrier{
+          .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+          .pNext = nullptr,
+          .srcStageMask = ToVkPipelineStageFlags(barrier.srcStage),
+          .srcAccessMask = ToVkAccessFlags(barrier.srcAccess),
+          .dstStageMask = ToVkPipelineStageFlags(barrier.dstStage),
+          .dstAccessMask = ToVkAccessFlags(barrier.dstAccess),
+          .oldLayout = ToVkImageLayout(barrier.oldLayout),
+          .newLayout = ToVkImageLayout(barrier.newLayout),
+          .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+          .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+          .image = image,
+          .subresourceRange =
+              {
+                  .aspectMask = aspectMask,
+                  .baseMipLevel = barrier.baseMipLevel,
+                  .levelCount = barrier.levelCount,
+                  .baseArrayLayer = barrier.baseArrayLayer,
+                  .layerCount = barrier.layerCount,
+              },
+      };
+      vkBarriers.PushBack(vkBarrier);
+    }
 
     VkDependencyInfo depInfo{
         .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
@@ -281,8 +312,8 @@ public:
         .pMemoryBarriers = nullptr,
         .bufferMemoryBarrierCount = 0,
         .pBufferMemoryBarriers = nullptr,
-        .imageMemoryBarrierCount = 1,
-        .pImageMemoryBarriers = &vkBarrier,
+        .imageMemoryBarrierCount = static_cast<uint32_t>(vkBarriers.GetSize()),
+        .pImageMemoryBarriers = vkBarriers.GetData(),
     };
 
     vkCmdPipelineBarrier2(m_cmd, &depInfo);
@@ -318,6 +349,36 @@ public:
                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
   }
 
+  void Blit(TextureHandle src, TextureHandle dst,
+            ImageBlitRegion region) override {
+    auto pSrcRes = m_resourceProvider.GetTexture({src.id});
+    auto pDstRes = m_resourceProvider.GetTexture(dst);
+    VkImageBlit2 vkRegion{
+        .srcSubresource{
+            .aspectMask = pSrcRes->aspectMask,
+            .mipLevel = 0,
+            .baseArrayLayer = 0,
+            .layerCount = 6,
+        },
+        .dstSubresource{
+            .aspectMask = pDstRes->aspectMask,
+            .mipLevel = 0,
+            .baseArrayLayer = 0,
+            .layerCount = 6,
+        },
+    };
+
+    VkBlitImageInfo2 info{
+        .srcImage = pSrcRes->image,
+        .srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        .dstImage = pDstRes->image,
+        .dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        .pRegions = &vkRegion,
+        .filter = VK_FILTER_CUBIC_IMG,
+    };
+    vkCmdBlitImage2(m_cmd, &info);
+  }
+
   void ClearColor(TextureHandle handle, ClearValue value) override {
     FlushBarriers();
     auto res = m_resourceProvider.GetTexture({handle.id});
@@ -339,18 +400,20 @@ private:
   void FlushBarriers() {
     if (!m_isDirty)
       return;
-    InternalPipelineBarrier(m_pendingBarriers);
-    m_pendingBarriers.Clear();
+    InternalPipelineBarrier(m_pendingImageBarriers, m_pendingBufferBarriers);
+    m_pendingImageBarriers.Clear();
+    m_pendingBufferBarriers.Clear();
     m_isDirty = false;
   }
 
-  void InternalPipelineBarrier(Span<const ImageBarrier> barriers) {
-    if (barriers.IsEmpty())
+  void InternalPipelineBarrier(Span<const ImageBarrier> imageBarriers,
+                               Span<const BufferBarrier> bufferBarriers) {
+    if (imageBarriers.IsEmpty() && bufferBarriers.IsEmpty())
       return;
 
     Array<VkImageMemoryBarrier2> vkBarriers;
 
-    for (const auto &b : barriers) {
+    for (const auto &b : imageBarriers) {
       auto textureRes = m_resourceProvider.GetTexture(b.texture);
 
       VkImageMemoryBarrier2 vkBarrier{
@@ -373,9 +436,33 @@ private:
               .layerCount = b.layerCount,
           }};
       vkBarriers.PushBack(vkBarrier);
-      // Debug("Transition layout texture:{}, src: {}, dest: {}",
-      //       reinterpret_cast<uint64_t>(textureRes->image),
-      //       ToView(b.oldLayout), ToView(b.newLayout));
+      // Debug("Transition layout texture:{}, src: {}, dest: {}, baseMipLevel: "
+      //       "{}, levelCount: {}",
+      //       textureRes->createInfo.nameHash.Resolve(), ToView(b.oldLayout),
+      //       ToView(b.newLayout), b.baseMipLevel, b.levelCount);
+    }
+
+    Array<VkBufferMemoryBarrier2> vkBufferBarriers;
+    for (auto &b : bufferBarriers) {
+      auto pBufferRes = m_resourceProvider.GetBuffer(b.buffer);
+      VkBufferMemoryBarrier2 vkBufferBarrier{
+          .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+          .srcStageMask = ToVkPipelineStageFlags(b.srcStage),
+          .srcAccessMask = ToVkAccessFlags(b.srcAccess),
+          .dstStageMask = ToVkPipelineStageFlags(b.dstStage),
+          .dstAccessMask = ToVkAccessFlags(b.dstAccess),
+          .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+          .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+          .buffer = pBufferRes->buffer,
+          .offset = b.offset,
+          .size = b.size,
+      };
+      vkBufferBarriers.PushBack(vkBufferBarrier);
+      // Debug("buffer barrier: handle: {}, offset: {}, size: {}, srcStage: {},
+      // "
+      //       "dstStage: {}, srcAccess: {}, dstAccess{}",
+      //       b.buffer.id, b.offset, b.size, ToView(b.srcStage),
+      //       ToView(b.dstStage), ToView(b.srcAccess), ToView(b.dstAccess));
     }
 
     VkDependencyInfo depInfo{
@@ -384,8 +471,9 @@ private:
         .dependencyFlags = 0,
         .memoryBarrierCount = 0,
         .pMemoryBarriers = nullptr,
-        .bufferMemoryBarrierCount = 0,
-        .pBufferMemoryBarriers = nullptr,
+        .bufferMemoryBarrierCount =
+            static_cast<uint32_t>(vkBufferBarriers.GetSize()),
+        .pBufferMemoryBarriers = vkBufferBarriers.GetData(),
         .imageMemoryBarrierCount = static_cast<uint32_t>(vkBarriers.GetSize()),
         .pImageMemoryBarriers = vkBarriers.GetData(),
     };
@@ -405,7 +493,8 @@ private:
   PipelineHandle m_lastBoundPipeline{};
   VkPipelineLayout m_layout{VK_NULL_HANDLE};
 
-  Array<ImageBarrier> m_pendingBarriers;
+  Array<ImageBarrier> m_pendingImageBarriers;
+  Array<BufferBarrier> m_pendingBufferBarriers;
 
   StateTracker &m_stateTracker;
 };

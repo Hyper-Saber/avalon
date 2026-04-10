@@ -40,7 +40,9 @@ struct CustomPush {
     float NdotH = max(H.z, 0.0);
 
     if(NdotL > 0.0) {
-      float G_Vis = visibilitySmithJoint(NdotV, NdotL, roughness);
+      float G_Vis = visibilitySmithJointGGX(NdotV, NdotL, roughness);
+      G_Vis *= 4.0 * VdotH * NdotL / NdotH;
+
       float Fc = pow(1.0 - VdotH, 5.0);
 
       A += (1.0 - Fc) * G_Vis;

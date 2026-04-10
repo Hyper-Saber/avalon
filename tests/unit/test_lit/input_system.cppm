@@ -53,6 +53,9 @@ class InputSystem : public ecs::SystemBase<InputSystem> {
     metallic += dMetallic;
     roughness = Clamp01(roughness);
     metallic = Clamp01(metallic);
+
+    // Debug("Roughness: {}, Metallic: {}", roughness, metallic);
+
     view.Foreach([&](auto &transform, auto &camera, auto &rigidBody) {
       auto moveDir = -transform.Forward() * moveInput.y +
                      transform.Right() * moveInput.x + transform.Up() * yValue;

@@ -10,8 +10,8 @@ struct PBRSurface {
 };
 
 float3 calculateIndirectLight(PBRSurface surface, float3 viewDir,
-                              uint irradianceMapIndex, uint prefilterMapIndex,
-                              uint brdfLutIndex, uint samplerIndex) {
+                              uint prefilterMapIndex, uint brdfLutIndex,
+                              uint samplerIndex) {
   float3 N = surface.normal;
   float3 V = viewDir;
   float3 R = reflect(-V, N);
@@ -22,23 +22,24 @@ float3 calculateIndirectLight(PBRSurface surface, float3 viewDir,
 
   float3 kS = F;
   float3 kD = (1.0 - kS) * (1.0 - surface.metallic);
-  // float3 irradiance = sampleCube(irradianceMapIndex, samplerIndex, N).rgb;
-  // float3 diffuse = irradiance * surface.albedo;
-  //
-  const float MAX_REFLECTION_LOD = 7.0;
+  // float3 irradiance = evaluateSH(N, uSceneGlobals.skyboxSH);
+  CubemapSH sh = uGeneralSSBO.Load<CubemapSH>(push.skyboxSHOffset);
+  float3 irradiance = evaluateSH(N, sh);
+  float3 diffuse = irradiance * surface.albedo;
+
+  const float MAX_REFLECTION_LOD = 8.0;
 
   float3 prefilteredColor =
       sampleCubeLod(prefilterMapIndex, samplerIndex, R,
                     surface.roughness * MAX_REFLECTION_LOD)
           .rgb;
+
   float2 envBRDF = sampleTexture2d(brdfLutIndex, samplerIndex,
                                    float2(NdotV, surface.roughness))
                        .rg;
   float3 specular = prefilteredColor * (F * envBRDF.x + envBRDF.y);
 
-  return specular;
-
-  // return (kD * diffuse + specular) * surface.ao;
+  return (kD * diffuse + specular) * surface.ao;
 }
 
 float3 calculateDirectLight(PBRSurface surface, Light mainLight,
@@ -54,7 +55,7 @@ float3 calculateDirectLight(PBRSurface surface, Light mainLight,
   F0 = lerp(F0, surface.albedo, surface.metallic);
 
   float D = distributionGGX(N, H, surface.roughness);
-  float G_Vis = visibilitySmithJoint(NdotV, NdotL, surface.roughness);
+  float G_Vis = visibilitySmithJointGGX(NdotV, NdotL, surface.roughness);
   float3 F = fresnelSchlick(max(dot(H, V), 0.0), F0);
 
   float3 specular = D * F * G_Vis;
@@ -107,12 +108,8 @@ float4 FsMain(VSOutput input) : SV_Target {
   float3 V = normalize(uCamera.worldPosition.xyz - input.worldPos);
   float3 direct = calculateDirectLight(surface, uMainLight, V);
 
-  float3 indirect =
-      calculateIndirectLight(surface, V, push.irradianceMap, push.prefilterMap,
-                             push.brdfLut, mMaterial.sampler);
+  float3 indirect = calculateIndirectLight(surface, V, push.prefilterMap,
+                                           push.brdfLut, mMaterial.sampler);
 
-  // float3 c = surface.normal;
-  // return float4(c, 1.0);
-  // return float4(indirect, 1.0);
   return float4(direct + indirect, 1.0);
 }

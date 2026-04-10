@@ -15,13 +15,14 @@ namespace {
 using namespace avalon;
 using namespace avalon::graphics;
 
-void ExtractComputeLocalSize(SpvReflectShaderModule* pModule, ReflectionData& outData) {
-    if (pModule->shader_stage == SPV_REFLECT_SHADER_STAGE_COMPUTE_BIT) {
-        auto entry = spvReflectGetEntryPoint(pModule, pModule->entry_point_name);
-        outData.localSizeX = entry->local_size.x;
-        outData.localSizeY = entry->local_size.y;
-        outData.localSizeZ = entry->local_size.z;
-    }
+void ExtractComputeLocalSize(SpvReflectShaderModule *pModule,
+                             ReflectionData &outData) {
+  if (pModule->shader_stage == SPV_REFLECT_SHADER_STAGE_COMPUTE_BIT) {
+    auto entry = spvReflectGetEntryPoint(pModule, pModule->entry_point_name);
+    outData.localSizeX = entry->local_size.x;
+    outData.localSizeY = entry->local_size.y;
+    outData.localSizeZ = entry->local_size.z;
+  }
 }
 
 void ExtractVertexInputs(SpvReflectShaderModule *pModule,
@@ -45,35 +46,36 @@ void ExtractVertexInputs(SpvReflectShaderModule *pModule,
 
 void ExtractPushConstant(SpvReflectShaderModule *pModule,
                          ReflectionData &reflectionData) {
-  uint32_t blockCount = 0;
-  SpvReflectResult result =
-      spvReflectEnumeratePushConstantBlocks(pModule, &blockCount, nullptr);
-  if (result != SPV_REFLECT_RESULT_SUCCESS || blockCount == 0)
-    return;
-
-  Array<SpvReflectBlockVariable *> pBlocks(blockCount);
-  spvReflectEnumeratePushConstantBlocks(pModule, &blockCount,
-                                        pBlocks.GetData());
-
-  for (uint32_t i = 0; i < blockCount; i++) {
-    const SpvReflectBlockVariable &rootBlock = *pBlocks[i];
-
-    AVALON_ASSERT_MSG(
-        rootBlock.size == sizeof(StandardPushConstant),
-        "PushConstant block size is not equal to sizeof(StanardPushConstant)!");
-    uint32_t slot = 0;
-    auto customBlock = rootBlock.members[2];
-    for (uint32_t j = 0; j < customBlock.member_count; j++) {
-      auto member = customBlock.members[j];
-      if (StringView(member.name) != "padding") {
-        ShaderCustomPushConstantTextureSlot pushConstant;
-        pushConstant.nameHash = StringId(member.name);
-        pushConstant.textureSlot = slot++;
-
-        reflectionData.pushConstantMembers.PushBack(pushConstant);
-      }
-    }
-  }
+  // uint32_t blockCount = 0;
+  // SpvReflectResult result =
+  //     spvReflectEnumeratePushConstantBlocks(pModule, &blockCount, nullptr);
+  // if (result != SPV_REFLECT_RESULT_SUCCESS || blockCount == 0)
+  //   return;
+  //
+  // Array<SpvReflectBlockVariable *> pBlocks(blockCount);
+  // spvReflectEnumeratePushConstantBlocks(pModule, &blockCount,
+  //                                       pBlocks.GetData());
+  //
+  // for (uint32_t i = 0; i < blockCount; i++) {
+  //   const SpvReflectBlockVariable &rootBlock = *pBlocks[i];
+  //
+  //   AVALON_ASSERT_MSG(
+  //       rootBlock.size == sizeof(StandardPushConstant),
+  //       "PushConstant block size is not equal to
+  //       sizeof(StanardPushConstant)!");
+  //   uint32_t slot = 0;
+  //   auto customBlock = rootBlock.members[2];
+  //   for (uint32_t j = 0; j < customBlock.member_count; j++) {
+  //     auto member = customBlock.members[j];
+  //     if (!StringView(member.name).Contains("padding")) {
+  //       ShaderCustomPushConstantTextureSlot pushConstant;
+  //       pushConstant.nameHash = StringId(member.name);
+  //       pushConstant.textureSlot = slot++;
+  //
+  //       reflectionData.pushConstantMembers.PushBack(pushConstant);
+  //     }
+  //   }
+  // }
 }
 
 void AddBufferMember(const SpvReflectBlockVariable &spvMember,
@@ -391,13 +393,13 @@ public:
 
       if constexpr (platform::kIsLinux) {
         AddArg(L"-spirv");
-        // AddArg(L"-fspv-extension=SPV_EXT_descriptor_indexing");
         AddArg(L"-fspv-target-env=universal1.5");
+        AddArg(L"-fspv-reflect");
+        AddArg(L"-fspv-preserve-bindings");
+        AddArg(L"-fvk-use-dx-layout");
+        AddArg(L"-D__SPIRV__=1");
       }
 
-      AddArg(L"-fspv-reflect");
-      AddArg(L"-fspv-preserve-bindings");
-      AddArg(L"-fvk-use-dx-layout");
       AddArg(L"-Zpc");
 
       Path shaderPath;

@@ -154,12 +154,12 @@ public:
     m_rhi.UnmapMemory(stagingHandle);
 
     m_rhi.ExcuteOnce(rhi::EQueueType::Transfer, [&](auto cmd) {
-      BufferCopy vRegion{
+      BufferCopyRegion vRegion{
           .srcOffset = 0,
           .dstOffset = 0,
           .size = vBufferSize,
       };
-      BufferCopy iRegion{
+      BufferCopyRegion iRegion{
           .srcOffset = vBufferSize,
           .dstOffset = 0,
           .size = iBufferSize,

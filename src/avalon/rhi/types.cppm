@@ -176,7 +176,11 @@ enum class EResourceUsage : uint32_t {
   TransferSrc = 1 << 9,
   TransferDst = 1 << 10,
 
-  Present = 1 << 11
+  Present = 1 << 11,
+
+  SceneGlobals = 1 << 12,
+
+  Host = 1 << 13,
 };
 
 enum class ETextureType {
@@ -305,17 +309,21 @@ enum class EAccess : uint32_t {
   ColorWrite = 1 << 1,
   DepthStencilRead = 1 << 2,
   DepthStencilWrite = 1 << 3,
-  ShaderRead = 1 << 4,
-  ShaderWrite = 1 << 5,
-  TransferRead = 1 << 6,
-  TransferWrite = 1 << 7,
-  MemoryRead = 1 << 8,
-  MemoryWrite = 1 << 9,
+  TextureRead = 1 << 4,
+  TransferRead = 1 << 5,
+  TransferWrite = 1 << 6,
+  MemoryRead = 1 << 7,
+  MemoryWrite = 1 << 8,
 
-  IndirectCommandRead = 1 << 10,
-  IndexRead = 1 << 11,
-  VertexAttributeRead = 1 << 12,
-  UniformRead = 1 << 13,
+  IndirectCommandRead = 1 << 9,
+  IndexRead = 1 << 10,
+  VertexAttributeRead = 1 << 11,
+  UniformRead = 1 << 12,
+  StorageRead = 1 << 13,
+  StorageWrite = 1 << 14,
+
+  HostWrite = 1 << 15,
+  HostRead = 1 << 16,
 };
 
 enum class EPipelineStage : uint64_t {
@@ -364,7 +372,7 @@ constexpr uint32_t kMaxCustomSlots = 7;
 constexpr uint32_t kPushConstantFloatSize = 32 + 1 + kMaxCustomSlots;
 constexpr uint32_t kInvalidTextureSlot = 0xFFFF;
 
-constexpr uint32_t kSkyboxIrradianceSlot = 0;
+constexpr uint32_t kSkyboxSHSlot = 0;
 constexpr uint32_t kSkyboxPrefilteredSlot = 1;
 constexpr uint32_t kBRDFLutSlot = 2;
 
@@ -815,8 +823,9 @@ struct PipelineCreateInfo {
 
 struct BufferAllocation {
   void *pHostAddress;
-  uint32_t offset;
   BufferHandle buffer;
+  uint32_t offset;
+  uint32_t size;
 };
 
 struct Offset2D {
@@ -931,7 +940,7 @@ struct RenderingInfo {
   std::optional<DepthStencilAttachmentInfo> depthStencil;
 };
 
-struct BufferCopy {
+struct BufferCopyRegion {
   uint64_t srcOffset = 0;
   uint64_t dstOffset = 0;
   uint64_t size = 0;
@@ -952,8 +961,29 @@ struct ImageBarrier {
   uint32_t layerCount = 1;
 };
 
+struct BufferBarrier {
+  BufferHandle buffer;
+  EAccess srcAccess;
+  EAccess dstAccess;
+  EPipelineStage srcStage;
+  EPipelineStage dstStage;
+
+  uint32_t offset = 0;
+  uint32_t size = 0;
+};
+
 struct ImageCopyRegion {
   Extent2D extent;
+  Offset2D srcOffset{0, 0};
+  Offset2D dstOffset{0, 0};
+  uint32_t srcMipLevel = 0;
+  uint32_t dstMipLevel = 0;
+  uint32_t srcLayer = 0;
+  uint32_t dstLayer = 0;
+  uint32_t layerCount = 1;
+};
+
+struct ImageBlitRegion {
   Offset2D srcOffset{0, 0};
   Offset2D dstOffset{0, 0};
   uint32_t srcMipLevel = 0;
@@ -966,12 +996,6 @@ struct ImageCopyRegion {
 struct StaticSamplers {
   uint32_t linearClamp;
   uint32_t pointClamp;
-};
-
-struct ResourceState {
-  EResourceUsage currentUsage = rhi::EResourceUsage::None;
-  EResourceLayout currentLayout = rhi::EResourceLayout::Undefined;
-  EPipelineStage lastWriteStage = rhi::EPipelineStage::None;
 };
 
 enum class ERhiResult {

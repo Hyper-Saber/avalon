@@ -115,6 +115,7 @@ private:
     auto allocation = m_rhi.GetUBOPool().AllocateAligned(sizeof(SceneGlobals));
     std::memcpy(allocation.pHostAddress, &globals, sizeof(SceneGlobals));
     m_context->sceneGlobalsSetDynamicOffset = allocation.offset;
+    m_resourceManager->ImportExternalBuffer("SceneGlobals"_id, allocation);
   }
 
   void PrepareMaterialBatches(RenderPacket &packet,

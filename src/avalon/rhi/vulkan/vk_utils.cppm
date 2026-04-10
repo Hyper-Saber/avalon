@@ -428,12 +428,9 @@ constexpr auto ToVkBufferUsageFlags(EResourceUsage usage) noexcept
   if (HasFlag(usage, EResourceUsage::UniformBuffer))
     vkUsages |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 
-  constexpr EResourceUsage storageMask = EResourceUsage::StorageBuffer |
-                                         EResourceUsage::ReadOnly |
-                                         EResourceUsage::ReadWrite;
-
-  if (HasFlag(usage, storageMask))
-    vkUsages |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+  if (HasFlag(usage, EResourceUsage::StorageBuffer))
+    vkUsages |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
   AVALON_ASSERT_MSG(vkUsages != 0, "[Vulkan]: Calculated BufferUsageFlags is "
                                    "empty. Check EResourceUsage mapping.");
@@ -627,6 +624,13 @@ constexpr auto ToVkAccessFlags(EAccess access) noexcept -> VkAccessFlags2 {
 
   VkAccessFlags2 flags = 0;
 
+  if (HasFlag(access, EAccess::HostRead)) {
+    flags |= VK_ACCESS_2_HOST_READ_BIT;
+  }
+  if (HasFlag(access, EAccess::HostWrite)) {
+    flags |= VK_ACCESS_2_HOST_WRITE_BIT;
+  }
+
   if (HasFlag(access, EAccess::ColorRead))
     flags |= VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT;
   if (HasFlag(access, EAccess::ColorWrite))
@@ -637,10 +641,8 @@ constexpr auto ToVkAccessFlags(EAccess access) noexcept -> VkAccessFlags2 {
   if (HasFlag(access, EAccess::DepthStencilWrite))
     flags |= VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
-  if (HasFlag(access, EAccess::ShaderRead))
-    flags |= VK_ACCESS_2_SHADER_READ_BIT;
-  if (HasFlag(access, EAccess::ShaderWrite))
-    flags |= VK_ACCESS_2_SHADER_WRITE_BIT;
+  if (HasFlag(access, EAccess::TextureRead))
+    flags |= VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
 
   if (HasFlag(access, EAccess::TransferRead))
     flags |= VK_ACCESS_2_TRANSFER_READ_BIT;
@@ -660,7 +662,10 @@ constexpr auto ToVkAccessFlags(EAccess access) noexcept -> VkAccessFlags2 {
     flags |= VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
   if (HasFlag(access, EAccess::UniformRead))
     flags |= VK_ACCESS_2_UNIFORM_READ_BIT;
-
+  if (HasFlag(access, EAccess::StorageRead))
+    flags |= VK_ACCESS_2_SHADER_STORAGE_READ_BIT;
+  if (HasFlag(access, EAccess::StorageWrite))
+    flags |= VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
   return flags;
 }
 

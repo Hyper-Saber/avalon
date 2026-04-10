@@ -30,7 +30,7 @@ float geometrySmith(float NdotV, float NdotL, float roughness) {
   return ggx1 * ggx2;
 }
 
-float visibilitySmithJoint(float NdotV, float NdotL, float roughness) {
+float visibilitySmithJointGGX(float NdotV, float NdotL, float roughness) {
   float a = roughness * roughness;
   float a2 = a * a;
 
@@ -74,6 +74,38 @@ float3 importanceSampleGGX(float2 Xi, float3 N, float roughness) {
   float3 bitangent = cross(N, tangent);
 
   return normalize(tangent * H.x + bitangent * H.y + N * H.z);
+}
+
+void computeSHBasis(float3 N, out float basis[9]) {
+  basis[0] = 0.282095f;
+  basis[1] = 0.488603f * N.y;
+  basis[2] = 0.488603f * N.z;
+  basis[3] = 0.488603f * N.x;
+  basis[4] = 1.092548f * N.x * N.y;
+  basis[5] = 1.092548f * N.y * N.z;
+  basis[6] = 0.315392f * (3.0f * N.z * N.z - 1.0f);
+  basis[7] = 1.092548f * N.x * N.z;
+  basis[8] = 0.546274f * (N.x * N.x - N.y * N.y);
+}
+
+float3 evaluateSH(float3 N, CubemapSH sh) {
+  float basis[9];
+  computeSHBasis(N, basis);
+
+  static const float A0 = k4Pi;
+  static const float A1 = k2_3Pi * 4.0;
+  static const float A2 = kPi;
+
+  float3 irradiance = 0;
+
+  [unroll] for(int i = 0; i < 9; i++) {
+    float3 coeff = sh.coefficients[i].xyz;
+
+    float finalWeight = (i == 0) ? A0 : (i < 4 ? A1 : A2);
+    irradiance += coeff * basis[i] * finalWeight;
+  }
+
+  return max(irradiance, 0.0);
 }
 
 #endif

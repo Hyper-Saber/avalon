@@ -26,11 +26,11 @@ public:
     auto &materialManager = graphics::GetMaterialManager();
     auto material = materialManager.Resolve(materialManager.GetDefaultOpaque());
     material->SetCullMode(rhi::ECullMode::None);
+
     auto &world = scene.GetWorld();
 
     auto cube = scene.CreatePrimitive(graphics::EPrimitiveType::Cube);
     auto sphere = scene.CreatePrimitive(graphics::EPrimitiveType::Sphere);
-    auto plane = scene.CreatePrimitive(graphics::EPrimitiveType::Plane);
     world.AddComponent<ecs::SphereComponent>(sphere);
     world.AddComponent<ecs::CubeComponent>(cube);
 
@@ -51,7 +51,7 @@ public:
     materialInstanceHandle = materialManager.CreateMaterialInstance(
         materialManager.GetDefaultOpaque());
     materialInstance = materialManager.Resolve(materialInstanceHandle);
-    materialInstance->SetProperty("uMaterials.albedo"_id, Color::Blue());
+    materialInstance->SetProperty("uMaterials.albedo"_id, Color::Black());
     materialInstance->SetProperty("uMaterials.metallic"_id, 0.7f);
     materialInstance->SetProperty("uMaterials.roughness"_id, 0.3f);
     materialInstance->SetProperty("uMaterials.ao"_id, 1.0f);
@@ -62,28 +62,10 @@ public:
     graphics::GetMeshManager().UploadMesh(meshHandle,
                                           material->GetVertexLayout());
 
-    materialInstanceHandle = materialManager.CreateMaterialInstance(
-        materialManager.GetDefaultOpaque());
-    materialInstance = materialManager.Resolve(materialInstanceHandle);
-    materialInstance->SetProperty("uMaterials.albedo"_id, Color::White());
-    materialInstance->SetProperty("uMaterials.metallic"_id, 0.2f);
-    materialInstance->SetProperty("uMaterials.roughness"_id, 0.8f);
-    materialInstance->SetProperty("uMaterials.ao"_id, 1.0f);
-
-    renderComp = world.GetComponent<ecs::RenderComponent>(plane);
-    renderComp->materialInstanceHandle = materialInstanceHandle;
-    meshHandle = renderComp->meshHandle;
-    graphics::GetMeshManager().UploadMesh(meshHandle,
-                                          material->GetVertexLayout());
-
     auto transComp = world.GetComponent<ecs::TransformComponent>(cube);
     transComp->SetPosition({0, 0, 1});
     transComp = world.GetComponent<ecs::TransformComponent>(sphere);
     transComp->SetPosition({0.5, 0, -1});
-
-    transComp = world.GetComponent<ecs::TransformComponent>(plane);
-    transComp->SetPosition({0, -1, 0});
-    transComp->SetScale({10, 1, 10});
 
     auto light = scene.AddLight(scene::ELightType::Directional);
     transComp = world.GetComponent<ecs::TransformComponent>(light);
@@ -98,7 +80,7 @@ public:
     world.AddComponent<ecs::RigidBodyComponent>(m_camera, rigidBody);
 
     world.AddSystem<ecs::UpdateLightSystem>();
-    world.AddSystem<ecs::MoveCubeSystem>();
+    // world.AddSystem<ecs::MoveCubeSystem>();
     world.AddSystem<ecs::InputSystem>();
 
     auto &inputManager = input::GetInputManager();

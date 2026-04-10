@@ -4,7 +4,7 @@
 
 VsOutput VsMain(uint vertexID : SV_VertexID) {
   // return FullscreenBase(vertexID);
-  return FullscreenSkybox(vertexID, uCamera.invProjection, uCamera.invView);
+  return fullscreenSkybox(vertexID, uCamera.invProjection, uCamera.invView);
 }
 
 float4 FsMain(VsOutput input) : SV_Target {
@@ -12,7 +12,7 @@ float4 FsMain(VsOutput input) : SV_Target {
   float3 sunDir = normalize(-uMainLight.posDir.xyz);
 
   float4 finalColor =
-      ComputeSkyColor(dir, sunDir, kZenithColor, kHorizonColor, kGroundColor);
+      computeSkyColor(dir, sunDir, kZenithColor, kHorizonColor, kGroundColor);
 
   return finalColor;
 }

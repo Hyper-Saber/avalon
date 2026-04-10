@@ -17,11 +17,12 @@ public:
   void Setup(RenderGraphBuilder &builder) override {
     m_colorHandle =
         builder.SetLoadOp(rhi::EAttachmentLoadOp::Load)
-            .Write(kSceneColor, rhi::EResourceUsage::ColorAttachment);
+            .WriteAttachment(kSceneColor, rhi::EResourceUsage::ColorAttachment);
     m_depthHandle =
         builder.SetLoadOp(rhi::EAttachmentLoadOp::Load)
-            .Write(kSceneDepth, rhi::EResourceUsage::DepthStencilAttachment |
-                                    rhi::EResourceUsage::ReadOnly);
+            .WriteAttachment(kSceneDepth,
+                             rhi::EResourceUsage::DepthStencilAttachment |
+                                 rhi::EResourceUsage::ReadOnly);
   }
 
   void OnCompile(rhi::IRhi &rhi) override {

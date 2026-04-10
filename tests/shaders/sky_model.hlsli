@@ -9,19 +9,19 @@ static const float3 kGroundColor = float3(0.02, 0.02, 0.02);
 static const float3 kZenithColor = float3(0.05, 0.15, 0.4);
 static const float3 kHorizonColor = float3(0.5, 0.7, 0.9);
 
-float3 ComputeExtinction(float sunHeight) {
+float3 computeExtinction(float sunHeight) {
   float h = max(0.02, sunHeight);
   float opticalDepth = 1.0 / (h + 0.05);
   return exp(-kRayleighScat * 80000.0 * opticalDepth);
 }
 
-float4 ComputeSkyColor(float3 dir, float3 sunDir, float3 zenithColor,
+float4 computeSkyColor(float3 dir, float3 sunDir, float3 zenithColor,
                        float3 horizonColor, float3 groundColor) {
   float viewHeight = dir.y;
   float sunHeight = sunDir.y;
   float sunDot = dot(dir, sunDir);
 
-  float3 extinction = ComputeExtinction(sunHeight);
+  float3 extinction = computeExtinction(sunHeight);
   float3 lightBaseColor = uMainLight.colorIntensity.rgb * extinction;
   float lightIntensity = uMainLight.colorIntensity.a;
 

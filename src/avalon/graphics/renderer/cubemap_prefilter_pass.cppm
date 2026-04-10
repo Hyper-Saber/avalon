@@ -1,7 +1,7 @@
 module;
 #include <cstdint>
 #include <debug/assert.hpp>
-export module avalon.graphics:cubemap_mip_gen_pass;
+export module avalon.graphics:prefilter_pass;
 
 import avalon.core;
 import avalon.rhi;
@@ -18,27 +18,27 @@ export class AVALON_GRAPHICS_API CubemapMipGenPass final
     : public RenderPass<CubemapMipGenPass> {
 public:
   explicit CubemapMipGenPass(ShaderHandle shader, uint32_t faceDataOffset,
-                             rhi::Extent2D extent, StringId sourceCubemap,
-                             StringId outputCubemap)
-      : m_shader(shader), m_faceDataOffset(faceDataOffset), m_extent(extent),
-        m_sourceCubemap(sourceCubemap), m_outputCubemap(outputCubemap),
-        m_mipLevels(Log2(m_extent.width / 8) + 1) {}
+                             rhi::Extent2D extent, uint32_t mipLevels,
+                             StringId sourceCubemap, StringId outputCubemap)
+      : m_shader(shader), m_extent(extent), m_sourceCubemap(sourceCubemap),
+        m_outputCubemap(outputCubemap), m_mipLevels(mipLevels) {}
 
   void Setup(RenderGraphBuilder &builder) override {
     m_inputHandle =
-        builder.Read(m_sourceCubemap, rhi::EResourceUsage::TransferSrc);
+        builder.Read(m_sourceCubemap, EResourceUsage::TransferSrc,
+                     EResourceUsage::TransferSrc, EShaderStage::Compute);
 
     AVALON_ASSERT_MSG(m_extent.width == m_extent.height,
                       "[CubemapMipGenPass] Cubemap must be square!");
 
-    m_outputHandle = builder.SetExtent(m_extent)
-                         .SetLayers(6)
-                         .SetTextureType(rhi::ETextureType::TextureCube)
-                         .SetMipLevels(m_mipLevels)
-                         .Write(m_outputCubemap,
-                                rhi::EResourceUsage::ReadWrite |
-                                    rhi::EResourceUsage::TransferDst,
-                                rhi::EResourceUsage::TransferDst);
+    m_outputHandle =
+        builder.SetExtent(m_extent)
+            .SetLayers(6)
+            .SetTextureType(rhi::ETextureType::TextureCube)
+            .SetMipLevels(m_mipLevels)
+            .Write(m_outputCubemap,
+                   EResourceUsage::ReadWrite | EResourceUsage::TransferDst,
+                   EResourceUsage::TransferDst, EShaderStage::Compute);
   }
 
   void OnCompile(rhi::IRhi &rhi) override {
@@ -68,10 +68,10 @@ public:
     };
 
     cmd.Transition(outputTexture, rhi::EResourceUsage::TransferDst, 6,
-                   m_mipLevels);
+                   m_mipLevels, EShaderStage::Compute);
     cmd.CopyImage(inputTexture, outputTexture, region);
     cmd.Transition(outputTexture, rhi::EResourceUsage::ReadWrite, 6,
-                   m_mipLevels);
+                   m_mipLevels, EShaderStage::Compute);
 
     cmd.BindPipeline(m_pipelineHandle);
 
@@ -84,21 +84,19 @@ public:
       float invSize = 1.0f / static_cast<float>(mipWidth);
       float roughness = static_cast<float>(i + 1) / (m_mipLevels - 1);
 
-      uint32_t srcIndex = bindlessManager.RegisterTextureArray(
-          outputTexture, EResourceUsage::ReadWrite, srcLevel);
+      uint32_t srcIndex = bindlessManager.RegisterTextureCube(outputTexture);
       uint32_t dstIndex = bindlessManager.RegisterRWTextureArray(
           outputTexture, EResourceUsage::ReadWrite, dstLevel);
 
       uint32_t finalSampleCount;
       if (i == 0)
-        finalSampleCount = 16;
-      else if (i < 3)
-        finalSampleCount = 32;
+        finalSampleCount = 1024;
+      // else if (i < 3)
+      //   finalSampleCount = 1024;
       else
-        finalSampleCount = 64;
+        finalSampleCount = 1024;
 
       struct CustomPush {
-        uint32_t faceDataOffset;
         uint32_t srcIndex;
         uint32_t dstIndex;
         uint32_t samplerIndex;
@@ -106,9 +104,8 @@ public:
         uint32_t size;
         float invSize;
         float roughness;
-        float paddings[kPushConstantFloatSize - 8];
+        float paddings[kPushConstantFloatSize - 7];
       } customPc = {
-          .faceDataOffset = m_faceDataOffset,
           .srcIndex = srcIndex,
           .dstIndex = dstIndex,
           .samplerIndex = m_samplerIndex,
@@ -124,27 +121,12 @@ public:
       uint32_t groupX = (mipWidth + 7) / 8;
       uint32_t groupY = (mipHeight + 7) / 8;
       cmd.Dispatch(groupX, groupY, 6);
-
-      rhi::ImageBarrier barrier{
-          .texture = outputTexture,
-          .srcAccess = rhi::EAccess::ShaderWrite,
-          .dstAccess = rhi::EAccess::ShaderRead,
-          .srcStage = rhi::EPipelineStage::ComputeShader,
-          .dstStage = rhi::EPipelineStage::ComputeShader,
-          .baseMipLevel = dstLevel,
-          .levelCount = 1,
-          .baseArrayLayer = 0,
-          .layerCount = 6,
-      };
-
-      cmd.PipelineBarrier(barrier);
     }
   }
 
 private:
   ShaderHandle m_shader;
   rhi::Extent2D m_extent;
-  uint32_t m_faceDataOffset;
 
   StringId m_sourceCubemap;
   StringId m_outputCubemap;

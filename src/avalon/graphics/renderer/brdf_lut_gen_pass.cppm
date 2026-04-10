@@ -21,10 +21,11 @@ public:
       : m_shader(shader), m_desc(desc) {}
 
   void Setup(RenderGraphBuilder &builder) override {
-    m_outputHandle = builder.SetExtent(m_desc.extent)
-                         .SetFormat(m_desc.format)
-                         .Write(m_desc.nameHash, m_desc.usage,
-                                rhi::EResourceUsage::ReadWrite);
+    m_outputHandle =
+        builder.SetExtent(m_desc.extent)
+            .SetFormat(m_desc.format)
+            .Write(m_desc.nameHash, m_desc.usage, EResourceUsage::ReadWrite,
+                   EShaderStage::Compute);
   }
 
   void OnCompile(rhi::IRhi &rhi) override {

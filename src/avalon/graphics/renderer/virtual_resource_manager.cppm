@@ -2,6 +2,7 @@ module;
 #include <algorithm>
 #include <cstdint>
 #include <debug/assert.hpp>
+#include <optional>
 #include <utility>
 export module avalon.graphics:virtual_resource_manager;
 
@@ -14,7 +15,9 @@ class VirtualResourceManager final
     : public NonCopyable,
       public mem::AutoDestroyable<VirtualResourceManager> {
 public:
-  explicit VirtualResourceManager(rhi::IRhi &rhi) : m_rhi(rhi) {}
+  explicit VirtualResourceManager(rhi::IRhi &rhi)
+      : m_rhi(rhi), m_uboPool(rhi.GetUBOPool()), m_ssboPool(rhi.GetSSBOPool()) {
+  }
 
   uint32_t ImportExternalTexture(StringId name,
                                  rhi::TextureHandle physicalHandle,
@@ -26,10 +29,49 @@ public:
     handle.MarkExternal();
     m_currentGenerations.PushBack(handle.GetGenerationRaw());
     m_virtualDescs.PushBack(desc);
+    RefineTextureUsage(handle, desc.usage);
     return index;
   }
 
-  uint32_t GetOrCreateVirtualResouceIndex(const VirtualTextureDesc &desc) {
+  uint32_t ImportExternalBuffer(StringId name, BufferAllocation allocation) {
+    auto index = CreateNewVirtualBuffer(name, allocation, true);
+    return index;
+  }
+
+  uint32_t GetOrCreateVirtualBufferIndex(StringId nameHash,
+                                         EResourceUsage usage, uint32_t size) {
+    auto pIndex = m_nameToIndex.Get(nameHash);
+    if (pIndex != nullptr) {
+      auto index = *pIndex;
+      return index;
+    }
+
+    if (HasFlag(usage, EResourceUsage::SceneGlobals)) {
+      AVALON_ASSERT_MSG(
+
+          false,
+          "[RenderGraph]: SceneGlobals allocation should have been Imported!")
+      return -1;
+    }
+
+    if (HasFlag(usage, EResourceUsage::StorageBuffer)) {
+      auto allocation = m_ssboPool.AllocateAligned(size);
+      return CreateNewVirtualBuffer(nameHash, allocation);
+    }
+
+    if (HasFlag(usage, EResourceUsage::UniformBuffer)) {
+      auto allocation = m_uboPool.AllocateAligned(size);
+      return CreateNewVirtualBuffer(nameHash, allocation);
+    }
+
+    AVALON_ASSERT_MSG(
+        false,
+        String::Format("[RenderGraph]: Unsupported usage: {}", ToView(usage)));
+    return -1;
+  }
+
+  uint32_t
+  GetOrCreateVirtualTextureResouceIndex(const VirtualTextureDesc &desc) {
     auto pIndex = m_nameToIndex.Get(desc.nameHash);
     if (pIndex != nullptr) {
       auto index = *pIndex;
@@ -74,7 +116,7 @@ public:
     return CreateNewVirtualResource(desc);
   }
 
-  void RefineUsage(VirtualResourceHandle handle, EResourceUsage usage) {
+  void RefineTextureUsage(VirtualResourceHandle handle, EResourceUsage usage) {
     auto index = handle.GetIndex();
     AVALON_ASSERT_MSG(
         m_virtualDescs.GetSize() > index,
@@ -90,10 +132,10 @@ public:
         String::Format("[RenderGraph]: Virtual resource [{}] not exsit!",
                        name.Resolve()));
 
-    return GetVirtualResource(*pIndex);
+    return GetVirtualTexture(*pIndex);
   }
 
-  auto GetVirtualResource(uint32_t index) const -> VirtualResourceHandle {
+  auto GetVirtualTexture(uint32_t index) const -> VirtualResourceHandle {
     AVALON_ASSERT_MSG(
         index < m_currentGenerations.GetSize(),
         String::Format(
@@ -101,7 +143,25 @@ public:
     return VirtualResourceHandle::Create(index, m_currentGenerations[index]);
   }
 
-  auto GetResourceDesc(VirtualResourceHandle handle) const
+  auto GetVirtualBuffer(StringId nameHash) const -> VirtualResourceHandle {
+    auto pIndex = m_nameToIndex.Get(nameHash);
+    AVALON_ASSERT_MSG(
+        pIndex != nullptr,
+        String::Format("[RenderGraph]: Virtual resource [{}] not exsit!",
+                       nameHash.Resolve()));
+
+    return GetVirtualBuffer(*pIndex);
+  }
+
+  auto GetVirtualBuffer(uint32_t index) const -> VirtualResourceHandle {
+    AVALON_ASSERT_MSG(
+        index < m_bufferGenerations.GetSize(),
+        String::Format(
+            "[RenderGraph]: VirtualResourceHandle index {} not exsit!", index));
+    return VirtualResourceHandle::Create(index, m_bufferGenerations[index]);
+  }
+
+  auto GetTextureDesc(VirtualResourceHandle handle) const
       -> const VirtualTextureDesc & {
     auto index = handle.GetIndex();
     AVALON_ASSERT_MSG(
@@ -111,7 +171,7 @@ public:
     return m_virtualDescs[index];
   }
 
-  bool IsFirstGeneration(uint32_t index) {
+  bool IsFirstTextureGeneration(uint32_t index) {
     AVALON_ASSERT_MSG(
         index < m_currentGenerations.GetSize(),
         String::Format(
@@ -119,7 +179,15 @@ public:
     return m_currentGenerations[index] == 0;
   }
 
-  auto IncreaseGeneration(uint32_t index) -> VirtualResourceHandle {
+  bool IsFirstBufferGeneration(uint32_t index) {
+    AVALON_ASSERT_MSG(
+        index < m_bufferGenerations.GetSize(),
+        String::Format(
+            "[RenderGraph]: VirtualResourceHandle index {} not exsit!", index));
+    return m_bufferGenerations[index] == 0;
+  }
+
+  auto IncreaseTextureGeneration(uint32_t index) -> VirtualResourceHandle {
     AVALON_ASSERT_MSG(
         index < m_currentGenerations.GetSize(),
         String::Format(
@@ -128,7 +196,16 @@ public:
     return VirtualResourceHandle::Create(index, m_currentGenerations[index]);
   }
 
-  void RealizeResources(
+  auto IncreaseBufferGeneration(uint32_t index) -> VirtualResourceHandle {
+    AVALON_ASSERT_MSG(
+        index < m_bufferGenerations.GetSize(),
+        String::Format(
+            "[RenderGraph]: VirtualResourceHandle index {} not exsit!", index));
+    m_bufferGenerations[index]++;
+    return VirtualResourceHandle::Create(index, m_bufferGenerations[index]);
+  }
+
+  void RealizeTextures(
       const HashMap<VirtualResourceHandle, ResourceTimeline> &timelines) {
     auto sortedHandles = timelines.GetKeys();
     std::ranges::sort(sortedHandles, [&](auto a, auto b) {
@@ -197,18 +274,28 @@ public:
     GarbageCollect();
   }
 
-  rhi::TextureHandle GetPhysical(VirtualResourceHandle handle) const {
+  rhi::TextureHandle GetPhysicalTexture(VirtualResourceHandle handle) const {
     if (auto *pHandle = m_vToPMap.Get(handle.GetIndex())) {
       return *pHandle;
     }
     return rhi::TextureHandle::Invalid();
   }
 
+  auto GetPhysicalBufferAllocation(VirtualResourceHandle handle) const
+      -> std::optional<BufferAllocation> {
+    if (auto pAlloc = m_vToPBufferMap.Get(handle.GetIndex())) {
+      return *pAlloc;
+    }
+    return std::nullopt;
+  }
+
   void ResetPool() {
     m_virtualDescs.Clear();
     m_currentGenerations.Clear();
+    m_bufferGenerations.Clear();
     m_nameToIndex.Clear();
     m_vToPMap.Clear();
+    m_vToPBufferMap.Clear();
   }
 
 private:
@@ -240,6 +327,27 @@ private:
     }
 
     return true;
+  }
+
+  uint32_t CreateNewVirtualBuffer(StringId nameHash,
+                                  BufferAllocation &allocation,
+                                  bool isExternal = false) {
+    const uint32_t index = static_cast<uint32_t>(m_bufferGenerations.GetSize());
+    uint32_t version = 0;
+    if (isExternal) {
+      auto handle = VirtualResourceHandle::Create(index, version);
+      handle.MarkExternal();
+      version = handle.GetGenerationRaw();
+    }
+    m_bufferGenerations.PushBack(version);
+    AVALON_ASSERT_MSG(
+        !m_nameToIndex.Contains(nameHash),
+        String::Format("[RenderGraph]: virtual resource '{}' is already exist!",
+                       nameHash.Resolve()));
+    m_nameToIndex.Insert(nameHash, index);
+    m_vToPBufferMap.Insert(index, allocation);
+
+    return index;
   }
 
   auto CreateNewVirtualResource(const VirtualTextureDesc &desc) -> uint32_t {
@@ -281,8 +389,13 @@ private:
   HashMap<HashType, Array<PhysicalEntry>> m_physicalCache;
   Array<VirtualTextureDesc> m_virtualDescs;
   Array<uint32_t> m_currentGenerations;
+  Array<uint32_t> m_bufferGenerations;
   HashMap<uint32_t, rhi::TextureHandle> m_vToPMap;
   HashMap<StringId, uint32_t> m_nameToIndex;
+  HashMap<uint32_t, BufferAllocation> m_vToPBufferMap;
+
+  RingBufferPool &m_ssboPool;
+  RingBufferPool &m_uboPool;
 };
 
 } // namespace avalon::graphics

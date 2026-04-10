@@ -13,21 +13,6 @@ struct CustomPush {
 #include "common.hlsli"
 #include "pbr.hlsli"
 
-static const float3 FaceForward[6] = {
-    float3(1, 0, 0),  float3(-1, 0, 0), float3(0, 1, 0),
-    float3(0, -1, 0), float3(0, 0, 1),  float3(0, 0, -1),
-};
-
-static const float3 FaceRight[6] = {
-    float3(0, 0, -1), float3(0, 0, 1), float3(1, 0, 0),
-    float3(1, 0, 0),  float3(1, 0, 0), float3(-1, 0, 0),
-};
-
-static const float3 FaceUp[6] = {
-    float3(0, -1, 0), float3(0, -1, 0), float3(0, 0, 1),
-    float3(0, 0, -1), float3(0, -1, 0), float3(0, -1, 0),
-};
-
 groupshared float3 g_sharedSH[64][9];
 groupshared float g_sharedWeight[64];
 
@@ -36,10 +21,9 @@ groupshared float g_sharedWeight[64];
   uint face = dispatchId.z;
 
   float2 uv = (dispatchId.xy + 0.5) * push.invSize;
-  uv = uv * 2.0 - 1.0;
 
-  float3 dir = FaceForward[face] + uv.x * FaceRight[face] + uv.y * FaceUp[face];
-  dir = normalize(dir);
+  float3 dir = getCubemapDirection(uv, dispatchId.z);
+
   float weight = 1.0 + uv.x * uv.x + uv.y * uv.y;
   weight = 4.0 / (sqrt(weight) * weight);
 

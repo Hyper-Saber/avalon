@@ -49,7 +49,8 @@ struct CustomPush {
       B += Fc * G_Vis;
     }
   }
+  float Eavg = A + B;
 
   writeRWTexture2d(push.brdfLutIndex, dispatchId.xy,
-                   float4(A / sampleCount, B / sampleCount, 0.0, 1.0));
+                   float4(A / sampleCount, B / sampleCount, Eavg, 1.0));
 }

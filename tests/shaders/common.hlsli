@@ -193,4 +193,41 @@ float4 loadRWTextureArray(uint index, uint3 coord) {
     }                                                                          \
   } while(0)
 
+static const float3 kFaceForwards[6] = {
+    float3(1.0, 0.0, 0.0),  // +X
+    float3(-1.0, 0.0, 0.0), // -X
+    float3(0.0, 1.0, 0.0),  // +Y
+    float3(0.0, -1.0, 0.0), // -Y
+    float3(0.0, 0.0, 1.0),  // +Z
+    float3(0.0, 0.0, -1.0)  // -Z
+};
+
+static const float3 kFaceRights[6] = {
+    float3(0.0, 0.0, -1.0), // +X 边缘接 -Z
+    float3(0.0, 0.0, 1.0),  // -X 边缘接 +Z
+    float3(1.0, 0.0, 0.0),  // +Y 边缘接 +X
+    float3(1.0, 0.0, 0.0),  // -Y 边缘接 +X
+    float3(1.0, 0.0, 0.0),  // +Z 边缘接 +X
+    float3(-1.0, 0.0, 0.0)  // -Z 边缘接 -X
+};
+
+static const float3 kFaceUps[6] = {
+    float3(0.0, -1.0, 0.0), // +X
+    float3(0.0, -1.0, 0.0), // -X
+    float3(0.0, 0.0, 1.0),  // +Y
+    float3(0.0, 0.0, -1.0), // -Y
+    float3(0.0, -1.0, 0.0), // +Z
+    float3(0.0, -1.0, 0.0)  // -Z
+};
+
+float3 getCubemapDirection(float2 uv, uint faceIndex) {
+  float2 st = uv * 2.0 - 1.0;
+
+  float3 f = kFaceForwards[faceIndex];
+  float3 r = kFaceRights[faceIndex];
+  float3 u = kFaceUps[faceIndex];
+
+  return normalize(f + st.x * r + st.y * u);
+}
+
 #endif // AVALON_COMMON_HLSLI

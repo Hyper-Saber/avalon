@@ -60,7 +60,7 @@ float2 hammersley(uint i, uint N) {
 
 float3 importanceSampleGGX(float2 Xi, float3 N, float roughness) {
   float a = roughness * roughness;
-  float phi = 2.0 * kPi * Xi.x;
+  float phi = k2Pi * Xi.x;
   float cosTheta = sqrt((1.0 - Xi.y) / (1.0 + (a * a - 1.0) * Xi.y));
   float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
 

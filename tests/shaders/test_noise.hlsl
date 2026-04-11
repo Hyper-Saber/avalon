@@ -2,11 +2,11 @@
 #include "noise.hlsli"
 #include "screen_space.hlsli"
 
-VsOutput VsMain(uint vertexID : SV_VertexID) {
+VSOutput VsMain(uint vertexID : SV_VertexID) {
   return FullscreenBase(vertexID);
 }
 
-float4 FsMain(VsOutput input) : SV_TARGET {
+float4 FsMain(VSOutput input) : SV_TARGET {
   float2 uv = input.uv * 5.0;
   float time = uTime * 0.2;
   float2 motion = float2(noise1d(time), noise1d(time + 100.0));

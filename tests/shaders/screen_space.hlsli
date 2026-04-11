@@ -1,7 +1,7 @@
 #ifndef AVALON_SCREEN_SPACE_HLSLI
 #define AVALON_SCREEN_SPACE_HLSLI
 
-struct VsOutput {
+struct VSOutput {
   float4 pos : SV_POSITION;
   float2 uv : TEXCOORD0;
   float3 viewDir : TEXCOORD1;
@@ -23,8 +23,8 @@ FullscreenVertexAttribute generateVertices(uint vertexId) {
   return output;
 }
 
-VsOutput fullscreenBase(uint vertexId) {
-  VsOutput output;
+VSOutput fullscreenBase(uint vertexId) {
+  VSOutput output;
   FullscreenVertexAttribute attribute = generateVertices(vertexId);
 
   output.uv = attribute.uv;
@@ -33,9 +33,9 @@ VsOutput fullscreenBase(uint vertexId) {
   return output;
 }
 
-VsOutput fullscreenSkybox(uint vertexId, float4x4 invProjection,
+VSOutput fullscreenSkybox(uint vertexId, float4x4 invProjection,
                           float4x4 invView) {
-  VsOutput output;
+  VSOutput output;
   FullscreenVertexAttribute attribute = generateVertices(vertexId);
 
   output.uv = attribute.uv;

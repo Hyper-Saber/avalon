@@ -20,9 +20,10 @@ public:
         builder.SetClearValue(ClearValue::Color(0, 0, 0.01))
             .WriteAttachment(kSceneColor, rhi::EResourceUsage::ColorAttachment);
     m_depthHandle =
-        builder.SetClearValue(ClearValue::DepthStencil(0, 0))
+        builder.SetLoadOp(rhi::EAttachmentLoadOp::Load)
             .WriteAttachment(kSceneDepth,
-                             EResourceUsage::DepthStencilAttachment);
+                             rhi::EResourceUsage::DepthStencilAttachment |
+                                 rhi::EResourceUsage::ReadOnly);
     m_prefilteredHandle =
         builder.Read("SkyboxPrefiltered"_id, EResourceUsage::ReadOnly,
                      EResourceUsage::ReadOnly, EShaderStage::Fragment);
@@ -43,7 +44,8 @@ public:
     auto &materialManager = GetMaterialManager();
     auto &meshManager = GetMeshManager();
 
-    rhi::BufferHandle lastVBO;
+    rhi::BufferHandle lastPosVBO;
+    rhi::BufferHandle lastAttriVBO;
     rhi::BufferHandle lastIBO;
     rhi::PipelineHandle lastPipeline;
 
@@ -63,12 +65,15 @@ public:
         if (!mesh) [[unlikely]]
           continue;
 
-        auto currentVBO = mesh->GetVBO();
+        auto currentPosVBO = mesh->GetPosVBO();
+        auto currentAttriVBO = mesh->GetAttriVBO();
         auto currentIBO = mesh->GetIBO();
 
-        if (currentVBO != lastVBO) {
-          cmd.BindVertexBuffer(0, 1, &currentVBO, 0);
-          lastVBO = currentVBO;
+        if (currentPosVBO != lastPosVBO || currentAttriVBO != lastAttriVBO) {
+          BufferHandle buffers[] = {currentPosVBO, currentAttriVBO};
+          cmd.BindVertexBuffer(0, 2, buffers, 0);
+          lastPosVBO = currentPosVBO;
+          lastAttriVBO = currentAttriVBO;
         }
         if (currentIBO != lastIBO) {
           cmd.BindIndexBuffer(currentIBO, 0, mesh->GetIndexFormat());

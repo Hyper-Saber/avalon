@@ -89,13 +89,6 @@ float3 calculateDirectLight(PBRSurface surface, Light mainLight, float3 viewDir,
          lightColor;
 }
 
-struct VSInput {
-  VK_LOCATION(0) float3 position : POSITION;
-  VK_LOCATION(1) float3 color : COLOR;
-  VK_LOCATION(2) float2 uv : TEXCOORD0;
-  VK_LOCATION(3) float3 normal : NORMAL;
-};
-
 struct VSOutput {
   float4 clipPos : SV_POSITION;
   VK_LOCATION(0) float3 color : COLOR;
@@ -104,15 +97,15 @@ struct VSOutput {
   VK_LOCATION(3) float3 worldNormal : NORMAL;
 };
 
-VSOutput VsMain(VSInput input) {
+VSOutput VsMain(StandardVSInput input) {
   VSOutput output;
 
   float4 worldPos = mul(mModel, float4(input.position, 1.0f));
-  output.clipPos = mul(uCamera.projection, mul(uCamera.view, worldPos));
+  output.worldPos = worldPos.xyz;
+  output.clipPos = calculateClipPosition(worldPos);
 
   output.color = input.color;
   output.uv = input.uv;
-  output.worldPos = worldPos.xyz;
   output.worldNormal = mul((float3x3)mNormalMatrix, input.normal);
 
   return output;

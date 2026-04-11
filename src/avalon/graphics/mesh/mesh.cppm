@@ -12,7 +12,8 @@ using namespace avalon::rhi;
 export namespace avalon::graphics {
 
 struct VertexLayout {
-  uint32_t stride;
+  bool bindingUsed[2]{false, false};
+  uint32_t strides[2]{0, 0};
   Span<const VertexInputAttribute> attributes;
 };
 
@@ -57,8 +58,10 @@ struct MeshData {
 
 class AVALON_GRAPHICS_API Mesh final : public mem::AutoDestroyable<Mesh> {
 public:
-  void Upload(BufferHandle vbo, BufferHandle ibo, EFormat indexFormat) {
-    m_vertexBuffer = vbo;
+  void Upload(BufferHandle posVBO, BufferHandle attriVBO, BufferHandle ibo,
+              EFormat indexFormat) {
+    m_posVBO = posVBO;
+    m_attriVBO = attriVBO;
     m_indexBuffer = ibo;
     m_indexFormat = indexFormat;
     m_isUploaded = true;
@@ -70,9 +73,14 @@ public:
 
   auto GetData() const noexcept -> const MeshData & { return m_data; }
 
-  BufferHandle GetVBO() const noexcept {
+  BufferHandle GetPosVBO() const noexcept {
     AVALON_ASSERT(m_isUploaded);
-    return m_vertexBuffer;
+    return m_posVBO;
+  }
+
+  BufferHandle GetAttriVBO() const noexcept {
+    AVALON_ASSERT(m_isUploaded);
+    return m_attriVBO;
   }
 
   BufferHandle GetIBO() const noexcept {
@@ -90,10 +98,15 @@ public:
     return m_indexFormat;
   }
 
+  bool IsUploaded() const noexcept { return m_isUploaded; }
+
 private:
   MeshData m_data;
   bool m_isUploaded;
-  BufferHandle m_vertexBuffer;
+
+  BufferHandle m_posVBO;
+  BufferHandle m_attriVBO;
+
   BufferHandle m_indexBuffer;
   uint32_t m_indexCount;
   EFormat m_indexFormat = EFormat::R32_Uint;

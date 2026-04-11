@@ -11,6 +11,7 @@ import :render_graph_builder;
 import :renderer_types;
 import :material;
 import :material_manager;
+import :depth_pass;
 import :opaque_pass;
 import :skybox_pass;
 import :blit_pass;
@@ -54,26 +55,28 @@ public:
     auto &shaderManager = graphics::GetShaderManager();
     auto &materialManager = graphics::GetMaterialManager();
 
-    auto shaderHandle = shaderManager.GetOrCreateShader("lit.hlsl");
+    auto shaderHandle = shaderManager.GetOrCreateShader("depth.hlsl");
     auto materialHandle =
-        materialManager.CreateMaterial(shaderHandle, "Default"_id);
-    materialManager.SetDefaultOpaque(materialHandle);
-
-    shaderHandle = shaderManager.GetOrCreateShader("blit.hlsl");
-    materialHandle = materialManager.CreateMaterial(shaderHandle, "Blit"_id);
-    materialManager.SetDefaultBlit(materialHandle);
-
-    shaderHandle = shaderManager.GetOrCreateShader("skybox.hlsl");
-    materialHandle = materialManager.CreateMaterial(shaderHandle, "Skybox"_id);
-    materialManager.SetDefaultSkyBox(materialHandle);
+        materialManager.CreateMaterial(shaderHandle, "Depth"_id);
 
     shaderHandle = shaderManager.GetOrCreateShader("skybox_generator.hlsl");
     materialHandle =
         materialManager.CreateMaterial(shaderHandle, "SkyboxGen"_id);
 
-    shaderHandle = shaderManager.GetOrCreateShader("cubemap_test.hlsl");
-    materialHandle =
-        materialManager.CreateMaterial(shaderHandle, "CubemapTest"_id);
+    shaderHandle = shaderManager.GetOrCreateShader("skybox.hlsl");
+    materialHandle = materialManager.CreateMaterial(shaderHandle, "Skybox"_id);
+    materialManager.SetDefaultSkyBox(materialHandle);
+
+    shaderHandle = shaderManager.GetOrCreateShader("lit.hlsl");
+    materialHandle = materialManager.CreateMaterial(shaderHandle, "Default"_id);
+    auto pMat = materialManager.Resolve(materialHandle);
+    pMat->DisableDepthWrite();
+    pMat->SetDepthComplieOp(ECompareOp::GreaterOrEqual);
+    materialManager.SetDefaultOpaque(materialHandle);
+
+    shaderHandle = shaderManager.GetOrCreateShader("blit.hlsl");
+    materialHandle = materialManager.CreateMaterial(shaderHandle, "Blit"_id);
+    materialManager.SetDefaultBlit(materialHandle);
 
     m_brdfLutGenShader =
         shaderManager.GetOrCreateComputeShader("brdf_lut_gen.hlsl");
@@ -83,6 +86,18 @@ public:
         shaderManager.GetOrCreateComputeShader("cubemap_sh_projection.hlsl");
     m_finalizeSHShader =
         shaderManager.GetOrCreateComputeShader("finalize_sh.hlsl");
+
+    //
+    //
+    //-------------------------------------------------------
+    if constexpr (debug::kIsDebug) {
+      shaderHandle = shaderManager.GetOrCreateShader("cubemap_test.hlsl");
+      materialHandle =
+          materialManager.CreateMaterial(shaderHandle, "CubemapTest"_id);
+    }
+    //-------------------------------------------------------
+    //
+    //
 
     TextureCreateInfo info{
         .nameHash = "BRDFLut"_id,
@@ -135,6 +150,8 @@ public:
                                       m_brdfLutGenShader, m_brdfLutDesc);
       m_isFisrtFrame = false;
     }
+
+    builder.AddPass<DepthPass>("Depth"_id);
 
     builder.AddPass<SkyboxGeneratorPass>("SkyboxGen"_id, EPassType::Graphics,
                                          skyboxExtent);

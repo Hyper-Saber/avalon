@@ -2,12 +2,12 @@
 #include "screen_space.hlsli"
 #include "sky_model.hlsli"
 
-VsOutput VsMain(uint vertexID : SV_VertexID) {
+VSOutput VsMain(uint vertexID : SV_VertexID) {
   // return FullscreenBase(vertexID);
   return fullscreenSkybox(vertexID, uCamera.invProjection, uCamera.invView);
 }
 
-float4 FsMain(VsOutput input) : SV_Target {
+float4 FsMain(VSOutput input) : SV_Target {
   float3 dir = normalize(input.viewDir);
   float3 sunDir = normalize(-uMainLight.posDir.xyz);
 

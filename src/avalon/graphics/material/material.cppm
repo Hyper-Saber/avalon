@@ -2,6 +2,7 @@ module;
 #include <algorithm>
 #include <cstdint>
 #include <debug/assert.hpp>
+#include <iterator>
 
 export module avalon.graphics:material;
 
@@ -181,26 +182,44 @@ private:
   void BuildVertexInputState(const Shader *shader) {
     auto attributes = shader->GetInputAttributes();
     m_vertexAttributes.Clear();
-    uint32_t currentOffset = 0;
+    uint32_t currentOffsets[] = {0, 0};
+    bool bindingUsed[] = {false, false};
+    uint32_t binding = 0;
     for (const auto &attr : attributes) {
+      if (attr.semantic == EVertexSemantic::Position)
+        binding = 0;
+      else {
+        binding = 1;
+      }
+      bindingUsed[binding] = true;
       m_vertexAttributes.PushBack({
           .location = attr.location,
-          .binding = 0,
+          .binding = binding,
           .format = attr.format,
           .semantic = attr.semantic,
-          .offset = currentOffset,
+          .offset = currentOffsets[binding],
       });
-      currentOffset += rhi::GetFormatSize(attr.format);
+      currentOffsets[binding] += rhi::GetFormatSize(attr.format);
     }
 
     m_vertexBindings.Clear();
-    m_vertexBindings.PushBack(
-        {.binding = 0, .stride = currentOffset, .isInstanceData = false});
+
+    for (uint32_t i = 0; i < std::size(bindingUsed); i++) {
+      if (bindingUsed[i])
+        m_vertexBindings.PushBack({
+            .binding = i,
+            .stride = currentOffsets[i],
+            .isInstanceData = false,
+        });
+    }
 
     std::sort(m_vertexAttributes.begin(), m_vertexAttributes.end(),
               [](auto &a, auto &b) { return a.location < b.location; });
 
-    m_cachedVertexLayout.stride = currentOffset;
+    m_cachedVertexLayout.bindingUsed[0] = bindingUsed[0];
+    m_cachedVertexLayout.bindingUsed[1] = bindingUsed[1];
+    m_cachedVertexLayout.strides[0] = currentOffsets[0];
+    m_cachedVertexLayout.strides[1] = currentOffsets[1];
     m_cachedVertexLayout.attributes = Span<const rhi::VertexInputAttribute>(
         m_vertexAttributes.GetData(), m_vertexAttributes.GetSize());
   }

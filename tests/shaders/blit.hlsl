@@ -9,11 +9,11 @@ struct BlitCustom {
 #include "common.hlsli"
 #include "screen_space.hlsli"
 
-VsOutput VsMain(uint vertexID : SV_VertexID) {
+VSOutput VsMain(uint vertexID : SV_VertexID) {
   return fullscreenBase(vertexID);
 }
 
-float4 FsMain(VsOutput input) : SV_Target {
+float4 FsMain(VSOutput input) : SV_Target {
   float4 color = sampleTexture2d(push.sceneColor, push.sampler, input.uv);
   return color;
 }

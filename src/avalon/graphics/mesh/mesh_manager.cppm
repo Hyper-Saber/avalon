@@ -50,15 +50,16 @@ bool IsValid(const MeshData &data, const VertexLayout &layout) noexcept {
 }
 
 void InterleaveVertexData(const MeshData &data, const VertexLayout &layout,
-                          uint8_t *pOutMapped) {
+                          uint8_t *pPosMapped, uint8_t *pAttrMapped) {
   auto vertexCount = data.positions.GetSize();
-  auto stride = layout.stride;
 
   for (size_t i = 0; i < vertexCount; i++) {
-    auto pVertexStart = pOutMapped + (i * stride);
+    uint8_t *pVertexStarts[2] = {pPosMapped + (i * layout.strides[0]),
+                                 pAttrMapped + (i * layout.strides[1])};
 
     for (const auto &attr : layout.attributes) {
-      auto targetAddr = pVertexStart + attr.offset;
+      auto targetAddr = pVertexStarts[attr.binding] + attr.offset;
+
       switch (attr.semantic) {
       case EVertexSemantic::Position:
         std::memcpy(targetAddr, &data.positions[i], sizeof(Vec3));
@@ -113,33 +114,35 @@ public:
     }
 
     auto data = mesh->GetData();
-
     if (!IsValid(data, layout))
-      return {};
+      return false;
 
     const EFormat iFormat = EFormat::R32_Uint;
     const size_t vertexCount = data.positions.GetSize();
-    const size_t vStride = layout.stride;
-    const size_t vBufferSize = vertexCount * vStride;
+
+    size_t vBufferSizes[2] = {
+        layout.bindingUsed[0] ? vertexCount * layout.strides[0] : 0,
+        layout.bindingUsed[1] ? vertexCount * layout.strides[1] : 0};
     const size_t iBufferSize = data.indices.GetSize() * GetFormatSize(iFormat);
 
-    AVALON_ASSERT(sizeof(data.indices[0]) == GetFormatSize(iFormat));
+    BufferHandle vHandles[2] = {{}, {}};
+    for (int i = 0; i < 2; ++i) {
+      if (vBufferSizes[i] > 0) {
+        vHandles[i] = m_rhi.CreateBuffer(
+            {.size = vBufferSizes[i],
+             .usage =
+                 EResourceUsage::VertexBuffer | EResourceUsage::TransferDst,
+             .memoryProperty = EMemoryProperty::DeviceLocal});
+      }
+    }
 
-    BufferCreateInfo vInfo{.size = vBufferSize,
-                           .usage = EResourceUsage::VertexBuffer |
-                                    EResourceUsage::TransferDst,
-                           .memoryProperty = EMemoryProperty::DeviceLocal};
+    auto iHandle = m_rhi.CreateBuffer(
+        {.size = iBufferSize,
+         .usage = EResourceUsage::IndexBuffer | EResourceUsage::TransferDst,
+         .memoryProperty = EMemoryProperty::DeviceLocal});
 
-    auto vHandle = m_rhi.CreateBuffer(vInfo);
-
-    BufferCreateInfo iInfo{.size = iBufferSize,
-                           .usage = EResourceUsage::IndexBuffer |
-                                    EResourceUsage::TransferDst,
-                           .memoryProperty = EMemoryProperty::DeviceLocal};
-
-    auto iHandle = m_rhi.CreateBuffer(iInfo);
-
-    const size_t totalStagingSize = vBufferSize + iBufferSize;
+    const size_t totalStagingSize =
+        vBufferSizes[0] + vBufferSizes[1] + iBufferSize;
     BufferHandle stagingHandle = m_rhi.CreateBuffer({
         .size = totalStagingSize,
         .usage = EResourceUsage::TransferSrc,
@@ -147,32 +150,37 @@ public:
             EMemoryProperty::HostVisible | EMemoryProperty::HostCoherent,
     });
 
-    auto pMapped = static_cast<uint8_t *>(m_rhi.MapMemory(stagingHandle));
-    InterleaveVertexData(data, layout, pMapped);
-    std::memcpy(pMapped + vBufferSize, data.indices.GetData(), iBufferSize);
+    auto pBaseMapped = static_cast<uint8_t *>(m_rhi.MapMemory(stagingHandle));
+
+    uint8_t *pPosMapped = pBaseMapped;
+    uint8_t *pAttrMapped = pBaseMapped + vBufferSizes[0];
+    uint8_t *pIndexMapped = pAttrMapped + vBufferSizes[1];
+
+    InterleaveVertexData(data, layout, pPosMapped, pAttrMapped);
+
+    std::memcpy(pIndexMapped, data.indices.GetData(), iBufferSize);
 
     m_rhi.UnmapMemory(stagingHandle);
 
     m_rhi.ExcuteOnce(rhi::EQueueType::Transfer, [&](auto cmd) {
-      BufferCopyRegion vRegion{
-          .srcOffset = 0,
-          .dstOffset = 0,
-          .size = vBufferSize,
-      };
-      BufferCopyRegion iRegion{
-          .srcOffset = vBufferSize,
-          .dstOffset = 0,
-          .size = iBufferSize,
-      };
-      cmd->CopyBuffer(stagingHandle, vHandle, vRegion);
-      cmd->CopyBuffer(stagingHandle, iHandle, iRegion);
+      if (vHandles[0].IsValid()) {
+        cmd->CopyBuffer(stagingHandle, vHandles[0], {0, 0, vBufferSizes[0]});
+      }
+      if (vHandles[1].IsValid()) {
+        cmd->CopyBuffer(stagingHandle, vHandles[1],
+                        {vBufferSizes[0], 0, vBufferSizes[1]});
+      }
+      cmd->CopyBuffer(stagingHandle, iHandle,
+                      {vBufferSizes[0] + vBufferSizes[1], 0, iBufferSize});
     });
 
     m_rhi.ReleaseBuffer(stagingHandle);
-    mesh->Upload(vHandle, iHandle, iFormat);
 
-    Debug("[MeshManager]: Mesh uploaded! Handle: {}, vbo size: {}", handle.id,
-          vBufferSize);
+    mesh->Upload(vHandles[0], vHandles[1], iHandle, iFormat);
+
+    Debug("[MeshManager]: Mesh uploaded! Handle: {}, PosSize: {}, AttrSize: {}",
+          handle.id, vBufferSizes[0], vBufferSizes[1]);
+
     return true;
   }
 

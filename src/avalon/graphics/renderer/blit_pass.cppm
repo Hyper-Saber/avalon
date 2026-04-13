@@ -52,7 +52,7 @@ public:
         .sampler = context.rhi.GetStaticSamplers().linearClamp,
     };
 
-    cmd.PushConstants(rhi::EShaderStage::All, 0, sizeof(StandardPushConstant),
+    cmd.PushConstants(rhi::EShaderStage::All, 0, sizeof(CustomPush),
                       &customPush);
 
     cmd.Draw(3, 1, 0, 0);

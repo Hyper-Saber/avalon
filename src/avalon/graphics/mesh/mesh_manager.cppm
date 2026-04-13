@@ -50,11 +50,11 @@ bool IsValid(const MeshData &data, const VertexLayout &layout) noexcept {
 }
 
 void InterleaveVertexData(const MeshData &data, const VertexLayout &layout,
-                          uint8_t *pPosMapped, uint8_t *pAttrMapped) {
+                          uint8_t *pPosUVMapped, uint8_t *pAttrMapped) {
   auto vertexCount = data.positions.GetSize();
 
   for (size_t i = 0; i < vertexCount; i++) {
-    uint8_t *pVertexStarts[2] = {pPosMapped + (i * layout.strides[0]),
+    uint8_t *pVertexStarts[2] = {pPosUVMapped + (i * layout.strides[0]),
                                  pAttrMapped + (i * layout.strides[1])};
 
     for (const auto &attr : layout.attributes) {
@@ -89,7 +89,7 @@ class AVALON_GRAPHICS_API MeshManager final
 public:
   explicit MeshManager(IRhi &rhi) : m_rhi(rhi) {}
 
-  MeshHandle GetDefaultMesh(EPrimitiveType primitiveType) {
+  MeshHandle GetDefaultMesh(ESDFType primitiveType) {
     if (m_defaultMeshes.Contains(primitiveType)) {
       return *m_defaultMeshes.Get(primitiveType);
     }
@@ -106,6 +106,10 @@ public:
     return m_meshPool.Create(std::move(data));
   }
 
+  bool UploadStandardMesh(MeshHandle handle) {
+    return UploadMesh(handle, VertexLayout::GetStandardLayout());
+  }
+
   bool UploadMesh(MeshHandle handle, const VertexLayout &layout) {
     auto mesh = m_meshPool.Resolve(handle);
     if (!mesh) {
@@ -117,69 +121,40 @@ public:
     if (!IsValid(data, layout))
       return false;
 
-    const EFormat iFormat = EFormat::R32_Uint;
     const size_t vertexCount = data.positions.GetSize();
+    const size_t indexCount = data.indices.GetSize();
+    const size_t iBufferSize = indexCount * sizeof(uint32_t);
 
-    size_t vBufferSizes[2] = {
-        layout.bindingUsed[0] ? vertexCount * layout.strides[0] : 0,
-        layout.bindingUsed[1] ? vertexCount * layout.strides[1] : 0};
-    const size_t iBufferSize = data.indices.GetSize() * GetFormatSize(iFormat);
+    size_t posSize =
+        layout.bindingUsed[0] ? vertexCount * layout.strides[0] : 0;
+    size_t attrSize =
+        layout.bindingUsed[1] ? vertexCount * layout.strides[1] : 0;
 
-    BufferHandle vHandles[2] = {{}, {}};
-    for (int i = 0; i < 2; ++i) {
-      if (vBufferSizes[i] > 0) {
-        vHandles[i] = m_rhi.CreateBuffer(
-            {.size = vBufferSizes[i],
-             .usage =
-                 EResourceUsage::VertexBuffer | EResourceUsage::TransferDst,
-             .memoryProperty = EMemoryProperty::DeviceLocal});
-      }
-    }
+    rhi::BufferAllocation posAlloc =
+        (posSize > 0) ? m_rhi.AllocateVertexGeometrySSBO(posSize)
+                      : rhi::BufferAllocation{};
 
-    auto iHandle = m_rhi.CreateBuffer(
-        {.size = iBufferSize,
-         .usage = EResourceUsage::IndexBuffer | EResourceUsage::TransferDst,
-         .memoryProperty = EMemoryProperty::DeviceLocal});
+    rhi::BufferAllocation attrAlloc =
+        (attrSize > 0) ? m_rhi.AllocateVertexAttributesSSBO(attrSize)
+                       : rhi::BufferAllocation{};
 
-    const size_t totalStagingSize =
-        vBufferSizes[0] + vBufferSizes[1] + iBufferSize;
-    BufferHandle stagingHandle = m_rhi.CreateBuffer({
-        .size = totalStagingSize,
-        .usage = EResourceUsage::TransferSrc,
-        .memoryProperty =
-            EMemoryProperty::HostVisible | EMemoryProperty::HostCoherent,
-    });
+    rhi::BufferAllocation indexAlloc =
+        m_rhi.AllocateVertexIndicesSSBO(iBufferSize);
 
-    auto pBaseMapped = static_cast<uint8_t *>(m_rhi.MapMemory(stagingHandle));
+    InterleaveVertexData(data, layout,
+                         static_cast<uint8_t *>(posAlloc.pHostAddress),
+                         static_cast<uint8_t *>(attrAlloc.pHostAddress));
 
-    uint8_t *pPosMapped = pBaseMapped;
-    uint8_t *pAttrMapped = pBaseMapped + vBufferSizes[0];
-    uint8_t *pIndexMapped = pAttrMapped + vBufferSizes[1];
+    std::memcpy(indexAlloc.pHostAddress, data.indices.GetData(), iBufferSize);
 
-    InterleaveVertexData(data, layout, pPosMapped, pAttrMapped);
+    mesh->SetGPUPointers(posAlloc.buffer, posAlloc.offset, attrAlloc.buffer,
+                         attrAlloc.offset, indexAlloc.buffer, indexAlloc.offset,
+                         static_cast<uint32_t>(vertexCount),
+                         static_cast<uint32_t>(indexCount));
 
-    std::memcpy(pIndexMapped, data.indices.GetData(), iBufferSize);
-
-    m_rhi.UnmapMemory(stagingHandle);
-
-    m_rhi.ExcuteOnce(rhi::EQueueType::Transfer, [&](auto cmd) {
-      if (vHandles[0].IsValid()) {
-        cmd->CopyBuffer(stagingHandle, vHandles[0], {0, 0, vBufferSizes[0]});
-      }
-      if (vHandles[1].IsValid()) {
-        cmd->CopyBuffer(stagingHandle, vHandles[1],
-                        {vBufferSizes[0], 0, vBufferSizes[1]});
-      }
-      cmd->CopyBuffer(stagingHandle, iHandle,
-                      {vBufferSizes[0] + vBufferSizes[1], 0, iBufferSize});
-    });
-
-    m_rhi.ReleaseBuffer(stagingHandle);
-
-    mesh->Upload(vHandles[0], vHandles[1], iHandle, iFormat);
-
-    Debug("[MeshManager]: Mesh uploaded! Handle: {}, PosSize: {}, AttrSize: {}",
-          handle.id, vBufferSizes[0], vBufferSizes[1]);
+    Debug("[MeshManager]: Mesh allocated in Global SSBO! Handle: {}, "
+          "PosOffset: {}, AttrOffset: {}, IndexOffset: {}",
+          handle.id, posAlloc.offset, attrAlloc.offset, indexAlloc.offset);
 
     return true;
   }
@@ -187,20 +162,23 @@ public:
   Mesh *Resolve(MeshHandle handle) { return m_meshPool.Resolve(handle); }
 
 private:
-  MeshHandle CreateDefaultMesh(EPrimitiveType type) {
+  MeshHandle CreateDefaultMesh(ESDFType type) {
     graphics::MeshData data;
     switch (type) {
-    case EPrimitiveType::Cube:
+    case ESDFType::Cube:
       data = PrimitiveGenerator::GenerateCube();
       break;
-    case EPrimitiveType::Plane:
+    case ESDFType::Plane:
       data = PrimitiveGenerator::GeneratePlane();
       break;
-    case EPrimitiveType::Quad:
+    case ESDFType::Quad:
       data = PrimitiveGenerator::GenerateQuad();
       break;
-    case EPrimitiveType::Sphere:
+    case ESDFType::Sphere:
       data = PrimitiveGenerator::GenerateSphere();
+      break;
+    default:
+      Error("No default mesh found !");
       break;
     }
 
@@ -212,7 +190,7 @@ private:
   IRhi &m_rhi;
   mem::ResourcePool<Mesh> m_meshPool;
 
-  HashMap<EPrimitiveType, MeshHandle> m_defaultMeshes;
+  HashMap<ESDFType, MeshHandle> m_defaultMeshes;
 };
 
 } // namespace avalon::graphics

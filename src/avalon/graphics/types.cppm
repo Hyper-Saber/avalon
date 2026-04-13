@@ -1,4 +1,5 @@
 module;
+#include <cstdint>
 export module avalon.graphics:types;
 
 import avalon.core;
@@ -21,6 +22,14 @@ using MeshHandle = Handle<Mesh>;
 using MaterialHandle = Handle<Material>;
 using MaterialInstanceHandle = Handle<MaterialInstance>;
 
+enum class ESDFType : uint32_t {
+  Cube = 0,
+  Plane,
+  Quad,
+  Sphere,
+  Mesh,
+};
+
 struct CubemapSH {
   Vec4 coefficients[9];
   float weight;
@@ -28,8 +37,8 @@ struct CubemapSH {
 };
 
 struct Resolution {
-  float width;
-  float height;
+  uint32_t width;
+  uint32_t height;
   float invWidth;
   float invHeight;
 };
@@ -124,13 +133,6 @@ struct Frustum {
                           planes[2].ToString(), planes[3].ToString(),
                           planes[4].ToString(), planes[5].ToString());
   }
-};
-
-enum class EPrimitiveType {
-  Cube,
-  Plane,
-  Quad,
-  Sphere,
 };
 
 } // namespace avalon::graphics

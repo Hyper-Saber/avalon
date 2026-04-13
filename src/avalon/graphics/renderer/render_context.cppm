@@ -17,11 +17,13 @@ class AVALON_GRAPHICS_API RenderContext final
       public ecs::IRenderDataSink {
 public:
   explicit RenderContext(rhi::IRhi &rhi, VirtualResourceManager &manager,
-                         RenderPacket &packet)
-      : rhi(rhi), m_resourceManager(manager), renderPacket(packet) {}
+                         RenderPacket &packet, Resolution &resolution)
+      : rhi(rhi), m_resourceManager(manager), renderPacket(packet),
+        resolution(resolution) {}
 
   rhi::IRhi &rhi;
   RenderPacket &renderPacket;
+  Resolution &resolution;
   PipelineRenderingInfo pipelineRenderingInfo;
   rhi::ICommandBuffer *cmd{nullptr};
   rhi::DescriptorSetHandle sceneGlobalsSet;

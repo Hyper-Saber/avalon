@@ -11,6 +11,6 @@
 #define k1_4Pi 0.78539816339
 #define kEpsilon 1e-8
 
-#define kPushConstantFloatSize 40
+#define kPushConstantFloatSize 16
 
 #endif

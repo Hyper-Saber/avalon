@@ -37,7 +37,7 @@ public:
     renderer.Render(snapshot);
   }
 
-  auto CreatePrimitive(graphics::EPrimitiveType type) {
+  auto CreatePrimitive(graphics::ESDFType type) {
     return Utils::CreatePrimitive(*m_world.Get(), type);
   }
 

@@ -65,6 +65,7 @@ enum class EFormat {
   R8G8B8_SRGB,
   R8G8B8A8_SRGB,
   B8G8R8A8_SRGB,
+  R16_SFLOAT,
   R16G16_SFLOAT,
   R16G16B16A16_SFLOAT,
   D32_SFLOAT,
@@ -368,7 +369,7 @@ template <> struct EnableBitmaskOperators<EPipelineStage> : std::true_type {};
 
 //---------------------------------------------------------------------------------------------------------------------
 
-constexpr uint32_t kMaxCustomSlots = 7;
+constexpr uint32_t kMaxCustomSlots = 16;
 constexpr uint32_t kPushConstantFloatSize = 32 + 1 + kMaxCustomSlots;
 constexpr uint32_t kInvalidTextureSlot = 0xFFFF;
 
@@ -376,11 +377,20 @@ constexpr uint32_t kSkyboxSHSlot = 0;
 constexpr uint32_t kSkyboxPrefilteredSlot = 1;
 constexpr uint32_t kBRDFLutSlot = 2;
 
-struct alignas(16) StandardPushConstant {
-  Matrix4x4 model;
-  Matrix4x4 normalMatrix;
-  uint32_t materialIndex = 0;
-  uint32_t customSlots[kMaxCustomSlots];
+struct IndexedIndirectCommand {
+  uint32_t indexCount;
+  uint32_t instanceCount;
+  uint32_t firstIndex;
+  int32_t vertexOffset;
+  uint32_t firstInstance;
+};
+
+struct alignas(16) StandardPushConstants {
+  uint32_t instanceBufferOffset;
+  uint32_t skyboxSHOffset;
+  uint32_t prefilterMap;
+  uint32_t brdfLut;
+  uint32_t paddings[kPushConstantFloatSize - 4];
 };
 
 struct DeviceCapabilities {

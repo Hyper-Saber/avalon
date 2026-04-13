@@ -12,11 +12,11 @@ struct CustomPush {
 [numthreads(16, 1, 1)] void CsMain(uint3 dispatchId : SV_DispatchThreadID) {
   if(dispatchId.x > 8)
     return;
-  float weight = uGeneralSSBO.Load<float>(push.weightOffset);
+  float weight = uDynamicSSBO.Load<float>(push.weightOffset);
   if(weight < kEpsilon)
     return;
 
   uint address = push.shOffset + dispatchId.x * 16;
-  float3 coefficient = uGeneralSSBO.Load<float3>(address);
-  uGeneralSSBO.Store3(address, asuint(coefficient / weight));
+  float3 coefficient = uDynamicSSBO.Load<float3>(address);
+  uDynamicSSBO.Store3(address, asuint(coefficient / weight));
 }

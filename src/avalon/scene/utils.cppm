@@ -8,10 +8,10 @@ namespace avalon::scene {
 
 class Utils {
 public:
-  static auto CreatePrimitive(ecs::World &world,
-                              graphics::EPrimitiveType type) {
+  static auto CreatePrimitive(ecs::World &world, graphics::ESDFType type) {
     auto entity = world.CreateEntity();
     auto meshHandle = graphics::GetMeshManager().GetDefaultMesh(type);
+    graphics::GetMeshManager().UploadStandardMesh(meshHandle);
     auto materialHandle = graphics::GetMaterialManager().GetDefaultOpaque();
     auto materialInstanceHandle =
         graphics::GetMaterialManager().GetDefaultOpaqueInstance();

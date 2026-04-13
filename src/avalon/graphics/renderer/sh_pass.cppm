@@ -1,7 +1,7 @@
 module;
+#include <cstddef>
 #include <cstdint>
 #include <debug/assert.hpp>
-#include <cstddef>
 export module avalon.graphics:sh_pass;
 
 import avalon.core;
@@ -66,7 +66,7 @@ public:
 
     float invSize = 1.0f / internalSize;
 
-    struct {
+    struct CustomPush {
       uint32_t envMap;
       uint32_t sampler;
       uint32_t outputOffset;
@@ -78,7 +78,8 @@ public:
         .envMap = inputIndex,
         .sampler = m_samplerIndex,
         .outputOffset = allocation.offset,
-        .weightOffset = static_cast<uint32_t>(allocation.offset + offsetof(CubemapSH, weight)),
+        .weightOffset = static_cast<uint32_t>(allocation.offset +
+                                              offsetof(CubemapSH, weight)),
         .sampleLevel = m_sampleLevel,
         .invSize = invSize,
     };
@@ -91,7 +92,7 @@ public:
                    allocation.offset, allocation.size, EShaderStage::Compute);
 
     cmd.BindPipeline(m_shPipelineHandle);
-    cmd.PushConstants(EShaderStage::Compute, 0, sizeof(StandardPushConstant),
+    cmd.PushConstants(EShaderStage::Compute, 0, sizeof(CustomPush),
                       &customPush);
 
     auto groupCount = internalSize / 8;
@@ -100,17 +101,18 @@ public:
     cmd.SyncBuffer(allocation.buffer, EResourceUsage::ReadWrite,
                    allocation.offset, allocation.size, EShaderStage::Compute);
 
-    struct {
+    struct FinalizePush {
       uint32_t offset;
       uint32_t weightOffset;
       float paddings[kPushConstantFloatSize - 2];
     } finalizePush{
         .offset = allocation.offset,
-        .weightOffset = static_cast<uint32_t>(allocation.offset + offsetof(CubemapSH, weight)),
+        .weightOffset = static_cast<uint32_t>(allocation.offset +
+                                              offsetof(CubemapSH, weight)),
     };
 
     cmd.BindPipeline(m_finalizeSHPipelineHandle);
-    cmd.PushConstants(EShaderStage::Compute, 0, sizeof(StandardPushConstant),
+    cmd.PushConstants(EShaderStage::Compute, 0, sizeof(FinalizePush),
                       &finalizePush);
 
     cmd.Dispatch(1, 1, 1);

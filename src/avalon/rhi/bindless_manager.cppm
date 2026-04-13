@@ -13,25 +13,29 @@ constexpr uint32_t kInternalSetCount = 2;
 constexpr uint32_t kBindlessSet = 0;
 constexpr uint32_t kSamplersBinding = 0;
 constexpr uint32_t kMaterialsBinding = 1;
-constexpr uint32_t kProbesBinding = 2;
-constexpr uint32_t kTextureCubeBinding = 3;
-constexpr uint32_t kTexture2DArrayBinding = 4;
-constexpr uint32_t kTexture3DBinding = 5;
-constexpr uint32_t kTexturesBinding = 6;
+constexpr uint32_t kStaticSSBOBinding = 2;
+constexpr uint32_t kDynamicSSBOBinding = 3;
+constexpr uint32_t kGeometriesBinding = 4;
+constexpr uint32_t kAttributesBinding = 5;
+constexpr uint32_t kIndicesBinding = 6;
+constexpr uint32_t kIndirectBinding = 7;
+
+constexpr uint32_t kTextureCubeBinding = 8;
+constexpr uint32_t kTexture2DArrayBinding = 9;
+constexpr uint32_t kTexture3DBinding = 10;
+constexpr uint32_t kTexturesBinding = 11;
+constexpr uint32_t kRWTexturesBinding = 12;
+constexpr uint32_t kRWTextureArraysBinding = 13;
+
 constexpr uint32_t kSceneGlobalsSet = 1;
 constexpr uint32_t kSceneGlobalsBinding = 0;
-
-constexpr uint32_t kRWTexturesBinding = 7;
-constexpr uint32_t kGeneralSSBOBinding = 8;
-constexpr uint32_t kRWTextureArraysBinding = 9;
 
 constexpr uint32_t kMaxRWTextureDescriptor = 1024;
 constexpr uint32_t kMaxRWTextureArrayDescriptor = 512;
 
 constexpr uint32_t kMaxSamplerDescriptor = 256;
 
-constexpr uint32_t kMaxMaterialCount = 65535; // uMaterials
-constexpr uint32_t kMaxProbeCount = 128;      // uProbes
+constexpr uint32_t kMaxMaterialCount = 65535;
 
 constexpr uint32_t kMaxTexture2DDescriptor = 1024 * 16;
 constexpr uint32_t kMaxTextureCubeDescriptor = 128;
@@ -46,9 +50,15 @@ constexpr uint32_t kMaxStorageImageDescriptor =
     kMaxRWTextureDescriptor + kMaxRWTextureArrayDescriptor;
 
 constexpr size_t kDynamicSSBOSize = 1024 * 1024 * 64;
+constexpr size_t kStaticSSBOSize = 1024 * 1024 * 64;
+constexpr size_t kGeomtriesSSBOSize = 1024 * 1024 * 256;
+constexpr size_t kAttributesSSBOSize = 1024 * 1024 * 512;
+constexpr size_t kIndicesSSBOSize = 1024 * 1024 * 128;
+constexpr size_t kIndirectSSBOSize = 1024 * 16;
 
 struct alignas(4) StandardMaterialData {
   Color albedo;
+
   float metallic;
   float roughness;
   float ao;

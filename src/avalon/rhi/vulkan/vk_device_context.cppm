@@ -332,6 +332,12 @@ private:
     m_capabilities.limits.maxSamplerAnisotroy =
         properties.limits.maxSamplerAnisotropy;
 
+    Debug("[Vulkan]: Device capabilities: \n Limits: \n "
+          "minUniformBufferOffsetAlignment: {} \n  "
+          "minStorageBufferOffsetAlignment: {} \n  maxSamplerAnisotropy: {}",
+          m_capabilities.limits.minUniformBufferOffsetAlignment,
+          m_capabilities.limits.minStorageBufferOffsetAlignment,
+          m_capabilities.limits.maxSamplerAnisotroy);
     IRhi::capabilities = m_capabilities;
   }
 
@@ -402,6 +408,8 @@ private:
     };
 
     m_config.features.fragmentStoresAndAtomics = VK_TRUE;
+    m_config.features.vertexPipelineStoresAndAtomics = VK_TRUE;
+    m_config.features.multiDrawIndirect = VK_TRUE;
 
     VkPhysicalDeviceFeatures2 features2{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,

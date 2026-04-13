@@ -41,68 +41,44 @@ public:
     if (packet.opaqueBatches.IsEmpty())
       return;
 
+    auto &rhi = context.rhi;
     auto &materialManager = GetMaterialManager();
-    auto &meshManager = GetMeshManager();
+    auto &bindlessManager = rhi.GetBindlessManager();
 
-    rhi::BufferHandle lastPosVBO;
-    rhi::BufferHandle lastAttriVBO;
-    rhi::BufferHandle lastIBO;
-    rhi::PipelineHandle lastPipeline;
+    uint32_t prefilteredIndex = bindlessManager.RegisterTextureCube(
+        context.GetPhysicalTexture(m_prefilteredHandle));
+    uint32_t brdfLutIndex = bindlessManager.RegisterTexture(
+        context.GetPhysicalTexture(m_brdfLudHandle));
+    auto shAllocation = context.GetPhysicalBufferAllocation(m_skyboxSHHandle);
+
+    StandardPushConstants passData{
+        .instanceBufferOffset = packet.opaqueInstanceDataBaseOffset,
+        .skyboxSHOffset = shAllocation.offset,
+        .prefilterMap = prefilteredIndex,
+        .brdfLut = brdfLutIndex,
+    };
+
+    cmd.BindIndexBuffer(rhi.GetIndexBuffer(), 0, EFormat::R32_Uint);
+
+    auto indirectAlloc = packet.indirectCommandBufferAllocation;
 
     for (auto &batch : packet.opaqueBatches) {
-      auto &material = *materialManager.Resolve(batch.material);
-      auto pipeline = material.GetOrCreatePipeline(
-          context.rhi, context.pipelineRenderingInfo);
+      auto *material = materialManager.Resolve(batch.material);
+      if (!material)
+        continue;
 
-      if (pipeline != lastPipeline) {
-        cmd.BindPipeline(pipeline);
-        lastPipeline = pipeline;
-      }
+      auto pipeline =
+          material->GetOrCreatePipeline(rhi, context.pipelineRenderingInfo);
+      cmd.BindPipeline(pipeline);
 
-      for (uint32_t i = batch.firstInstance;
-           i < batch.firstInstance + batch.instanceCount; i++) {
-        auto *mesh = meshManager.Resolve(packet.meshHandles[i]);
-        if (!mesh) [[unlikely]]
-          continue;
+      cmd.PushConstants(rhi::EShaderStage::All, 0,
+                        sizeof(StandardPushConstants), &passData);
 
-        auto currentPosVBO = mesh->GetPosVBO();
-        auto currentAttriVBO = mesh->GetAttriVBO();
-        auto currentIBO = mesh->GetIBO();
-
-        if (currentPosVBO != lastPosVBO || currentAttriVBO != lastAttriVBO) {
-          BufferHandle buffers[] = {currentPosVBO, currentAttriVBO};
-          cmd.BindVertexBuffer(0, 2, buffers, 0);
-          lastPosVBO = currentPosVBO;
-          lastAttriVBO = currentAttriVBO;
-        }
-        if (currentIBO != lastIBO) {
-          cmd.BindIndexBuffer(currentIBO, 0, mesh->GetIndexFormat());
-          lastIBO = currentIBO;
-        }
-
-        auto prefilteredTexture =
-            context.GetPhysicalTexture(m_prefilteredHandle);
-        auto allocation = context.GetPhysicalBufferAllocation(m_skyboxSHHandle);
-
-        auto &bindlessManager = context.rhi.GetBindlessManager();
-        auto prefilteredIndex =
-            bindlessManager.RegisterTextureCube(prefilteredTexture);
-        auto brdfLutIndex = bindlessManager.RegisterTexture(
-            context.GetPhysicalTexture(m_brdfLudHandle));
-
-        packet.pushConstants[i].customSlots[kSkyboxPrefilteredSlot] =
-            prefilteredIndex;
-        packet.pushConstants[i].customSlots[kBRDFLutSlot] = brdfLutIndex;
-        packet.pushConstants[i].customSlots[kSkyboxSHSlot] = allocation.offset;
-
-        // Debug("begin opaque pass, buffer: {}, offset: {}, size: {}",
-        // allocation.buffer.id, allocation.offset, allocation.size);
-        cmd.PushConstants(rhi::EShaderStage::All, 0,
-                          sizeof(StandardPushConstant),
-                          &packet.pushConstants[i]);
-
-        cmd.DrawIndexed(mesh->GetIndexCount(), 1, 0, 0, 0);
-      }
+      cmd.DrawIndexedIndirect(
+          indirectAlloc.buffer,
+          indirectAlloc.offset +
+              (batch.commandOffset * sizeof(IndexedIndirectCommand)),
+          batch.commandCount, sizeof(IndexedIndirectCommand));
     }
   }
 

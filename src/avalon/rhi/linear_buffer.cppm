@@ -1,24 +1,25 @@
 module;
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <debug/assert.hpp>
-export module avalon.rhi:ring_buffer;
+export module avalon.rhi:linear_buffer;
 
 import avalon.core;
 import :rhi;
 import :types;
 
 export namespace avalon::rhi {
-class AVALON_RHI_API RingBufferPool final
-    : public mem::AutoDestroyable<RingBufferPool>,
+class AVALON_RHI_API LinearBufferPool final
+    : public mem::AutoDestroyable<LinearBufferPool>,
       public NonCopyable {
 public:
-  RingBufferPool(IRhi &rhi, EResourceUsage usage,
-                 EMemoryProperty memoryProperty, size_t segmentSize)
+  LinearBufferPool(IRhi &rhi, EResourceUsage usage,
+                   EMemoryProperty memoryProperty, size_t size)
       : m_rhi(rhi), m_usage(usage), m_memoryProperty(memoryProperty),
-        m_segmentSize(segmentSize) {}
+        m_size(size) {}
 
-  ~RingBufferPool() {
+  ~LinearBufferPool() {
     if (m_handle.IsValid()) {
       m_rhi.UnmapMemory(m_handle);
       m_rhi.ReleaseBuffer(m_handle);
@@ -30,12 +31,9 @@ public:
         HasFlag(m_usage, EResourceUsage::UniformBuffer)
             ? m_rhi.GetCapabilities().limits.minUniformBufferOffsetAlignment
             : m_rhi.GetCapabilities().limits.minStorageBufferOffsetAlignment;
-    m_alignedSegmentSize = mem::AlignUp(m_segmentSize, m_alignment);
-
-    size_t totalSize = m_alignedSegmentSize * m_rhi.GetMaxFrameInFlight();
 
     BufferCreateInfo info{
-        .size = totalSize,
+        .size = m_size,
         .usage = m_usage,
         .memoryProperty = m_memoryProperty,
     };
@@ -48,31 +46,20 @@ public:
     return m_mappedPtr != nullptr;
   }
 
-  void ResetPool() {
-    m_allocatedSizeInFrame = 0;
-    m_frameIndex = m_rhi.GetCurrentFrameIndex();
-  }
-
   BufferAllocation AllocateAligned(size_t size) {
     auto alignedSize = mem::AlignUp(size, m_alignment);
 
-    size_t segmentBase = m_frameIndex * m_alignedSegmentSize;
-
-    AVALON_ASSERT_MSG(m_allocatedSizeInFrame + alignedSize <=
-                          m_alignedSegmentSize,
-                      "[RingBufferPool]: Not enough space in the ring buffer "
-                      "for the allocation!");
-
-    uint32_t finalOffset =
-        static_cast<uint32_t>(segmentBase + m_allocatedSizeInFrame);
-    m_allocatedSizeInFrame += alignedSize;
+    AVALON_ASSERT_MSG(m_allocatedSize + alignedSize <= m_size,
+                      "LinearBufferPool overflow!");
 
     BufferAllocation allocation{
-        .pHostAddress = m_mappedPtr + finalOffset,
+        .pHostAddress = m_mappedPtr + m_allocatedSize,
         .buffer = m_handle,
-        .offset = finalOffset,
+        .offset = static_cast<uint32_t>(m_allocatedSize),
         .size = static_cast<uint32_t>(size),
     };
+
+    m_allocatedSize += alignedSize;
 
 #ifdef AVALON_DEBUG
     m_lastAllocation = allocation;
@@ -81,8 +68,12 @@ public:
     return allocation;
   }
 
+  void UpdateData(uint32_t offset, const void *data, uint32_t size) {
+    AVALON_ASSERT(offset + size <= m_size);
+    std::memcpy(m_mappedPtr + offset, data, size);
+  }
+
   auto GetBufferHandle() const { return m_handle; }
-  auto GetSegmentSize() const { return m_alignedSegmentSize; }
 
 #ifdef AVALON_DEBUG
   auto DEBUG_GetLastAllocation() -> BufferAllocation & {
@@ -94,11 +85,9 @@ private:
   IRhi &m_rhi;
   EResourceUsage m_usage;
   EMemoryProperty m_memoryProperty;
-  size_t m_segmentSize;
-  size_t m_alignedSegmentSize;
-  size_t m_allocatedSizeInFrame = 0;
+  size_t m_size;
+  size_t m_allocatedSize = 0;
   size_t m_alignment;
-  uint32_t m_frameIndex;
 
   BufferHandle m_handle;
   uint8_t *m_mappedPtr = nullptr;

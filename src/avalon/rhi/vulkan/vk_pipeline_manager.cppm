@@ -152,7 +152,7 @@ private:
     vkRanges.PushBack({
         .stageFlags = VK_SHADER_STAGE_ALL,
         .offset = 0,
-        .size = sizeof(StandardPushConstant),
+        .size = sizeof(StandardPushConstants),
     });
 
     auto layout =
@@ -179,7 +179,7 @@ private:
     vkRanges.PushBack({
         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
         .offset = 0,
-        .size = sizeof(StandardPushConstant),
+        .size = sizeof(StandardPushConstants),
     });
 
     auto layout =

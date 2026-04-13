@@ -353,6 +353,8 @@ constexpr StringView ToView(EFormat format) {
     return "R8G8B8A8_SRGB";
   case B8G8R8A8_SRGB:
     return "B8G8R8A8_SRGB";
+  case R16_SFLOAT:
+    return "R16_SFLOAT";
   case R16G16_SFLOAT:
     return "R16G16_SFLOAT";
   case R16G16B16A16_SFLOAT:

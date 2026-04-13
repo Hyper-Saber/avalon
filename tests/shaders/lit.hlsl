@@ -43,7 +43,7 @@ float3 calculateIndirectLight(PBRSurface surface, float3 viewDir,
   float3 kS = f_ss + multiScatteringOrder;
   float3 kD = (1.0 - kS) * (1.0 - surface.metallic);
 
-  CubemapSH sh = uGeneralSSBO.Load<CubemapSH>(push.skyboxSHOffset);
+  CubemapSH sh = uDynamicSSBO.Load<CubemapSH>(push.skyboxSHOffset);
   float3 irradiance = evaluateSH(N, sh);
   float3 diffuse = irradiance * surface.albedo;
 
@@ -95,23 +95,35 @@ struct VSOutput {
   VK_LOCATION(1) float2 uv : TEXCOORD0;
   VK_LOCATION(2) float3 worldPos : POSITION;
   VK_LOCATION(3) float3 worldNormal : NORMAL;
+  VK_LOCATION(4) nointerpolation uint materialID : MATERIAL_ID;
 };
 
-VSOutput VsMain(StandardVSInput input) {
+VSOutput VsMain(uint vertexID : SV_VertexID, uint instanceID : SV_InstanceID) {
   VSOutput output;
 
-  float4 worldPos = mul(mModel, float4(input.position, 1.0f));
+  InstanceData data = loadInstanceData(instanceID);
+  VertexPosUV posUV = loadVertexPosUV(vertexID, data.posUVOffset);
+  VertexAttributes attributes =
+      loadVertexAttributes(vertexID, data.attributesOffset);
+
+  float4 worldPos = calculateWorldPosition(data.modelOffset, posUV.position);
   output.worldPos = worldPos.xyz;
   output.clipPos = calculateClipPosition(worldPos);
 
-  output.color = input.color;
-  output.uv = input.uv;
-  output.worldNormal = mul((float3x3)mNormalMatrix, input.normal);
+  output.color = attributes.color;
+
+  output.uv = posUV.uv;
+  output.worldNormal =
+      calculateWorldNormal(data.invModelOffset, attributes.normal);
+  output.materialID = data.materialID;
 
   return output;
 }
 
+#define mMaterial uMaterials[materialID]
+
 float4 FsMain(VSOutput input) : SV_Target {
+  uint materialID = input.materialID;
   PBRSurface surface;
   surface.albedo = mMaterial.albedo.rgb;
   surface.metallic = mMaterial.metallic;

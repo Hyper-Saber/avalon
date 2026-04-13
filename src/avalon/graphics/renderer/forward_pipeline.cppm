@@ -26,11 +26,6 @@ import :cubemap_test;
 
 namespace {
 constexpr uint32_t kSkyboxSize = 256;
-struct FaceData {
-  Vec4 right;
-  Vec4 up;
-  Vec4 forward;
-};
 } // namespace
 
 export namespace avalon::graphics {
@@ -43,7 +38,8 @@ public:
   bool Initialize() override {
 
     rhi::ProbeData data = graphics::CreateSkyboxProbeData();
-    m_rhi.UpdateProbeBuffer(0, &data, sizeof(rhi::ProbeData));
+    auto allocation = m_rhi.AllocateStaticSSBO(sizeof(rhi::ProbeData));
+    std::memcpy(allocation.pHostAddress, &data, sizeof(rhi::ProbeData));
 
     uint32_t i = 0;
     for (auto &view : data.captureViews) {
@@ -156,7 +152,8 @@ public:
     builder.AddPass<SkyboxGeneratorPass>("SkyboxGen"_id, EPassType::Graphics,
                                          skyboxExtent);
 
-    auto allocation = m_rhi.GetSSBOPool().AllocateAligned(sizeof(FaceData) * 6);
+    auto allocation =
+        m_rhi.GetDynamicSSBOPool().AllocateAligned(sizeof(FaceData) * 6);
     std::memcpy(allocation.pHostAddress, &m_faces, sizeof(FaceData) * 6);
     builder.AddPass<CubemapMipGenPass>(
         "SkyboxPrefilter"_id, rhi::EPassType::Compute, m_mipGenShader,
@@ -176,6 +173,12 @@ public:
   }
 
 private:
+  struct FaceData {
+    Vec4 right;
+    Vec4 up;
+    Vec4 forward;
+  };
+
   bool m_isFisrtFrame = true;
 
   VirtualTextureDesc m_brdfLutDesc;

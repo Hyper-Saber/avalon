@@ -11,6 +11,7 @@ struct RenderComponent {
   graphics::MaterialHandle materialHandle;
   graphics::MaterialInstanceHandle materialInstanceHandle;
   AABB localBounds;
+  graphics::ESDFType sdfType;
 };
 
 } // namespace avalon::ecs

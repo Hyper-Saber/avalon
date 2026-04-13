@@ -52,14 +52,14 @@ groupshared float g_sharedWeight[64];
 
   if(groupIndex == 0) {
     uint baseAddr = push.outputOffset;
-    ATOMIC_ADD_FLOAT(uGeneralSSBO, push.weightOffset, g_sharedWeight[0]);
+    ATOMIC_ADD_FLOAT(uDynamicSSBO, push.weightOffset, g_sharedWeight[0]);
     [[unroll]] for(int i = 0; i < 9; i++) {
       float3 finalVal = g_sharedSH[0][i];
       uint addr = baseAddr + i * 16;
 
-      ATOMIC_ADD_FLOAT(uGeneralSSBO, addr + 0, finalVal.r);
-      ATOMIC_ADD_FLOAT(uGeneralSSBO, addr + 4, finalVal.g);
-      ATOMIC_ADD_FLOAT(uGeneralSSBO, addr + 8, finalVal.b);
+      ATOMIC_ADD_FLOAT(uDynamicSSBO, addr + 0, finalVal.r);
+      ATOMIC_ADD_FLOAT(uDynamicSSBO, addr + 4, finalVal.g);
+      ATOMIC_ADD_FLOAT(uDynamicSSBO, addr + 8, finalVal.b);
     }
   }
 }

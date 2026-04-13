@@ -15,7 +15,8 @@ VsOputput VsMain(uint vertexId : SV_VertexID, uint viewId : SV_ViewID) {
   float2 uv = uvTable[vertexId];
   output.position = float4(uv.x * 2.0 - 1.0, uv.y * 2.0 - 1.0, 0, 1.0);
 
-  float4x4 invView = uProbes[0].captureViews[viewId];
+  ProbeData probe = uStaticSSBO.Load<ProbeData>(0);
+  float4x4 invView = probe.captureViews[viewId];
 
   float3 dir = mul((float3x3)invView, float3(output.position.xy, -1.0));
   output.viewDir = dir;

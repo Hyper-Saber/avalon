@@ -29,12 +29,19 @@ public:
                   uint32_t height) -> ERhiResult override;
 
   auto GetUBOPool() const -> RingBufferPool & override;
-  auto GetSSBOPool() const -> RingBufferPool & override;
+  auto GetDynamicSSBOPool() const -> RingBufferPool & override;
   auto GetBindlessManager() const -> IBindlessManager & override;
 
   void UpdateMaterialBuffer(size_t offset, const void *data,
                             size_t size) override;
-  void UpdateProbeBuffer(size_t offset, const void *data, size_t size) override;
+
+  auto AllocateIndirectSSBO(size_t size) -> BufferAllocation override;
+  auto AllocateStaticSSBO(size_t size) -> BufferAllocation override;
+  auto AllocateVertexGeometrySSBO(size_t size) -> BufferAllocation override;
+  auto AllocateVertexAttributesSSBO(size_t size) -> BufferAllocation override;
+  auto AllocateVertexIndicesSSBO(size_t size) -> BufferAllocation override;
+
+  auto GetIndexBuffer() const -> BufferHandle override;
 
   auto GetStaticSamplers() const -> const StaticSamplers & override;
   auto GetMainCommandBuffer() const -> ICommandBuffer * override;
@@ -93,21 +100,17 @@ public:
   auto GetSceneGlobalSetLayout() const -> VkDescriptorSetLayout override;
   uint32_t GetCurrentFrameIndex() override;
   uint32_t GetLastCompletedFrameIndex() override;
-  auto GetMaterialBufferInfo() const -> const VkDescriptorBufferInfo & override;
-  auto GetProbeBufferInfo() const -> const VkDescriptorBufferInfo & override;
-  auto GetGeneralSSBOInfo() const -> const VkDescriptorBufferInfo & override;
+  auto GetMaterialSSBOInfo() const -> const VkDescriptorBufferInfo & override;
+  auto GetIndirectSSBOInfo() const -> const VkDescriptorBufferInfo & override;
+  auto GetDynamicSSBOInfo() const -> const VkDescriptorBufferInfo & override;
+  auto GetStaticSSBOInfo() const -> const VkDescriptorBufferInfo & override;
+  auto GetGeometriesSSBOInfo() const -> const VkDescriptorBufferInfo & override;
+  auto GetAttributesSSBOInfo() const -> const VkDescriptorBufferInfo & override;
+  auto GetIndicesSSBOInfo() const -> const VkDescriptorBufferInfo & override;
+
   void WaitIdle() override;
 
 private:
-  struct StorageBufferResource {
-    Handle<BufferResource> handle;
-    VkBuffer buffer = VK_NULL_HANDLE;
-    VkDeviceMemory memory = VK_NULL_HANDLE;
-    void *pHostAddress = nullptr;
-    VkDescriptorBufferInfo bufferInfo{};
-    size_t size = 0;
-  };
-
   void CreateUBOPool();
   void CreateSSBOPool();
   auto CreateCommandPools() -> std::expected<void, ERhiResult>;
@@ -117,7 +120,13 @@ private:
   void CreateCommandBuffer();
   void WarpSwapchainTextures();
 
-  auto CreateStorageBuffer(size_t bufferSize) -> StorageBufferResource;
+  void CreateStaticSSBOPool(UniquePtr<LinearBufferPool> &outUP,
+                            VkDescriptorBufferInfo &outInfo, size_t size,
+                            EResourceUsage usage);
+
+  void CreateDynamicSSBOPool(UniquePtr<RingBufferPool> &outUP,
+                             VkDescriptorBufferInfo &outInfo, size_t size,
+                             EResourceUsage usage);
 
 private:
   struct FrameSyncObject {
@@ -131,10 +140,22 @@ private:
   StaticSamplers m_staticSamplers;
 
   UniquePtr<RingBufferPool> m_uboPool;
-  UniquePtr<RingBufferPool> m_ssboPool;
+  UniquePtr<RingBufferPool> m_indirectPool;
+  UniquePtr<RingBufferPool> m_dynamicPool;
 
-  VkDescriptorBufferInfo m_ssboDescriptorInfo;
+  UniquePtr<LinearBufferPool> m_materialPool;
+  UniquePtr<LinearBufferPool> m_staticPool;
+  UniquePtr<LinearBufferPool> m_geometryPool;
+  UniquePtr<LinearBufferPool> m_attributesPool;
+  UniquePtr<LinearBufferPool> m_indicesPool;
 
+  VkDescriptorBufferInfo m_dynamicSSBODescriptorInfo;
+  VkDescriptorBufferInfo m_indirectSSBODescriptorInfo;
+  VkDescriptorBufferInfo m_materialSSBODescriptorInfo;
+  VkDescriptorBufferInfo m_staticSSBODescriptorInfo;
+  VkDescriptorBufferInfo m_geometrySSBOescriptorInfo;
+  VkDescriptorBufferInfo m_attributesSSBODescriptorInfo;
+  VkDescriptorBufferInfo m_indicesSSBODescriptorInfo;
 
   UniquePtr<DescriptorProvider> m_descriptorProvider;
   UniquePtr<BindlessManager> m_bindlessManager;
@@ -153,9 +174,6 @@ private:
   uint32_t m_currentImageIndex = 0;
   uint32_t m_currentFrame = 0;
   uint32_t m_maxFrameInFlight;
-
-  StorageBufferResource m_materialPool;
-  StorageBufferResource m_probePool;
 
   PipelineHandle m_dummyComputePipeline;
 

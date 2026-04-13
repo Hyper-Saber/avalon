@@ -27,6 +27,8 @@ public:
     return *m_dataBlob.Get();
   }
 
+  float GetAlphaThreshold() { return m_alphaThreshold; }
+
   uint32_t GetTextureSlot(StringId nameHash) const {
     auto texture = m_textureMap.Get(nameHash);
     if (texture)
@@ -76,6 +78,8 @@ private:
   auto GetTexturePushPending() const noexcept -> const Array<StringId> & {
     return m_texturePushPending;
   }
+
+  float m_alphaThreshold = 1.0;
 
   MaterialHandle m_materialHandle;
   uint32_t m_gpuIndex;

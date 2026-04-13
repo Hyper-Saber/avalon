@@ -21,13 +21,20 @@ public:
       -> ERhiResult = 0;
 
   virtual auto GetUBOPool() const -> class RingBufferPool & = 0;
-  virtual auto GetSSBOPool() const -> RingBufferPool & = 0;
+  virtual auto GetDynamicSSBOPool() const -> RingBufferPool & = 0;
   virtual auto GetBindlessManager() const -> class IBindlessManager & = 0;
 
   virtual void UpdateMaterialBuffer(size_t offset, const void *data,
                                     size_t size) = 0;
-  virtual void UpdateProbeBuffer(size_t offset, const void *data,
-                                 size_t size) = 0;
+
+  virtual auto AllocateIndirectSSBO(size_t size) -> BufferAllocation = 0;
+  virtual auto AllocateStaticSSBO(size_t size) -> BufferAllocation = 0;
+  virtual auto AllocateVertexGeometrySSBO(size_t size) -> BufferAllocation = 0;
+  virtual auto AllocateVertexAttributesSSBO(size_t size)
+      -> BufferAllocation = 0;
+  virtual auto AllocateVertexIndicesSSBO(size_t size) -> BufferAllocation = 0;
+
+  virtual auto GetIndexBuffer() const -> BufferHandle = 0;
 
   virtual auto GetStaticSamplers() const -> const StaticSamplers & = 0;
   virtual auto GetSwapchainImageFormat() const -> EFormat = 0;

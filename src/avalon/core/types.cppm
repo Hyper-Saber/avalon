@@ -167,6 +167,26 @@ struct RenderView {
   Vec4 worldPosition;
 };
 
+struct alignas(4) InstanceData {
+  uint32_t instanceID;
+  uint32_t materialID;
+  uint32_t geometryOffset;
+  uint32_t attributeOffset;
+
+  uint32_t indexOffset;
+  uint32_t vertexCount;
+  uint32_t indexCount;
+  uint32_t modelOffset;
+
+  uint32_t invModelOffset;
+  uint32_t sdfType;
+  uint32_t sdfTextureIndex;
+  float alphaThreshold;
+
+  Vec3 sdfExtent;
+  float padding;
+};
+
 struct SceneSnapshot {
   RenderView camera{};
   LightData lightData{.colorIntensity = {0, 0, 0, 0},
@@ -176,6 +196,7 @@ struct SceneSnapshot {
   Array<ResourceHandle> opaqueMaterials;
   Array<ResourceHandle> opaqueMaterialInstances;
   Array<Matrix4x4> opaqueWorldMatrices;
+  Array<Matrix4x4> opaqueInvWorldMatrices;
 
   const void *pNext = nullptr;
 };

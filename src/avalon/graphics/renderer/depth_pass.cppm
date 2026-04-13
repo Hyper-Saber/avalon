@@ -1,5 +1,4 @@
 module;
-#include <cstdint>
 export module avalon.graphics:depth_pass;
 
 import avalon.core;
@@ -18,6 +17,9 @@ public:
   void Setup(RenderGraphBuilder &builder) override {
     builder.SetClearValue(ClearValue::DepthStencil(0, 0))
         .WriteAttachment(kSceneDepth, EResourceUsage::DepthStencilAttachment);
+    builder.SetClearValue(ClearValue::Black())
+        .SetFormat(EFormat::R16_SFLOAT)
+        .WriteAttachment("InstanceID"_id, EResourceUsage::ColorAttachment);
   }
 
   void OnCompile(rhi::IRhi &rhi) override {}
@@ -28,42 +30,30 @@ public:
       return;
 
     auto &materialManager = GetMaterialManager();
+
     auto materialHandle = materialManager.TryGetMaterial("Depth"_id);
     auto pMat = materialManager.Resolve(materialHandle);
 
-    cmd.BindPipeline(
-        pMat->GetOrCreatePipeline(context.rhi, context.pipelineRenderingInfo));
-    rhi::BufferHandle lastVBO;
-    rhi::BufferHandle lastIBO;
+    auto pipeline =
+        pMat->GetOrCreatePipeline(context.rhi, context.pipelineRenderingInfo);
 
-    auto &meshManager = GetMeshManager();
+    auto indirectAlloc = packet.indirectCommandBufferAllocation;
 
-    for (auto &batch : packet.opaqueBatches) {
-      for (uint32_t i = batch.firstInstance;
-           i < batch.firstInstance + batch.instanceCount; i++) {
-        auto *mesh = meshManager.Resolve(packet.meshHandles[i]);
-        if (!mesh) [[unlikely]]
-          continue;
+    StandardPushConstants push{
+        .instanceBufferOffset = packet.opaqueInstanceDataBaseOffset,
+    };
 
-        auto currentVBO = mesh->GetPosVBO();
-        auto currentIBO = mesh->GetIBO();
+    cmd.BindIndexBuffer(context.rhi.GetIndexBuffer(), 0, EFormat::R32_Uint);
 
-        if (currentVBO != lastVBO) {
-          cmd.BindVertexBuffer(0, 1, &currentVBO, 0);
-          lastVBO = currentVBO;
-        }
-        if (currentIBO != lastIBO) {
-          cmd.BindIndexBuffer(currentIBO, 0, mesh->GetIndexFormat());
-          lastIBO = currentIBO;
-        }
+    cmd.BindPipeline(pipeline);
+    cmd.PushConstants(rhi::EShaderStage::All, 0, sizeof(StandardPushConstants),
+                      &push);
 
-        cmd.PushConstants(rhi::EShaderStage::All, 0,
-                          sizeof(StandardPushConstant),
-                          &packet.pushConstants[i]);
-
-        cmd.DrawIndexed(mesh->GetIndexCount(), 1, 0, 0, 0);
-      }
-    }
+    cmd.DrawIndexedIndirect(indirectAlloc.buffer, indirectAlloc.offset,
+                            packet.totalCommandCount,
+                            sizeof(IndexedIndirectCommand));
   }
+
+private:
 };
 } // namespace avalon::graphics

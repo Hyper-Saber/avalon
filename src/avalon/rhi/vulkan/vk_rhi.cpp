@@ -43,12 +43,17 @@ VkRhi::~VkRhi() {
   if (m_immTransferPool != VK_NULL_HANDLE)
     vkDestroyCommandPool(m_deviceContext->GetDevice(), m_immTransferPool,
                          nullptr);
-  UnmapMemory({m_materialPool.handle.id});
-  UnmapMemory({m_probePool.handle.id});
+
   m_descriptorProvider.Reset();
   m_bindlessManager.Reset();
+  m_materialPool.Reset();
+  m_staticPool.Reset();
+  m_geometryPool.Reset();
+  m_attributesPool.Reset();
+  m_indicesPool.Reset();
   m_uboPool.Reset();
-  m_ssboPool.Reset();
+  m_dynamicPool.Reset();
+  m_indirectPool.Reset();
   m_pipelineManager.Reset();
   m_resourcePool.Reset();
   m_swapchainContext.Reset();
@@ -80,10 +85,29 @@ auto VkRhi::Initialize(const DeviceRequirement &requirement,
 
   m_resourcePool = MakeUnique<ResourcePool>(*m_deviceContext.Get());
   CreateUBOPool();
-  CreateSSBOPool();
-  m_materialPool =
-      CreateStorageBuffer(sizeof(StandardMaterialData) * kMaxMaterialCount);
-  m_probePool = CreateStorageBuffer(sizeof(ProbeData) * kMaxProbeCount);
+
+  auto usage = EResourceUsage::StorageBuffer | EResourceUsage::TransferSrc |
+               EResourceUsage::TransferDst;
+
+  CreateDynamicSSBOPool(m_dynamicPool, m_dynamicSSBODescriptorInfo,
+                        kDynamicSSBOSize, usage);
+
+  CreateDynamicSSBOPool(
+      m_indirectPool, m_indirectSSBODescriptorInfo, kIndirectSSBOSize,
+      EResourceUsage::StorageBuffer | EResourceUsage::IndirectBuffer);
+
+  CreateStaticSSBOPool(m_materialPool, m_materialSSBODescriptorInfo,
+                       kMaxMaterialCount * sizeof(StandardMaterialData), usage);
+  CreateStaticSSBOPool(m_staticPool, m_staticSSBODescriptorInfo,
+                       kStaticSSBOSize, usage);
+  CreateStaticSSBOPool(m_geometryPool, m_geometrySSBOescriptorInfo,
+                       kGeomtriesSSBOSize, usage);
+  CreateStaticSSBOPool(m_attributesPool, m_attributesSSBODescriptorInfo,
+                       kAttributesSSBOSize, usage);
+  CreateStaticSSBOPool(
+      m_indicesPool, m_indicesSSBODescriptorInfo, kIndicesSSBOSize,
+      EResourceUsage::StorageBuffer | EResourceUsage::IndexBuffer);
+
   WarpSwapchainTextures();
   m_descriptorProvider =
       MakeUnique<DescriptorProvider>(m_deviceContext->GetDevice());
@@ -107,30 +131,53 @@ void VkRhi::CreateUBOPool() {
       1024 * 1024 * 16);
 }
 
-void VkRhi::CreateSSBOPool() {
-  m_ssboPool = MakeUnique<rhi::RingBufferPool>(
-      *this,
-      EResourceUsage::StorageBuffer | EResourceUsage::TransferSrc |
-          EResourceUsage::TransferDst,
-      EMemoryProperty::DeviceLocal | EMemoryProperty::HostVisible |
-          EMemoryProperty::HostCoherent,
-      kDynamicSSBOSize);
+void VkRhi::CreateDynamicSSBOPool(UniquePtr<RingBufferPool> &outUP,
+                                  VkDescriptorBufferInfo &outInfo, size_t size,
+                                  EResourceUsage usage) {
 
-  auto pRes = m_resourcePool->ResolveBuffer({m_ssboPool->GetBufferHandle().id});
-   m_ssboDescriptorInfo = {
-    .buffer = pRes->buffer,
-    .offset = 0,
-    .range = pRes->size,
+  outUP = MakeUnique<rhi::RingBufferPool>(*this, usage,
+                                          EMemoryProperty::DeviceLocal |
+                                              EMemoryProperty::HostVisible |
+                                              EMemoryProperty::HostCoherent,
+                                          size);
+
+  auto pRes = m_resourcePool->ResolveBuffer({outUP->GetBufferHandle().id});
+  outInfo = {
+      .buffer = pRes->buffer,
+      .offset = 0,
+      .range = pRes->size,
+  };
+}
+
+void VkRhi::CreateStaticSSBOPool(UniquePtr<LinearBufferPool> &outUP,
+                                 VkDescriptorBufferInfo &outInfo, size_t size,
+                                 EResourceUsage usage) {
+  outUP = MakeUnique<rhi::LinearBufferPool>(*this, usage,
+                                            EMemoryProperty::DeviceLocal |
+                                                EMemoryProperty::HostVisible |
+                                                EMemoryProperty::HostCoherent,
+                                            size);
+
+  auto pRes = m_resourcePool->ResolveBuffer({outUP->GetBufferHandle().id});
+  outInfo = {
+      .buffer = pRes->buffer,
+      .offset = 0,
+      .range = pRes->size,
   };
 }
 
 auto VkRhi::GetUBOPool() const -> RingBufferPool & { return *m_uboPool.Get(); }
-auto VkRhi::GetSSBOPool() const -> RingBufferPool & {
-  return *m_ssboPool.Get();
+
+auto VkRhi::GetDynamicSSBOPool() const -> RingBufferPool & {
+  return *m_dynamicPool.Get();
 }
 
 auto VkRhi::GetBindlessManager() const -> IBindlessManager & {
   return *m_bindlessManager.Get();
+}
+
+auto VkRhi::GetIndexBuffer() const -> BufferHandle {
+  return m_indicesPool->GetBufferHandle();
 }
 
 auto VkRhi::GetStaticSamplers() const -> const StaticSamplers & {
@@ -243,63 +290,56 @@ uint32_t VkRhi::GetLastCompletedFrameIndex() {
   return m_currentFrame - 1 < 0 ? m_maxFrameInFlight - 1 : m_currentFrame - 1;
 }
 
-auto VkRhi::GetMaterialBufferInfo() const -> const VkDescriptorBufferInfo & {
-  return m_materialPool.bufferInfo;
+auto VkRhi::GetMaterialSSBOInfo() const -> const VkDescriptorBufferInfo & {
+  return m_materialSSBODescriptorInfo;
 }
 
-auto VkRhi::GetProbeBufferInfo() const -> const VkDescriptorBufferInfo & {
-  return m_probePool.bufferInfo;
+auto VkRhi::GetIndirectSSBOInfo() const -> const VkDescriptorBufferInfo & {
+  return m_indirectSSBODescriptorInfo;
 }
 
-auto VkRhi::GetGeneralSSBOInfo() const -> const VkDescriptorBufferInfo & {
-  return m_ssboDescriptorInfo;
+auto VkRhi::GetStaticSSBOInfo() const -> const VkDescriptorBufferInfo & {
+  return m_staticSSBODescriptorInfo;
 }
 
-auto VkRhi::CreateStorageBuffer(size_t bufferSize) -> StorageBufferResource {
-  BufferCreateInfo gpuInfo{.size = bufferSize,
-                           .usage = EResourceUsage::StorageBuffer |
-                                    EResourceUsage::TransferDst,
-                           .memoryProperty = EMemoryProperty::DeviceLocal |
-                                             EMemoryProperty::HostVisible |
-                                             EMemoryProperty::HostCoherent};
+auto VkRhi::GetDynamicSSBOInfo() const -> const VkDescriptorBufferInfo & {
+  return m_dynamicSSBODescriptorInfo;
+}
 
-  StorageBufferResource ret;
+auto VkRhi::GetGeometriesSSBOInfo() const -> const VkDescriptorBufferInfo & {
+  return m_geometrySSBOescriptorInfo;
+}
 
-  ret.handle = m_resourcePool->CreateBuffer(gpuInfo);
+auto VkRhi::GetAttributesSSBOInfo() const -> const VkDescriptorBufferInfo & {
+  return m_attributesSSBODescriptorInfo;
+}
 
-  if (!ret.handle.IsValid()) {
-    avalon::Error("Failed to create Bindless Material Pool!");
-    return {};
-  }
-
-  auto *bufferRes = m_resourcePool->ResolveBuffer(ret.handle);
-  ret.buffer = bufferRes->buffer;
-  ret.memory = bufferRes->memory;
-  ret.size = bufferSize;
-
-  ret.pHostAddress = MapMemory({ret.handle.id});
-
-  ret.bufferInfo.buffer = ret.buffer;
-  ret.bufferInfo.offset = 0;
-  ret.bufferInfo.range = ret.size;
-
-  return ret;
+auto VkRhi::GetIndicesSSBOInfo() const -> const VkDescriptorBufferInfo & {
+  return m_indicesSSBODescriptorInfo;
 }
 
 void VkRhi::UpdateMaterialBuffer(size_t offset, const void *data, size_t size) {
-  AVALON_ASSERT(m_materialPool.pHostAddress != nullptr);
-  AVALON_ASSERT(offset + size <= m_materialPool.size);
-
-  std::memcpy(static_cast<uint8_t *>(m_materialPool.pHostAddress) + offset,
-              data, size);
+  m_materialPool->UpdateData(offset, data, size);
 }
 
-void VkRhi::UpdateProbeBuffer(size_t offset, const void *data, size_t size) {
-  AVALON_ASSERT(m_probePool.pHostAddress != nullptr);
-  AVALON_ASSERT(offset + size <= m_probePool.size);
+auto VkRhi::AllocateIndirectSSBO(size_t size) -> BufferAllocation {
+  return m_indirectPool->AllocateAligned(size);
+}
 
-  std::memcpy(static_cast<uint8_t *>(m_probePool.pHostAddress) + offset, data,
-              size);
+auto VkRhi::AllocateStaticSSBO(size_t size) -> BufferAllocation {
+  return m_staticPool->AllocateAligned(size);
+}
+
+auto VkRhi::AllocateVertexGeometrySSBO(size_t size) -> BufferAllocation {
+  return m_geometryPool->AllocateAligned(size);
+}
+
+auto VkRhi::AllocateVertexAttributesSSBO(size_t size) -> BufferAllocation {
+  return m_attributesPool->AllocateAligned(size);
+}
+
+auto VkRhi::AllocateVertexIndicesSSBO(size_t size) -> BufferAllocation {
+  return m_indicesPool->AllocateAligned(size);
 }
 
 auto VkRhi::RecreateSwapchain(uint32_t width, uint32_t height) -> ERhiResult {
@@ -517,7 +557,8 @@ auto VkRhi::BeginFrame() -> ERhiResult {
                      m_frameCommandPools[m_currentFrame], 0);
 
   m_uboPool->ResetPool();
-  m_ssboPool->ResetPool();
+  m_dynamicPool->ResetPool();
+  m_indirectPool->ResetPool();
   m_descriptorProvider->Flip();
   m_bindlessManager->ProcessPendingDeletions();
   return {};
@@ -671,17 +712,6 @@ auto VkRhi::CreateSyncObjects() -> std::expected<void, ERhiResult> {
 
 //-------------------------------DEBUG-------------------------------------
 #ifndef NDEBUG
-
-void VkRhi::DumpMaterial(uint32_t index) {
-  if (!m_materialPool.pHostAddress) {
-    Error("Material Pool host address is null!");
-    return;
-  }
-
-  size_t offset = index * sizeof(StandardMaterialData);
-  debug::DumpMaterial(static_cast<uint8_t *>(m_materialPool.pHostAddress) +
-                      offset);
-}
 
 #endif // !NDEBUG
 } // namespace avalon::rhi

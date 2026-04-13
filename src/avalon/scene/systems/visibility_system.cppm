@@ -1,4 +1,5 @@
 module;
+#include <utility>
 export module avalon.scene:visibility_system;
 
 import avalon.ecs;
@@ -52,6 +53,8 @@ class VisibilitySystem final : public RenderSystemBase<VisibilitySystem> {
         outSnapshot.opaqueMaterialInstances.PushBack(
             {render.materialInstanceHandle.id});
         outSnapshot.opaqueWorldMatrices.PushBack(trans.worldMatrix);
+        outSnapshot.opaqueInvWorldMatrices.PushBack(
+            trans.worldMatrix.Inverse());
       }
     }
   }

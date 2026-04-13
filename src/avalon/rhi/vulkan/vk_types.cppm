@@ -149,6 +149,7 @@ struct TextureResource : public mem::AutoDestroyable<TextureResource> {
         info.format == EFormat::R8G8B8_SRGB ||
         info.format == EFormat::B8G8R8A8_SRGB ||
         info.format == EFormat::R8G8B8A8_SRGB ||
+        info.format == EFormat::R16_SFLOAT ||
         info.format == EFormat::R16G16_SFLOAT ||
         info.format == EFormat::R16G16B16A16_SFLOAT) {
       aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -249,11 +250,18 @@ public:
   virtual auto GetSceneGlobalSetHandle() const -> DescriptorSetHandle = 0;
   virtual auto GetCurrentSwapchainImage() const -> VkImage = 0;
   virtual auto GetSwapchainExtent() const -> Extent2D = 0;
-  virtual auto GetMaterialBufferInfo() const
+
+  virtual auto GetMaterialSSBOInfo() const
       -> const VkDescriptorBufferInfo & = 0;
-  virtual auto GetProbeBufferInfo() const -> const VkDescriptorBufferInfo & = 0;
-  virtual auto GetGeneralSSBOInfo() const
+  virtual auto GetIndirectSSBOInfo() const
       -> const VkDescriptorBufferInfo & = 0;
+  virtual auto GetStaticSSBOInfo() const -> const VkDescriptorBufferInfo & = 0;
+  virtual auto GetDynamicSSBOInfo() const -> const VkDescriptorBufferInfo & = 0;
+  virtual auto GetGeometriesSSBOInfo() const
+      -> const VkDescriptorBufferInfo & = 0;
+  virtual auto GetAttributesSSBOInfo() const
+      -> const VkDescriptorBufferInfo & = 0;
+  virtual auto GetIndicesSSBOInfo() const -> const VkDescriptorBufferInfo & = 0;
 
   virtual uint32_t GetCurrentFrameIndex() = 0;
   virtual uint32_t GetLastCompletedFrameIndex() = 0;

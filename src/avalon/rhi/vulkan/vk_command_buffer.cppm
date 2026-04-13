@@ -245,6 +245,20 @@ public:
                      firstInstance);
   }
 
+  void DrawIndirect(BufferHandle indirectBuffer, uint32_t offset,
+                    uint32_t count, uint32_t stride) override {
+    FlushBarriers();
+    auto buffer = m_resourceProvider.GetBuffer(indirectBuffer)->buffer;
+    vkCmdDrawIndirect(m_cmd, buffer, offset, count, stride);
+  }
+
+  void DrawIndexedIndirect(BufferHandle indirectBuffer, uint32_t offset,
+                           uint32_t count, uint32_t stride) override {
+    FlushBarriers();
+    auto buffer = m_resourceProvider.GetBuffer(indirectBuffer)->buffer;
+    vkCmdDrawIndexedIndirect(m_cmd, buffer, offset, count, stride);
+  }
+
   void Transition(TextureHandle handle, EResourceUsage usage,
                   uint32_t layerCount, uint32_t levelCount,
                   EShaderStage stage) override {

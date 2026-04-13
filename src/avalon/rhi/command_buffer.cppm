@@ -40,11 +40,16 @@ public:
                             const void *pData, uint64_t size) = 0;
   virtual void CopyBuffer(BufferHandle src, BufferHandle dst,
                           const BufferCopyRegion &region) = 0;
+
   virtual void Draw(uint32_t vertexCount, uint32_t instanceCount,
                     uint32_t firstVertex, uint32_t firstInstance) = 0;
   virtual void DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
                            uint32_t firstIndex, int32_t vertexOffset,
                            uint32_t firstInstance) = 0;
+  virtual void DrawIndirect(BufferHandle indirectBuffer, uint32_t offset,
+                            uint32_t count, uint32_t stride) = 0;
+  virtual void DrawIndexedIndirect(BufferHandle indirectBuffer, uint32_t offset,
+                                   uint32_t count, uint32_t stride) = 0;
 
   virtual void Transition(TextureHandle handle, EResourceUsage usage,
                           uint32_t layerCount, uint32_t levelCount,

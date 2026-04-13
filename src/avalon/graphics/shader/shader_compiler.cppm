@@ -397,7 +397,11 @@ public:
         AddArg(L"-fspv-reflect");
         AddArg(L"-fspv-preserve-bindings");
         AddArg(L"-fvk-use-dx-layout");
-        AddArg(L"-D__SPIRV__=1");
+        AddArg(L"-D__SPIRV__");
+
+        if (stageDesc.shaderStage == EShaderStage::Compute) {
+          AddArg(L"-D__COMPUTE_SHADER__");
+        }
       }
 
       AddArg(L"-Zpc");

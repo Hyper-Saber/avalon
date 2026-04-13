@@ -61,7 +61,27 @@ public:
          .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
          .descriptorCount = 1,
          .stageFlags = VK_SHADER_STAGE_ALL},
-        {.binding = kProbesBinding,
+        {.binding = kStaticSSBOBinding,
+         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+         .descriptorCount = 1,
+         .stageFlags = VK_SHADER_STAGE_ALL},
+        {.binding = kDynamicSSBOBinding,
+         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+         .descriptorCount = 1,
+         .stageFlags = VK_SHADER_STAGE_ALL},
+        {.binding = kGeometriesBinding,
+         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+         .descriptorCount = 1,
+         .stageFlags = VK_SHADER_STAGE_ALL},
+        {.binding = kAttributesBinding,
+         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+         .descriptorCount = 1,
+         .stageFlags = VK_SHADER_STAGE_ALL},
+        {.binding = kIndicesBinding,
+         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+         .descriptorCount = 1,
+         .stageFlags = VK_SHADER_STAGE_ALL},
+        {.binding = kIndirectBinding,
          .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
          .descriptorCount = 1,
          .stageFlags = VK_SHADER_STAGE_ALL},
@@ -81,24 +101,14 @@ public:
          .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
          .descriptorCount = kMaxTexture2DDescriptor,
          .stageFlags = VK_SHADER_STAGE_ALL},
-        {
-            .binding = kRWTexturesBinding,
-            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-            .descriptorCount = kMaxRWTextureDescriptor,
-            .stageFlags = VK_SHADER_STAGE_ALL,
-        },
-        {
-            .binding = kGeneralSSBOBinding,
-            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            .descriptorCount = 1,
-            .stageFlags = VK_SHADER_STAGE_ALL,
-        },
-        {
-            .binding = kRWTextureArraysBinding,
-            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-            .descriptorCount = kMaxRWTextureArrayDescriptor,
-            .stageFlags = VK_SHADER_STAGE_ALL,
-        },
+        {.binding = kRWTexturesBinding,
+         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+         .descriptorCount = kMaxRWTextureDescriptor,
+         .stageFlags = VK_SHADER_STAGE_ALL},
+        {.binding = kRWTextureArraysBinding,
+         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+         .descriptorCount = kMaxRWTextureArrayDescriptor,
+         .stageFlags = VK_SHADER_STAGE_ALL},
     };
 
     VkDescriptorBindingFlags commonFlags =
@@ -107,13 +117,17 @@ public:
     VkDescriptorBindingFlags bindingFlags[] = {
         commonFlags,                                 // Samplers
         VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT, // Materials
-        VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT, // Probes
+        VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT, // StaticSSBO
+        VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT, // DynamicSSBO
+        VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT, // Geometry
+        VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT, // Attributes
+        VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT, // Indices
+        VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT, // IndirectBuffer
         commonFlags,                                 // Cube
-        commonFlags,                                 // 3D
         commonFlags,                                 // Array
+        commonFlags,                                 // 3D
         commonFlags,                                 // 2D
         commonFlags,                                 // RW Textures
-        VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT, // RW Buffers
         commonFlags,                                 // RW TextureArray
     };
 
@@ -141,8 +155,12 @@ public:
     m_bindlessSet = allocation->set;
 
     UpdateMaterialBufferDescriptor();
-    UpdateProbeBufferDescriptor();
-    UpdateGeneralSSBODescriptor();
+    UpdateStaticSSBODescriptor();
+    UpdateDynamicSSBODescriptor();
+    UpdateGeometriesDescriptor();
+    UpdateAttributesDescriptor();
+    UpdateIndicesDescriptor();
+    UpdateIndirectDescriptor();
 
     CreateSceneGlobalsLayout();
 
@@ -373,14 +391,16 @@ private:
 
   void UnregisterResource(TextureHandle handle, ResourceType type,
                           int32_t mipLevel = kNoMiplevels) {
+    auto currFrame = m_resourceProvider.GetCurrentFrameIndex();
     std::lock_guard lock(m_mutex);
     auto pool = GetPool(type);
     auto key = ResourceLookupKey{handle, mipLevel};
     if (auto *pIndex = pool.lookup.Get(key)) {
-      m_pendingDeletions.PushBack(
-          {.index = *pIndex,
-           .type = type,
-           .frameIndex = m_resourceProvider.GetCurrentFrameIndex()});
+      m_pendingDeletions.PushBack({
+          .index = *pIndex,
+          .type = type,
+          .frameIndex = currFrame,
+      });
       pool.lookup.Remove(key);
     }
   }
@@ -407,20 +427,44 @@ private:
   }
 
   void UpdateMaterialBufferDescriptor() {
-    VkDescriptorBufferInfo info = m_resourceProvider.GetMaterialBufferInfo();
+    VkDescriptorBufferInfo info = m_resourceProvider.GetMaterialSSBOInfo();
     UpdateDescriptor(0, kMaterialsBinding, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                      &info, nullptr);
   }
 
-  void UpdateProbeBufferDescriptor() {
-    VkDescriptorBufferInfo info = m_resourceProvider.GetProbeBufferInfo();
-    UpdateDescriptor(0, kProbesBinding, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+  void UpdateStaticSSBODescriptor() {
+    VkDescriptorBufferInfo info = m_resourceProvider.GetStaticSSBOInfo();
+    UpdateDescriptor(0, kStaticSSBOBinding, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                      &info, nullptr);
   }
 
-  void UpdateGeneralSSBODescriptor() {
-    VkDescriptorBufferInfo info = m_resourceProvider.GetGeneralSSBOInfo();
-    UpdateDescriptor(0, kGeneralSSBOBinding, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+  void UpdateDynamicSSBODescriptor() {
+    VkDescriptorBufferInfo info = m_resourceProvider.GetDynamicSSBOInfo();
+    UpdateDescriptor(0, kDynamicSSBOBinding, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                     &info, nullptr);
+  }
+
+  void UpdateGeometriesDescriptor() {
+    VkDescriptorBufferInfo info = m_resourceProvider.GetGeometriesSSBOInfo();
+    UpdateDescriptor(0, kGeometriesBinding, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                     &info, nullptr);
+  }
+
+  void UpdateAttributesDescriptor() {
+    VkDescriptorBufferInfo info = m_resourceProvider.GetAttributesSSBOInfo();
+    UpdateDescriptor(0, kAttributesBinding, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                     &info, nullptr);
+  }
+
+  void UpdateIndicesDescriptor() {
+    VkDescriptorBufferInfo info = m_resourceProvider.GetIndicesSSBOInfo();
+    UpdateDescriptor(0, kIndicesBinding, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                     &info, nullptr);
+  }
+
+  void UpdateIndirectDescriptor() {
+    VkDescriptorBufferInfo info = m_resourceProvider.GetIndirectSSBOInfo();
+    UpdateDescriptor(0, kIndirectBinding, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                      &info, nullptr);
   }
 

@@ -7,6 +7,20 @@
 #define VK_PUSH_CONSTANT [[vk::push_constant]]
 #define VK_LOCATION(l) [[vk::location(l)]]
 
+#ifndef __COMPUTE_SHADER__
+#define STORAGE_BUFFER(type) type
+#define STORAGE_STRUCT(type) StructuredBuffer<type>
+#define STORAGE_TEXTURE(type) Texture2D<type>
+#define STORAGE_TEXTURE_ARRAY(type) Texture2DArray<type>
+#define REG_SLOT(t_reg, u_reg) t_reg
+#else
+#define STORAGE_BUFFER(type) RW##type
+#define STORAGE_STRUCT(type) RWStructuredBuffer<type>
+#define STORAGE_TEXTURE(type) RWTexture2D<type>
+#define STORAGE_TEXTURE_ARRAY(type) RWTexture2DArray<type>
+#define REG_SLOT(t_reg, u_reg) u_reg
+#endif
+
 #define uCamera uSceneGlobals.camera
 #define uMainLight uSceneGlobals.light
 #define uTime uSceneGlobals.time.time
@@ -45,11 +59,18 @@ struct CubemapSH {
   float4 coefficients[9];
 };
 
+struct Resolution {
+  uint width;
+  uint height;
+  float invWidth;
+  float invHeight;
+};
+
 struct SceneGlobals {
   Camera camera;
   Light light;
   GlobalTime time;
-  float4 resolution;
+  Resolution resolution;
   CubemapSH skyboxSH;
 };
 
@@ -72,24 +93,17 @@ struct ProbeData {
 
 #ifndef CUSTOM_PUSH_TYPE
 
-#define mModel push.model.model
-#define mNormalMatrix push.model.normalMatrix
-#define mMaterialIndex push.materialIdx
-
-#define mMaterial uMaterials[mMaterialIndex]
-
 struct ModelData {
   float4x4 model;
   float4x4 normalMatrix;
 };
 
 struct StandardPushConstants {
-  ModelData model;
-  uint materialIdx;
+  uint instanceBufferOffset;
   uint skyboxSHOffset;
   uint prefilterMap;
   uint brdfLut;
-  uint paddings[kPushConstantFloatSize - 36];
+  uint paddings[kPushConstantFloatSize - 4];
 };
 
 #define CUSTOM_PUSH_TYPE StandardPushConstants
@@ -97,35 +111,77 @@ struct StandardPushConstants {
 
 #endif
 
+struct DrawCommand {
+  uint indexCount;
+  uint instanceCount;
+  uint firstIndex;
+  int vertexOffset;
+  uint firstInstance;
+};
+
+struct InstanceData {
+  uint instanceID;
+  uint materialID;
+  uint posUVOffset;
+  uint attributesOffset;
+
+  uint indexOffset;
+  uint vertexCount;
+  uint indexCount;
+  uint modelOffset;
+
+  uint invModelOffset;
+  uint sdfType;
+  uint sdfTextureIndex;
+  float alphaThreshold;
+
+  float3 sdfExtent;
+  float padding;
+};
+
+struct VertexPosUV {
+  float3 position;
+  float2 uv;
+};
+
+struct VertexAttributes {
+  float3 normal;
+  float3 color;
+};
+
+#define kVertexPosUVSize 20
+#define kVertexAttributesSize 24
+#define kInstanceDataSize 64
+
 VK_PUSH_CONSTANT CUSTOM_PUSH_TYPE push;
 
 VK_BINDING(0, 0) SamplerState uSamplers[] : register(s0, space0);
 VK_BINDING(1, 0) StructuredBuffer<MaterialData> uMaterials
     : register(t0, space0);
-VK_BINDING(2, 0) StructuredBuffer<ProbeData> uProbes : register(t1, space0);
-VK_BINDING(3, 0) TextureCube uEnvCubes[] : register(t8, space0);
-VK_BINDING(4, 0) Texture2DArray uTextureArrays[] : register(t128, space0);
-VK_BINDING(5, 0) Texture3D uVolumes[] : register(t256, space0);
-VK_BINDING(6, 0) Texture2D uTextures[] : register(t512, space0);
-VK_BINDING(7, 0) RWTexture2D<float4> uRWTextures[] : register(u0, space0);
-VK_BINDING(8, 0) RWByteAddressBuffer uGeneralSSBO : register(u1024, space0);
-VK_BINDING(9, 0) RWTexture2DArray<float4> uRWTextureArrays[]
-    : register(u2048, space0);
+VK_BINDING(2, 0) STORAGE_BUFFER(ByteAddressBuffer) uStaticSSBO
+    : register(REG_SLOT(t1, u0), space0);
+VK_BINDING(3, 0) STORAGE_BUFFER(ByteAddressBuffer) uDynamicSSBO
+    : register(REG_SLOT(t2, u1), space0);
+VK_BINDING(4, 0) STORAGE_BUFFER(ByteAddressBuffer) uPosUVSSBO
+    : register(REG_SLOT(t3, u2), space0);
+VK_BINDING(5, 0) STORAGE_BUFFER(ByteAddressBuffer) uAttributesSSBO
+    : register(REG_SLOT(t4, u3), space0);
+VK_BINDING(6, 0) STORAGE_BUFFER(ByteAddressBuffer) uIndicesSSBO
+    : register(REG_SLOT(t5, u4), space0);
+VK_BINDING(7, 0) STORAGE_STRUCT(DrawCommand) uCommandSSBO
+    : register(REG_SLOT(t6, u5), space0);
+
+VK_BINDING(8, 0) TextureCube uEnvCubes[] : register(t8, space0);
+VK_BINDING(9, 0) Texture2DArray uTextureArrays[] : register(t128, space0);
+VK_BINDING(10, 0) Texture3D uVolumes[] : register(t256, space0);
+VK_BINDING(11, 0) Texture2D uTextures[] : register(t512, space0);
+
+VK_BINDING(12, 0) STORAGE_TEXTURE(float4) uRWTextures[]
+    : register(REG_SLOT(t20000, u8), space0);
+VK_BINDING(13, 0) STORAGE_TEXTURE_ARRAY(float4) uRWTextureArrays[]
+    : register(REG_SLOT(t21000, u2048), space0);
 
 VK_BINDING(0, 1) ConstantBuffer<SceneGlobals> uSceneGlobals
     : register(b0, space1);
-
-struct StandardVSInput {
-  VK_LOCATION(0) float3 position : POSITION;
-  VK_LOCATION(1) float3 color : COLOR;
-  VK_LOCATION(2) float2 uv : TEXCOORD0;
-  VK_LOCATION(3) float3 normal : NORMAL;
-};
-
-#ifdef STANDARD_PUSH
-float4 calculateClipPosition(float4 worldPos) {
-  return mul(uCamera.viewProjection, worldPos);
-}
-#endif
 
 #endif

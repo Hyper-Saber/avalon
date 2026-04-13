@@ -25,12 +25,12 @@ public:
                     rhi::Extent2D extent) override {
     auto &materialManager = graphics::GetMaterialManager();
     auto material = materialManager.Resolve(materialManager.GetDefaultOpaque());
-    material->SetCullMode(rhi::ECullMode::None);
+    material->SetCullMode(rhi::ECullMode::Back);
 
     auto &world = scene.GetWorld();
 
-    auto cube = scene.CreatePrimitive(graphics::EPrimitiveType::Cube);
-    auto sphere = scene.CreatePrimitive(graphics::EPrimitiveType::Sphere);
+    auto cube = scene.CreatePrimitive(graphics::ESDFType::Cube);
+    auto sphere = scene.CreatePrimitive(graphics::ESDFType::Sphere);
     world.AddComponent<ecs::SphereComponent>(sphere);
     world.AddComponent<ecs::CubeComponent>(cube);
 
@@ -44,9 +44,6 @@ public:
 
     auto renderComp = world.GetComponent<ecs::RenderComponent>(cube);
     renderComp->materialInstanceHandle = materialInstanceHandle;
-    auto meshHandle = renderComp->meshHandle;
-    graphics::GetMeshManager().UploadMesh(meshHandle,
-                                          material->GetVertexLayout());
 
     materialInstanceHandle = materialManager.CreateMaterialInstance(
         materialManager.GetDefaultOpaque());
@@ -58,9 +55,6 @@ public:
 
     renderComp = world.GetComponent<ecs::RenderComponent>(sphere);
     renderComp->materialInstanceHandle = materialInstanceHandle;
-    meshHandle = renderComp->meshHandle;
-    graphics::GetMeshManager().UploadMesh(meshHandle,
-                                          material->GetVertexLayout());
 
     auto transComp = world.GetComponent<ecs::TransformComponent>(cube);
     transComp->SetPosition({0, 0, 1});

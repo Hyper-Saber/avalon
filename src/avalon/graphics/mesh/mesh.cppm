@@ -6,6 +6,7 @@ export module avalon.graphics:mesh;
 
 import avalon.core;
 import avalon.rhi;
+import :types;
 
 using namespace avalon::rhi;
 
@@ -15,6 +16,48 @@ struct VertexLayout {
   bool bindingUsed[2]{false, false};
   uint32_t strides[2]{0, 0};
   Span<const VertexInputAttribute> attributes;
+
+  static VertexLayout GetStandardLayout() {
+    static Array<VertexInputAttribute> attributes = {
+        {
+            .location = 0,
+            .binding = 0,
+            .format = EFormat::R32G32B32_Float,
+            .semantic = EVertexSemantic::Position,
+            .offset = 0,
+        },
+        {
+            .location = 1,
+            .binding = 0,
+            .format = EFormat::R32G32_Float,
+            .semantic = EVertexSemantic::TexCoord,
+            .offset = 12,
+        },
+        {
+            .location = 2,
+            .binding = 1,
+            .format = EFormat::R32G32B32_Float,
+            .semantic = EVertexSemantic::Normal,
+            .offset = 0,
+        },
+
+        {
+            .location = 3,
+            .binding = 1,
+            .format = EFormat::R32G32B32_Float,
+            .semantic = EVertexSemantic::Color,
+            .offset = 12,
+        },
+    };
+
+    VertexLayout layout;
+    layout.bindingUsed[0] = true;
+    layout.bindingUsed[1] = true;
+    layout.strides[0] = 20;
+    layout.strides[1] = 24;
+    layout.attributes = attributes;
+    return layout;
+  }
 };
 
 struct MeshData {
@@ -58,58 +101,70 @@ struct MeshData {
 
 class AVALON_GRAPHICS_API Mesh final : public mem::AutoDestroyable<Mesh> {
 public:
-  void Upload(BufferHandle posVBO, BufferHandle attriVBO, BufferHandle ibo,
-              EFormat indexFormat) {
-    m_posVBO = posVBO;
-    m_attriVBO = attriVBO;
-    m_indexBuffer = ibo;
-    m_indexFormat = indexFormat;
+  Mesh(MeshData &&data) : m_data(std::move(data)), m_isUploaded(false) {}
+
+  void SetGPUPointers(BufferHandle posBuf, uint32_t posOffset,
+                      BufferHandle attrBuf, uint32_t attrOffset,
+                      BufferHandle indexBuf, uint32_t indexOffset,
+                      uint32_t vertexCount, uint32_t indexCount) {
+    m_posBuffer = posBuf;
+    m_posUVOffset = posOffset;
+
+    m_attrBuffer = attrBuf;
+    m_attrOffset = attrOffset;
+
+    m_indexBuffer = indexBuf;
+    m_indexOffset = indexOffset;
+
+    m_vertexCount = vertexCount;
+    m_indexCount = indexCount;
+
     m_isUploaded = true;
   }
 
-  Mesh(MeshData &&data)
-      : m_data(std::move(data)), m_isUploaded(false),
-        m_indexCount(m_data.indices.GetSize()) {}
+  void SetSDFType(ESDFType type) { m_sdfType = type; }
+  void SetSDFSize(Vec3 size) { m_sdfSize = size; }
+  void SetSDFTexture(TextureHandle handle) { m_sdfTexture = handle; }
 
   auto GetData() const noexcept -> const MeshData & { return m_data; }
-
-  BufferHandle GetPosVBO() const noexcept {
-    AVALON_ASSERT(m_isUploaded);
-    return m_posVBO;
-  }
-
-  BufferHandle GetAttriVBO() const noexcept {
-    AVALON_ASSERT(m_isUploaded);
-    return m_attriVBO;
-  }
-
-  BufferHandle GetIBO() const noexcept {
-    AVALON_ASSERT(m_isUploaded);
-    return m_indexBuffer;
-  }
-
-  uint32_t GetIndexCount() const noexcept {
-    AVALON_ASSERT(m_isUploaded);
-    return m_indexCount;
-  }
-
-  EFormat GetIndexFormat() const noexcept {
-    AVALON_ASSERT(m_isUploaded);
-    return m_indexFormat;
-  }
-
   bool IsUploaded() const noexcept { return m_isUploaded; }
+
+  BufferHandle GetPosBuffer() const noexcept { return m_posBuffer; }
+  BufferHandle GetAttrBuffer() const noexcept { return m_attrBuffer; }
+  BufferHandle GetIndexBuffer() const noexcept { return m_indexBuffer; }
+
+  uint32_t GetPosUVOffset() const noexcept { return m_posUVOffset; }
+  uint32_t GetAttributeOffset() const noexcept { return m_attrOffset; }
+  uint32_t GetIndexOffset() const noexcept { return m_indexOffset; }
+
+  uint32_t GetVertexCount() const noexcept { return m_vertexCount; }
+  uint32_t GetIndexCount() const noexcept { return m_indexCount; }
+
+  ESDFType GetSDFType() const noexcept { return m_sdfType; }
+  Vec3 GetSDFExtent() const noexcept { return m_sdfSize; }
+  TextureHandle GetSDFTexture() const noexcept { return m_sdfTexture; }
+
+  EFormat GetIndexFormat() const noexcept { return EFormat::R32_Uint; }
 
 private:
   MeshData m_data;
-  bool m_isUploaded;
+  bool m_isUploaded = false;
 
-  BufferHandle m_posVBO;
-  BufferHandle m_attriVBO;
+  BufferHandle m_posBuffer;
+  uint32_t m_posUVOffset = 0;
+
+  BufferHandle m_attrBuffer;
+  uint32_t m_attrOffset = 0;
 
   BufferHandle m_indexBuffer;
-  uint32_t m_indexCount;
-  EFormat m_indexFormat = EFormat::R32_Uint;
+  uint32_t m_indexOffset = 0;
+
+  uint32_t m_vertexCount = 0;
+  uint32_t m_indexCount = 0;
+
+  ESDFType m_sdfType = ESDFType::Sphere;
+  Vec3 m_sdfSize;
+  TextureHandle m_sdfTexture;
 };
 
 } // namespace avalon::graphics

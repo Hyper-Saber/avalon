@@ -31,97 +31,99 @@ auto TranslateRequirements(const DeviceRequirement &requirements)
 constexpr auto ToVkFormat(EFormat format) noexcept -> VkFormat {
   switch (format) {
   case EFormat::Undefined:
-    return VkFormat::VK_FORMAT_UNDEFINED;
+    return VK_FORMAT_UNDEFINED;
   case EFormat::R16_Uint:
-    return VkFormat::VK_FORMAT_R16_UINT;
+    return VK_FORMAT_R16_UINT;
   case EFormat::R16_Int:
-    return VkFormat::VK_FORMAT_R16_SINT;
+    return VK_FORMAT_R16_SINT;
   case EFormat::R16_Float:
-    return VkFormat::VK_FORMAT_R16_SFLOAT;
+    return VK_FORMAT_R16_SFLOAT;
   case EFormat::R16G16_Uint:
-    return VkFormat::VK_FORMAT_R16G16_UINT;
+    return VK_FORMAT_R16G16_UINT;
   case EFormat::R16G16_Int:
-    return VkFormat::VK_FORMAT_R16G16_SINT;
+    return VK_FORMAT_R16G16_SINT;
   case EFormat::R16G16_Float:
-    return VkFormat::VK_FORMAT_R16G16_SFLOAT;
+    return VK_FORMAT_R16G16_SFLOAT;
   case EFormat::R16G16B16_Uint:
-    return VkFormat::VK_FORMAT_R16G16B16_UINT;
+    return VK_FORMAT_R16G16B16_UINT;
   case EFormat::R16G16B16_Int:
-    return VkFormat::VK_FORMAT_R16G16B16_SINT;
+    return VK_FORMAT_R16G16B16_SINT;
   case EFormat::R16G16B16_Float:
-    return VkFormat::VK_FORMAT_R16G16B16_SFLOAT;
+    return VK_FORMAT_R16G16B16_SFLOAT;
   case EFormat::R16G16B16A16_Uint:
-    return VkFormat::VK_FORMAT_R16G16B16A16_UINT;
+    return VK_FORMAT_R16G16B16A16_UINT;
   case EFormat::R16G16B16A16_Int:
-    return VkFormat::VK_FORMAT_R16G16B16A16_SINT;
+    return VK_FORMAT_R16G16B16A16_SINT;
   case EFormat::R16G16B16A16_Float:
-    return VkFormat::VK_FORMAT_R16G16B16A16_SFLOAT;
+    return VK_FORMAT_R16G16B16A16_SFLOAT;
   case EFormat::R32_Uint:
-    return VkFormat::VK_FORMAT_R32_UINT;
+    return VK_FORMAT_R32_UINT;
   case EFormat::R32_Int:
-    return VkFormat::VK_FORMAT_R32_SINT;
+    return VK_FORMAT_R32_SINT;
   case EFormat::R32_Float:
-    return VkFormat::VK_FORMAT_R32_SFLOAT;
+    return VK_FORMAT_R32_SFLOAT;
   case EFormat::R32G32_Uint:
-    return VkFormat::VK_FORMAT_R32G32_UINT;
+    return VK_FORMAT_R32G32_UINT;
   case EFormat::R32G32_Int:
-    return VkFormat::VK_FORMAT_R32G32_SINT;
+    return VK_FORMAT_R32G32_SINT;
   case EFormat::R32G32_Float:
-    return VkFormat::VK_FORMAT_R32G32_SFLOAT;
+    return VK_FORMAT_R32G32_SFLOAT;
   case EFormat::R32G32B32_Uint:
-    return VkFormat::VK_FORMAT_R32G32B32_UINT;
+    return VK_FORMAT_R32G32B32_UINT;
   case EFormat::R32G32B32_Int:
-    return VkFormat::VK_FORMAT_R32G32B32_SINT;
+    return VK_FORMAT_R32G32B32_SINT;
   case EFormat::R32G32B32_Float:
-    return VkFormat::VK_FORMAT_R32G32B32_SFLOAT;
+    return VK_FORMAT_R32G32B32_SFLOAT;
   case EFormat::R32G32B32A32_Uint:
-    return VkFormat::VK_FORMAT_R32G32B32A32_UINT;
+    return VK_FORMAT_R32G32B32A32_UINT;
   case EFormat::R32G32B32A32_Int:
-    return VkFormat::VK_FORMAT_R32G32B32A32_SINT;
+    return VK_FORMAT_R32G32B32A32_SINT;
   case EFormat::R32G32B32A32_Float:
-    return VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT;
+    return VK_FORMAT_R32G32B32A32_SFLOAT;
   case EFormat::R64_Uint:
-    return VkFormat::VK_FORMAT_R64_UINT;
+    return VK_FORMAT_R64_UINT;
   case EFormat::R64_Int:
-    return VkFormat::VK_FORMAT_R64_SINT;
+    return VK_FORMAT_R64_SINT;
   case EFormat::R64_Float:
-    return VkFormat::VK_FORMAT_R64_SFLOAT;
+    return VK_FORMAT_R64_SFLOAT;
   case EFormat::R64G64_Uint:
-    return VkFormat::VK_FORMAT_R64G64_UINT;
+    return VK_FORMAT_R64G64_UINT;
   case EFormat::R64G64_Int:
-    return VkFormat::VK_FORMAT_R64G64_SINT;
+    return VK_FORMAT_R64G64_SINT;
   case EFormat::R64G64_Float:
-    return VkFormat::VK_FORMAT_R64G64_SFLOAT;
+    return VK_FORMAT_R64G64_SFLOAT;
   case EFormat::R64G64B64_Uint:
-    return VkFormat::VK_FORMAT_R64G64B64_UINT;
+    return VK_FORMAT_R64G64B64_UINT;
   case EFormat::R64G64B64_Int:
-    return VkFormat::VK_FORMAT_R64G64B64_SINT;
+    return VK_FORMAT_R64G64B64_SINT;
   case EFormat::R64G64B64_Float:
-    return VkFormat::VK_FORMAT_R64G64B64_SFLOAT;
+    return VK_FORMAT_R64G64B64_SFLOAT;
   case EFormat::R64G64B64A64_Uint:
-    return VkFormat::VK_FORMAT_R64G64B64A64_UINT;
+    return VK_FORMAT_R64G64B64A64_UINT;
   case EFormat::R64G64B64A64_Int:
-    return VkFormat::VK_FORMAT_R64G64B64A64_SINT;
+    return VK_FORMAT_R64G64B64A64_SINT;
   case EFormat::R64G64B64A64_Float:
-    return VkFormat::VK_FORMAT_R64G64B64A64_SFLOAT;
+    return VK_FORMAT_R64G64B64A64_SFLOAT;
   case EFormat::R8G8B8_UNORM:
-    return VkFormat::VK_FORMAT_R8G8B8_UNORM;
+    return VK_FORMAT_R8G8B8_UNORM;
   case EFormat::R8G8B8A8_UNORM:
-    return VkFormat::VK_FORMAT_R8G8B8A8_UNORM;
+    return VK_FORMAT_R8G8B8A8_UNORM;
   case EFormat::R8G8B8_SRGB:
-    return VkFormat::VK_FORMAT_R8G8B8_SRGB;
+    return VK_FORMAT_R8G8B8_SRGB;
   case EFormat::R8G8B8A8_SRGB:
-    return VkFormat::VK_FORMAT_R8G8B8A8_SRGB;
+    return VK_FORMAT_R8G8B8A8_SRGB;
   case EFormat::B8G8R8A8_SRGB:
-    return VkFormat::VK_FORMAT_B8G8R8A8_SRGB;
+    return VK_FORMAT_B8G8R8A8_SRGB;
+  case EFormat::R16_SFLOAT:
+    return VK_FORMAT_R16_SFLOAT;
   case EFormat::R16G16_SFLOAT:
-    return VkFormat::VK_FORMAT_R16G16_SFLOAT;
+    return VK_FORMAT_R16G16_SFLOAT;
   case EFormat::R16G16B16A16_SFLOAT:
-    return VkFormat::VK_FORMAT_R16G16B16A16_SFLOAT;
+    return VK_FORMAT_R16G16B16A16_SFLOAT;
   case EFormat::D32_SFLOAT:
-    return VkFormat::VK_FORMAT_D32_SFLOAT;
+    return VK_FORMAT_D32_SFLOAT;
   case EFormat::D32_SFLOAT_S8_UINT:
-    return VkFormat::VK_FORMAT_D32_SFLOAT_S8_UINT;
+    return VK_FORMAT_D32_SFLOAT_S8_UINT;
   }
 }
 
@@ -331,28 +333,6 @@ constexpr auto ToVkAddressMode(EAddressMode e) noexcept {
   }
 }
 
-// constexpr auto ToVkBufferUsageBits(EResourceUsage usage) noexcept
-//     -> VkBufferUsageFlagBits {
-//   switch (usage) {
-//   case EResourceUsage::Vertex:
-//     return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-//   case EResourceUsage::Uniform:
-//     return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-//   case EResourceUsage::Index:
-//     return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-//   case EResourceUsage::Storage:
-//     return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-//   case EResourceUsage::Indirect:
-//     return VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
-//   case EResourceUsage::TransferSrc:
-//     return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-//   case EResourceUsage::TransferDst:
-//     return VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-//   case EResourceUsage::None:
-//     return VK_BUFFER_USAGE_FLAG_BITS_MAX_ENUM;
-//   }
-// }
-//
 constexpr auto ToVkImageUsageFlags(EResourceUsage usage) noexcept
     -> VkImageUsageFlags {
   if (usage == EResourceUsage::None) {

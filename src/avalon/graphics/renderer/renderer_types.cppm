@@ -15,29 +15,27 @@ constexpr StringId kOpaquePassName = "OpaquePass"_id;
 
 struct RenderBatch {
   MaterialHandle material;
-  uint32_t firstInstance = 0;
-  uint32_t instanceCount = 0;
+  uint32_t commandOffset = 0;
+  uint32_t commandCount = 0;
 };
 
 struct RenderPacket {
-  Array<MeshHandle> meshHandles;
-  Array<MaterialInstanceHandle> materialInstances;
-  Array<StandardPushConstant> pushConstants;
-
-  Array<Array<uint32_t>> materialOffsets;
   Array<RenderBatch> opaqueBatches;
   Array<RenderBatch> transparentBatches;
 
+  uint32_t opaqueInstanceDataBaseOffset;
+  uint32_t transparentInstanceDataBaseOffset;
+
+  BufferAllocation indirectCommandBufferAllocation;
+
+  uint32_t totalCommandCount;
+
   void Clear() {
-    meshHandles.Clear();
-    materialInstances.Clear();
-    pushConstants.Clear();
-    materialOffsets.Clear();
     opaqueBatches.Clear();
     transparentBatches.Clear();
   }
 
-  bool IsEmpty() const noexcept { return meshHandles.IsEmpty(); }
+  bool IsEmpty() const noexcept { return opaqueBatches.IsEmpty(); }
 };
 
 struct VirtualTextureDesc {

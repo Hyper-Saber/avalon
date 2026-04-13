@@ -16,8 +16,8 @@ class VirtualResourceManager final
       public mem::AutoDestroyable<VirtualResourceManager> {
 public:
   explicit VirtualResourceManager(rhi::IRhi &rhi)
-      : m_rhi(rhi), m_uboPool(rhi.GetUBOPool()), m_ssboPool(rhi.GetSSBOPool()) {
-  }
+      : m_rhi(rhi), m_uboPool(rhi.GetUBOPool()),
+        m_ssboPool(rhi.GetDynamicSSBOPool()) {}
 
   uint32_t ImportExternalTexture(StringId name,
                                  rhi::TextureHandle physicalHandle,

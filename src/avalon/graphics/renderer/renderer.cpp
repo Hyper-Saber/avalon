@@ -24,8 +24,8 @@ class Renderer final : public IRenderer {
 public:
   explicit Renderer(rhi::IRhi &rhi) : m_rhi(rhi) {
     m_resourceManager = MakeUnique<VirtualResourceManager>(rhi);
-    m_context =
-        MakeUnique<RenderContext>(m_rhi, *m_resourceManager.Get(), m_packet);
+    m_context = MakeUnique<RenderContext>(m_rhi, *m_resourceManager.Get(),
+                                          m_packet, m_resolution);
 
     auto &writer = m_rhi.GetSceneGlobalSetWriter();
     if (writer.IsValid()) {
@@ -52,8 +52,8 @@ public:
 
     m_rhi.WaitIdle();
 
-    m_resolution.width = static_cast<float>(width);
-    m_resolution.height = static_cast<float>(height);
+    m_resolution.width = width;
+    m_resolution.height = height;
     m_resolution.invWidth = 1.0f / m_resolution.width;
     m_resolution.invHeight = 1.0f / m_resolution.height;
 
@@ -121,56 +121,134 @@ private:
   void PrepareMaterialBatches(RenderPacket &packet,
                               const SceneSnapshot &snapshot) {
     uint32_t totalInstances = snapshot.opaqueMeshHandles.GetSize();
+    AVALON_ASSERT(snapshot.opaqueWorldMatrices.GetSize() == totalInstances);
+    AVALON_ASSERT(snapshot.opaqueInvWorldMatrices.GetSize() == totalInstances);
+
     if (totalInstances == 0)
       return;
 
-    auto &materialManager = GetMaterialManager();
+    auto &ssboPool = m_rhi.GetDynamicSSBOPool();
+
+    auto modelAlloc =
+        ssboPool.AllocateAligned(totalInstances * sizeof(Matrix4x4));
+    auto invModelAlloc =
+        ssboPool.AllocateAligned(totalInstances * sizeof(Matrix4x4));
+
+    std::memcpy(modelAlloc.pHostAddress, snapshot.opaqueWorldMatrices.GetData(),
+                modelAlloc.size);
+    std::memcpy(invModelAlloc.pHostAddress,
+                snapshot.opaqueInvWorldMatrices.GetData(), invModelAlloc.size);
 
     Array<uint32_t> indices(totalInstances);
     std::iota(indices.begin(), indices.end(), 0);
-
     std::sort(indices.begin(), indices.end(), [&](uint32_t a, uint32_t b) {
-      auto matA = snapshot.opaqueMaterials[a];
-      auto matB = snapshot.opaqueMaterials[b];
-      if (matA != matB)
-        return matA < matB;
+      if (snapshot.opaqueMaterials[a] != snapshot.opaqueMaterials[b])
+        return snapshot.opaqueMaterials[a] < snapshot.opaqueMaterials[b];
       return snapshot.opaqueMeshHandles[a] < snapshot.opaqueMeshHandles[b];
     });
 
     auto lastMaterial = ResourceHandle::Invalid();
+    auto lastMesh = ResourceHandle::Invalid();
+
+    auto matrixSize = static_cast<uint32_t>(sizeof(Matrix4x4));
+
+    Array<InstanceData> instanceDatas;
+    Array<IndexedIndirectCommand> indirectCommands;
+
+    instanceDatas.Reserve(totalInstances);
+    indirectCommands.Reserve(totalInstances / 2);
 
     for (uint32_t i : indices) {
-      auto currInstHandle = snapshot.opaqueMaterialInstances[i];
-      auto currMaterialHandle = snapshot.opaqueMaterials[i];
+      uint32_t offset = i * matrixSize;
+      uint32_t modelOffset = modelAlloc.offset + offset;
+      uint32_t invOffset = invModelAlloc.offset + offset;
 
-      auto &materialInstance = materialManager.ResolveSafe({currInstHandle.id});
-      uint32_t materialGpuIndex = materialInstance.GetGpuIndex();
+      auto gpuData = BuildInstanceData(i, snapshot, modelOffset, invOffset);
 
-      const Matrix4x4 &worldMatrix = snapshot.opaqueWorldMatrices[i];
-      StandardPushConstant pc{.model = worldMatrix,
-                              .normalMatrix = ComputeNormalMatrix(worldMatrix),
-                              .materialIndex = materialGpuIndex};
-      auto textureSlots = materialInstance.GetTextureSlots();
-      AVALON_ASSERT(textureSlots.GetSize() <= kMaxCustomSlots);
-      std::memcpy(pc.customSlots, textureSlots.GetData(),
-                  textureSlots.GetSize());
+      instanceDatas.PushBack(gpuData);
 
-      packet.pushConstants.PushBack(pc);
+      auto currMesh = snapshot.opaqueMeshHandles[i];
+      auto currMat = snapshot.opaqueMaterials[i];
 
-      if (currMaterialHandle != lastMaterial) {
-        RenderBatch batch;
-        batch.material = {currMaterialHandle.id};
-        batch.firstInstance = packet.pushConstants.GetSize() - 1;
-        batch.instanceCount = 0;
+      if (currMesh == lastMesh && currMat == lastMaterial) {
+        indirectCommands.GetBack().instanceCount++;
+      } else {
+        indirectCommands.PushBack({
+            .indexCount = gpuData.indexCount,
+            .instanceCount = 1,
+            .firstIndex =
+                gpuData.indexOffset / static_cast<uint32_t>(sizeof(uint)),
+            .vertexOffset = 0,
+            .firstInstance = static_cast<uint32_t>(instanceDatas.GetSize() - 1),
+        });
 
-        packet.opaqueBatches.PushBack(batch);
-        lastMaterial = currMaterialHandle;
+        if (currMat != lastMaterial) {
+          packet.opaqueBatches.PushBack({
+              .material = {currMat.id},
+              .commandOffset =
+                  static_cast<uint32_t>(indirectCommands.GetSize() - 1),
+              .commandCount = 0,
+          });
+          lastMaterial = currMat;
+        }
+        packet.opaqueBatches.GetBack().commandCount++;
+        lastMesh = currMesh;
       }
-
-      packet.opaqueBatches.GetBack().instanceCount++;
-
-      packet.meshHandles.PushBack({snapshot.opaqueMeshHandles[i].id});
     }
+
+    auto instanceAlloc = ssboPool.AllocateAligned(instanceDatas.GetSize() *
+                                                  sizeof(InstanceData));
+    std::memcpy(instanceAlloc.pHostAddress, instanceDatas.GetData(),
+                instanceAlloc.size);
+
+    auto indirectAlloc = m_rhi.AllocateIndirectSSBO(
+        indirectCommands.GetSize() * sizeof(IndexedIndirectCommand));
+    std::memcpy(indirectAlloc.pHostAddress, indirectCommands.GetData(),
+                indirectAlloc.size);
+
+    packet.opaqueInstanceDataBaseOffset = instanceAlloc.offset;
+    packet.indirectCommandBufferAllocation = indirectAlloc;
+    packet.totalCommandCount = indirectCommands.GetSize();
+  }
+
+  graphics::InstanceData BuildInstanceData(uint32_t snapshotIdx,
+                                           const SceneSnapshot &snapshot,
+                                           uint32_t modelOffset,
+                                           uint32_t invModelOffset) {
+    graphics::InstanceData data{};
+
+    auto meshHandle = snapshot.opaqueMeshHandles[snapshotIdx];
+    auto instHandle = snapshot.opaqueMaterialInstances[snapshotIdx];
+    auto *mesh = GetMeshManager().Resolve({meshHandle.id});
+    auto &matInst = GetMaterialManager().ResolveSafe({instHandle.id});
+
+    data.instanceID = snapshotIdx;
+    data.materialID = matInst.GetGpuIndex();
+    data.geometryOffset = mesh->GetPosUVOffset();
+    data.attributeOffset = mesh->GetAttributeOffset();
+    data.indexOffset = mesh->GetIndexOffset();
+    data.vertexCount = mesh->GetVertexCount();
+    data.indexCount = mesh->GetIndexCount();
+
+    data.modelOffset = modelOffset;
+    data.invModelOffset = invModelOffset;
+
+    auto sdfType = mesh->GetSDFType();
+    uint32_t index = 0;
+    if (sdfType == ESDFType::Mesh) {
+      auto handle = mesh->GetSDFTexture();
+      if (handle.IsValid()) {
+        index = m_rhi.GetBindlessManager().RegisterTexture3D(handle);
+      }
+    }
+
+    data.sdfType = std::underlying_type_t<ESDFType>(sdfType);
+    data.sdfTextureIndex = index;
+    data.alphaThreshold = matInst.GetAlphaThreshold();
+
+    data.sdfExtent = mesh->GetSDFExtent();
+
+    return data;
   }
 
   rhi::IRhi &m_rhi;

@@ -115,7 +115,7 @@ public:
           .roughness = roughness,
       };
 
-      cmd.PushConstants(EShaderStage::Compute, 0, sizeof(StandardPushConstant),
+      cmd.PushConstants(EShaderStage::Compute, 0, sizeof(CustomPush),
                         &customPc);
 
       uint32_t groupX = (mipWidth + 7) / 8;

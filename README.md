@@ -9,7 +9,7 @@
 - [核心架构](#核心架构)
   - [1. 世界数据更新 (ECS)](#1-世界数据更新-ecs)
   - [2. 渲染流程 (Render Graph)](#2-渲染流程-render-graph)
-  - [3. 渲染数据更新 (Data Binding)](#3-渲染数据更新-data-binding)
+  - [3. 渲染管线资源绑定表 (Data Binding)](#3-渲染管线资源绑定表-descriptor-sets)
 - [路线图 (Roadmap)](#路线图-roadmap)
 
 ---
@@ -28,23 +28,25 @@
 - **同步优化**: 自动分析资源读写依赖，精确注入 **Pipeline Barriers** 与 **Image Layout Transitions**。
 - **资源管理**: 自动化处理资源生命周期，支持显存复用（Aliasing）。
 
-### 3. 渲染数据更新 (Data Binding)
+### 3. 渲染管线资源绑定表 (Descriptor Sets)
 
-针对现代 GPU 设计的低开销绑定策略。
-
-| Set | Binding | Resource | Description |
-| :--- | :--- | :--- | :--- |
-| **Set 0** | 0 | `samplers[]` | **Bindless**: 全局采样器池 |
-|  | 1 | `materialDatas` | **SSBO**: 全局材质属性池 (Color, PBR Params, etc.) |
-| | 2 | `probes` | **SSBO**: 全局探针池 |
-| | 3 | `envCubes[]` | **Bindless**: 全局环境贴图池 |
-| | 5 | `texture2DArrays[]` | **Bindless**: 全局材质数组池 |
-| | 4 | `volumes[]` | **Bindless**: 全局3D材质池 |
-| | 6 | `textures[]` | **Bindless**: 全局材质池 |
-| | 7 | `rwTextures[]` | **Bindless**: 全局StorageImage池 |
-| | 8 | `rwBuffers` | **SSBO**: 全局通用SSBO池 |
-| | 9 | `rwTextureArrays[]` | **Bindless**: 全局storageImageArray池 |
-| **Set 1** | 0 | `sceneGlobals` | **UBO**: 相机矩阵、环境光、投影参数 |
+| Set | Binding | HLSL 变量名 | 类型 (HLSL) | 说明 |
+| :--- | :--- | :--- | :--- | :--- |
+| **Set 0** | 0 | `uSamplers[]` | `SamplerState` | **Bindless**: 全局采样器池 |
+| | 1 | `uMaterials` | `StructuredBuffer<MaterialData>` | **SSBO**: 全局材质属性池 (PBR 参数、颜色等) |
+| | 2 | `uStaticSSBO` | `ByteAddressBuffer` | **SSBO**: 静态几何/场景/通用数据 |
+| | 3 | `uDynamicSSBO` | `ByteAddressBuffer` | **SSBO**: 动态/每帧更新数据 (Model 矩阵等) |
+| | 4 | `uPosUVSSBO` | `ByteAddressBuffer` | **SSBO**: 顶点位置 (Position) 与 UV 数据 |
+| | 5 | `uAttributesSSBO` | `ByteAddressBuffer` | **SSBO**: 顶点法线、切线、顶点色等属性 |
+| | 6 | `uIndicesSSBO` | `ByteAddressBuffer` | **SSBO**: 全局索引缓冲区 |
+| | 7 | `uCommandSSBO` | `StructuredBuffer<DrawCommand>` | **SSBO**: 绘制命令数据 (DrawCommand / Indirect Args) |
+| | 8 | `uEnvCubes[]` | `TextureCube` | **Bindless**: 全局环境贴图池 |
+| | 9 | `uTextureArrays[]` | `Texture2DArray` | **Bindless**: 全局纹理数组池 |
+| | 10 | `uVolumes[]` | `Texture3D` | **Bindless**: 全局 3D 纹理/体积数据 |
+| | 11 | `uTextures[]` | `Texture2D` | **Bindless**: 全局 2D 纹理池 |
+| | 12 | `uRWTextures[]` | `RWTexture2D` | **Bindless**: 可读写 Storage Image |
+| | 13 | `uRWTextureArrays[]`| `RWTexture2DArray` | **Bindless**: 可读写 Storage Image Array |
+| **Set 1** | 0 | `sceneGlobals` | `ConstantBuffer<SceneGlobals>` | **UBO**: 场景全局参数 (View/Proj 矩阵、时间、灯光) |
 
 ---
 
@@ -57,11 +59,11 @@
 - [x] **Bindless** 渲染架构（贴图与采样器全局绑定）。
 - [x] **Inverse-Z** 高精度深度缓冲策略。
 - [x] **输入系统 (Input System)**: 抽象手柄的三种输入方式,按键,扳机,摇杆。
+- [x] **Indirect draw**: 支持间接渲染。
 
 ### 🛠️ 开发中 (In Progress)
 
 - [ ] **PBR 材质系统**: 基于BRDF, D项使用GGX。
-- [ ] **Async Compute Transfer**: 修改commandbuffer,提供异步传输计算的选项。
 
 ### 🚀 远期目标 (Future)
 

@@ -21,14 +21,17 @@ public:
 
   void Setup(RenderGraphBuilder &builder) override {
     m_outputHandle =
-        builder.SetFormat(EFormat::R8G8B8A8_UNORM)
+        builder.SetFormat(EFormat::R16G16B16A16_SFLOAT)
             .Write("ShadowMask"_id, EResourceUsage::ReadWrite,
                    EResourceUsage::ReadWrite, EShaderStage::Compute);
     m_depthHandle =
         builder.Read(kSceneDepth, EResourceUsage::ReadOnly,
                      EResourceUsage::ReadOnly, EShaderStage::Compute);
+    m_normalHandle =
+        builder.Read("Normal"_id, EResourceUsage::ReadOnly,
+                     EResourceUsage::ReadOnly, EShaderStage::Compute);
     m_instanceIDHandle =
-        builder.Read("InstanceId"_id, EResourceUsage::ReadOnly,
+        builder.Read("InstanceID"_id, EResourceUsage::ReadOnly,
                      EResourceUsage::ReadOnly, EShaderStage::Compute);
   }
 
@@ -51,13 +54,17 @@ public:
     auto &bindlessManager = context.rhi.GetBindlessManager();
 
     auto depthTextureHandle = context.GetPhysicalTexture(m_depthHandle);
+    auto normalTextureHandle = context.GetPhysicalTexture(m_normalHandle);
     auto shadowMaskHandle = context.GetPhysicalTexture(m_outputHandle);
     auto instanceIDHandle = context.GetPhysicalTexture(m_instanceIDHandle);
 
     auto shadowMaskIndex = bindlessManager.RegisterRWTexture(
         shadowMaskHandle, EResourceUsage::ReadWrite);
-    auto depthTextureIndex =
-        bindlessManager.RegisterTexture(depthTextureHandle);
+    auto depthTextureIndex = bindlessManager.RegisterTexture(
+        depthTextureHandle,
+        EResourceUsage::DepthTexture | EResourceUsage::ReadOnly);
+    auto normalTextureIndex = bindlessManager.RegisterTexture(
+        normalTextureHandle, EResourceUsage::ReadOnly);
     auto instanceIDTextureIndex =
         bindlessManager.RegisterTexture(instanceIDHandle);
 
@@ -65,21 +72,43 @@ public:
 
     struct CustomPush {
       uint32_t depthTextureIndex;
+      uint32_t normalTextureIndex;
       uint32_t instanceIDTextureIndex;
       uint32_t shadowMaskIndex;
+
+      uint32_t opaqueInstanceBufferOffset;
       uint32_t width;
       uint32_t height;
       float invWidth;
+
       float invHeight;
-      float paddings[kPushConstantFloatSize - 7];
+      float minDistance;
+      float maxDistance;
+      uint32_t maxStep;
+
+      float k;
+      uint32_t opaqueInstanceCount;
+
+      float paddings[kPushConstantFloatSize - 14];
     } customPush{
         .depthTextureIndex = depthTextureIndex,
+        .normalTextureIndex = normalTextureIndex,
         .instanceIDTextureIndex = instanceIDTextureIndex,
         .shadowMaskIndex = shadowMaskIndex,
+
+        .opaqueInstanceBufferOffset =
+            context.renderPacket.opaqueInstanceDataBaseOffset,
         .width = context.resolution.width,
         .height = context.resolution.height,
         .invWidth = context.resolution.invWidth,
+
         .invHeight = context.resolution.invHeight,
+        .minDistance = 0.02f,
+        .maxDistance = 100.0f,
+        .maxStep = 64,
+
+        .k = 8.0f,
+        .opaqueInstanceCount = context.renderPacket.opaqueInstanceCount,
     };
 
     cmd.PushConstants(EShaderStage::Compute, 0, sizeof(CustomPush),
@@ -92,6 +121,7 @@ public:
 private:
   VirtualResourceHandle m_depthHandle;
   VirtualResourceHandle m_instanceIDHandle;
+  VirtualResourceHandle m_normalHandle;
   VirtualResourceHandle m_outputHandle;
   ShaderHandle m_shaderHandle;
   PipelineHandle m_pipelineHandle;

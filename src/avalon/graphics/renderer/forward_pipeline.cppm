@@ -11,7 +11,7 @@ import :render_graph_builder;
 import :renderer_types;
 import :material;
 import :material_manager;
-import :depth_pass;
+import :g_buffer_pass;
 import :opaque_pass;
 import :skybox_pass;
 import :blit_pass;
@@ -20,6 +20,7 @@ import :prefilter_pass;
 import :sh_pass;
 import :brdf_lut_gen_pass;
 import :buffer_copy_pass;
+import :sdf_shadow_pass;
 import :types;
 
 import :cubemap_test;
@@ -51,9 +52,9 @@ public:
     auto &shaderManager = graphics::GetShaderManager();
     auto &materialManager = graphics::GetMaterialManager();
 
-    auto shaderHandle = shaderManager.GetOrCreateShader("depth.hlsl");
+    auto shaderHandle = shaderManager.GetOrCreateShader("g_buffer.hlsl");
     auto materialHandle =
-        materialManager.CreateMaterial(shaderHandle, "Depth"_id);
+        materialManager.CreateMaterial(shaderHandle, "GBuffer"_id);
 
     shaderHandle = shaderManager.GetOrCreateShader("skybox_generator.hlsl");
     materialHandle =
@@ -74,6 +75,7 @@ public:
     materialHandle = materialManager.CreateMaterial(shaderHandle, "Blit"_id);
     materialManager.SetDefaultBlit(materialHandle);
 
+    m_shadowShader = shaderManager.GetOrCreateComputeShader("sdf_shadow.hlsl");
     m_brdfLutGenShader =
         shaderManager.GetOrCreateComputeShader("brdf_lut_gen.hlsl");
     m_mipGenShader =
@@ -147,7 +149,9 @@ public:
       m_isFisrtFrame = false;
     }
 
-    builder.AddPass<DepthPass>("Depth"_id);
+    builder.AddPass<GBufferPass>("GBuffer"_id);
+    builder.AddPass<SDFShadowPass>("Shadow"_id, EPassType::Compute,
+                                   m_shadowShader);
 
     builder.AddPass<SkyboxGeneratorPass>("SkyboxGen"_id, EPassType::Graphics,
                                          skyboxExtent);
@@ -189,6 +193,8 @@ private:
   rhi::Extent2D skyboxExtent = {kSkyboxSize, kSkyboxSize};
   uint32_t m_mipLevels = Log2(kSkyboxSize / 2) + 1;
   rhi::IRhi &m_rhi;
+
+  ShaderHandle m_shadowShader;
   ShaderHandle m_mipGenShader;
   ShaderHandle m_brdfLutGenShader;
   ShaderHandle m_shShader;

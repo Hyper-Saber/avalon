@@ -347,6 +347,13 @@ constexpr StringView ToView(EFormat format) {
     return "R8G8B8_UNORM";
   case R8G8B8A8_UNORM:
     return "R8G8B8A8_UNORM";
+  case R16_UNORM:
+    return "R16_UNORM";
+  case R16G16_UNORM:
+    return "R16G16_UNORM";
+  case R16G16B16A16_UNORM:
+    return "R16G16B16A16_UNORM";
+
   case R8G8B8_SRGB:
     return "R8G8B8_SRGB";
   case R8G8B8A8_SRGB:

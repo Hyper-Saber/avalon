@@ -36,6 +36,7 @@ public:
             .SetLayers(6)
             .SetTextureType(rhi::ETextureType::TextureCube)
             .SetMipLevels(m_mipLevels)
+            .SetFormat(EFormat::R16G16B16A16_SFLOAT)
             .Write(m_outputCubemap,
                    EResourceUsage::ReadWrite | EResourceUsage::TransferDst,
                    EResourceUsage::TransferDst, EShaderStage::Compute);

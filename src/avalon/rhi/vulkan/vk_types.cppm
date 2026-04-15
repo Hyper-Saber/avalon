@@ -106,25 +106,29 @@ struct BufferResource : public mem::AutoDestroyable<BufferResource> {
 };
 
 struct TextureSubresourceKey {
-  uint32_t mipLevel;
-  uint32_t arrayLayer;
-  bool isArrayView;
+  uint32_t mipLevel = 0;
+  uint32_t arrayLayer = 1;
+  bool isArrayView = false;
+  bool isDepthView = false;
+  bool isStencilView = false;
 
   HashType GetHash() const noexcept {
     uint64_t packed = 0;
 
     packed |= (static_cast<uint64_t>(mipLevel) & 0xFFFFULL);
-
     packed |= (static_cast<uint64_t>(arrayLayer) & 0xFFFFULL) << 16;
-
     packed |= (static_cast<uint64_t>(isArrayView ? 1ULL : 0ULL)) << 32;
+    packed |= (static_cast<uint64_t>(isDepthView ? 1ULL : 0ULL)) << 33;
+    packed |= (static_cast<uint64_t>(isStencilView ? 1ULL : 0ULL)) << 34;
 
     return Hash::Combine(Hash::kOffsetBasis, packed);
   }
 
   bool operator==(const TextureSubresourceKey &other) const noexcept {
     return mipLevel == other.mipLevel && arrayLayer == other.arrayLayer &&
-           isArrayView == other.isArrayView;
+           isArrayView == other.isArrayView &&
+           isDepthView == other.isDepthView &&
+           isStencilView == other.isStencilView;
   }
 };
 
@@ -146,6 +150,10 @@ struct TextureResource : public mem::AutoDestroyable<TextureResource> {
         createInfo(info), isSwapchainTexture(isSwapChainTexture) {
     if (info.format == EFormat::R8G8B8_UNORM ||
         info.format == EFormat::R8G8B8A8_UNORM ||
+        info.format == EFormat::R16_UNORM ||
+        info.format == EFormat::R16G16_UNORM ||
+        info.format == EFormat::R16G16B16A16_UNORM ||
+        info.format == EFormat::R32_Uint ||
         info.format == EFormat::R8G8B8_SRGB ||
         info.format == EFormat::B8G8R8A8_SRGB ||
         info.format == EFormat::R8G8B8A8_SRGB ||
@@ -240,6 +248,8 @@ public:
   virtual auto GetTexture(TextureHandle) -> const TextureResource * = 0;
   virtual auto GetOrCreateMipStorageView(TextureHandle, uint32_t mipLevel)
       -> VkImageView = 0;
+  virtual auto GetOrCreateDepthTextureView(TextureHandle) -> VkImageView = 0;
+
   virtual auto GetSampler(SamplerHandle) -> const SamplerResource * = 0;
   virtual auto GetDescriptorSet(DescriptorSetHandle)
       -> const DescriptorSetResource * = 0;

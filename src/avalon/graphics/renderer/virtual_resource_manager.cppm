@@ -161,6 +161,15 @@ public:
     return VirtualResourceHandle::Create(index, m_bufferGenerations[index]);
   }
 
+  auto TryGetTextureDesc(StringId name) const
+      -> std::optional<VirtualTextureDesc> {
+    auto pIndex = m_nameToIndex.Get(name);
+    if (pIndex == nullptr)
+      return std::nullopt;
+    auto handle = GetVirtualResource(name);
+    return GetTextureDesc(handle);
+  }
+
   auto GetTextureDesc(VirtualResourceHandle handle) const
       -> const VirtualTextureDesc & {
     auto index = handle.GetIndex();

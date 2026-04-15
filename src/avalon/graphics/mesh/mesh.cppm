@@ -29,16 +29,16 @@ struct VertexLayout {
         {
             .location = 1,
             .binding = 0,
-            .format = EFormat::R32G32_Float,
-            .semantic = EVertexSemantic::TexCoord,
+            .format = EFormat::R32G32B32_Float,
+            .semantic = EVertexSemantic::Normal,
             .offset = 12,
         },
         {
             .location = 2,
-            .binding = 1,
-            .format = EFormat::R32G32B32_Float,
-            .semantic = EVertexSemantic::Normal,
-            .offset = 0,
+            .binding = 0,
+            .format = EFormat::R32G32_Float,
+            .semantic = EVertexSemantic::TexCoord,
+            .offset = 24,
         },
 
         {
@@ -46,15 +46,15 @@ struct VertexLayout {
             .binding = 1,
             .format = EFormat::R32G32B32_Float,
             .semantic = EVertexSemantic::Color,
-            .offset = 12,
+            .offset = 32,
         },
     };
 
     VertexLayout layout;
     layout.bindingUsed[0] = true;
     layout.bindingUsed[1] = true;
-    layout.strides[0] = 20;
-    layout.strides[1] = 24;
+    layout.strides[0] = 32;
+    layout.strides[1] = 12;
     layout.attributes = attributes;
     return layout;
   }
@@ -103,12 +103,12 @@ class AVALON_GRAPHICS_API Mesh final : public mem::AutoDestroyable<Mesh> {
 public:
   Mesh(MeshData &&data) : m_data(std::move(data)), m_isUploaded(false) {}
 
-  void SetGPUPointers(BufferHandle posBuf, uint32_t posOffset,
+  void SetGPUPointers(BufferHandle geometryBuf, uint32_t geometryOffset,
                       BufferHandle attrBuf, uint32_t attrOffset,
                       BufferHandle indexBuf, uint32_t indexOffset,
                       uint32_t vertexCount, uint32_t indexCount) {
-    m_posBuffer = posBuf;
-    m_posUVOffset = posOffset;
+    m_geometryBuffer = geometryBuf;
+    m_geometryOffset = geometryOffset;
 
     m_attrBuffer = attrBuf;
     m_attrOffset = attrOffset;
@@ -129,11 +129,11 @@ public:
   auto GetData() const noexcept -> const MeshData & { return m_data; }
   bool IsUploaded() const noexcept { return m_isUploaded; }
 
-  BufferHandle GetPosBuffer() const noexcept { return m_posBuffer; }
+  BufferHandle GetGeometryBuffer() const noexcept { return m_geometryBuffer; }
   BufferHandle GetAttrBuffer() const noexcept { return m_attrBuffer; }
   BufferHandle GetIndexBuffer() const noexcept { return m_indexBuffer; }
 
-  uint32_t GetPosUVOffset() const noexcept { return m_posUVOffset; }
+  uint32_t GetGeometryOffset() const noexcept { return m_geometryOffset; }
   uint32_t GetAttributeOffset() const noexcept { return m_attrOffset; }
   uint32_t GetIndexOffset() const noexcept { return m_indexOffset; }
 
@@ -150,8 +150,8 @@ private:
   MeshData m_data;
   bool m_isUploaded = false;
 
-  BufferHandle m_posBuffer;
-  uint32_t m_posUVOffset = 0;
+  BufferHandle m_geometryBuffer;
+  uint32_t m_geometryOffset = 0;
 
   BufferHandle m_attrBuffer;
   uint32_t m_attrOffset = 0;

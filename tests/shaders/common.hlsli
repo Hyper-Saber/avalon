@@ -1,4 +1,5 @@
 #ifndef AVALON_COMMON_HLSLI
+float3 normal;
 #define AVALON_COMMON_HLSLI
 
 #include "constants.hlsli"
@@ -92,48 +93,22 @@ float4x4 loadStaticMatrix(uint offset) {
 }
 
 InstanceData loadInstanceData(uint baseOffset, uint instanceID) {
-  uint addr = baseOffset + (instanceID * 64);
-  InstanceData d;
-  uint4 g0 = uDynamicSSBO.Load4(addr);
-  d.instanceID = g0.x;
-  d.materialID = g0.y;
-  d.posUVOffset = g0.z;
-  d.attributesOffset = g0.w;
-
-  uint4 g1 = uDynamicSSBO.Load4(addr + 16);
-  d.indexOffset = g1.x;
-  d.vertexCount = g1.y;
-  d.indexCount = g1.z;
-  d.modelOffset = g1.w;
-
-  uint4 g2 = uDynamicSSBO.Load4(addr + 32);
-  d.invModelOffset = g2.x;
-  d.sdfTextureIndex = g2.y;
-  d.sdfType = g2.z;
-  d.alphaThreshold = asfloat(g2.w);
-
-  d.sdfExtent = asfloat(uDynamicSSBO.Load3(addr + 48));
-  return d;
+  uint addr = baseOffset + instanceID * kInstanceDataSize;
+  return uDynamicSSBO.Load<InstanceData>(addr);
 }
 
 uint loadVertexID(uint indexOffset, uint drawID) {
   return uIndicesSSBO.Load(indexOffset + drawID);
 }
 
-VertexPosUV loadVertexPosUV(uint vertexID, uint posUVOffset) {
-  uint addr = posUVOffset + vertexID * kVertexPosUVSize;
-  VertexPosUV res;
-  res.position = asfloat(uPosUVSSBO.Load3(addr));
-  res.uv = asfloat(uPosUVSSBO.Load2(addr + 12));
-  return res;
+VertexGeometry loadVertexGeometry(uint vertexID, uint geometryOffset) {
+  uint addr = geometryOffset + vertexID * kVertexGeometrySize;
+  return uGeometrySSBO.Load<VertexGeometry>(addr);
 }
 
 VertexAttributes loadVertexAttributes(uint vertexID, uint attributesOffset) {
   uint addr = attributesOffset + vertexID * kVertexAttributesSize;
-  VertexAttributes res;
-  res.normal = asfloat(uAttributesSSBO.Load3(addr));
-  res.color = asfloat(uAttributesSSBO.Load3(addr + 12));
-  return res;
+  return uAttributesSSBO.Load<VertexAttributes>(addr);
 }
 
 float4 calculateWorldPosition(uint modelOffset, float3 localPosition) {
@@ -142,7 +117,7 @@ float4 calculateWorldPosition(uint modelOffset, float3 localPosition) {
 
 float3 calculateWorldNormal(uint invModelOffset, float3 localNormal) {
   float4x4 invModel = loadDynamicMatrix(invModelOffset);
-  return normalize(mul((float3x3)transpose(invModel), localNormal));
+  return normalize(mul(localNormal, (float3x3)invModel));
 }
 
 float4 calculateClipPosition(float4 worldPos) {
@@ -153,6 +128,15 @@ float4 ndcToLocal(uint invModelOffset, float4 ndcPosition) {
   float4 worldPosH = mul(uCamera.invViewProjection, ndcPosition);
   float4 worldPos = worldPosH / worldPosH.w;
   return mul(loadDynamicMatrix(invModelOffset), worldPos);
+}
+
+float4 ndcToWorld(float4 ndcPosition) {
+  float4 worldPosH = mul(uCamera.invViewProjection, ndcPosition);
+  return worldPosH / worldPosH.w;
+}
+
+float4 worldToLocal(uint invModelOffset, float4 worldPosition) {
+  return mul(loadDynamicMatrix(invModelOffset), worldPosition);
 }
 
 #ifdef STANDARD_PUSH

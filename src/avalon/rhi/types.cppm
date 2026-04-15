@@ -35,6 +35,7 @@ enum class EFormat {
   R16G16B16A16_Uint,
   R16G16B16A16_Int,
   R16G16B16A16_Float,
+
   R32_Uint,
   R32_Int,
   R32_Float,
@@ -47,6 +48,7 @@ enum class EFormat {
   R32G32B32A32_Uint,
   R32G32B32A32_Int,
   R32G32B32A32_Float,
+
   R64_Uint,
   R64_Int,
   R64_Float,
@@ -62,12 +64,18 @@ enum class EFormat {
 
   R8G8B8_UNORM,
   R8G8B8A8_UNORM,
+  R16_UNORM,
+  R16G16_UNORM,
+  R16G16B16A16_UNORM,
+
   R8G8B8_SRGB,
   R8G8B8A8_SRGB,
   B8G8R8A8_SRGB,
+
   R16_SFLOAT,
   R16G16_SFLOAT,
   R16G16B16A16_SFLOAT,
+
   D32_SFLOAT,
   D32_SFLOAT_S8_UINT,
 };
@@ -182,6 +190,8 @@ enum class EResourceUsage : uint32_t {
   SceneGlobals = 1 << 12,
 
   Host = 1 << 13,
+  DepthTexture = 1 << 14,
+  StencilTexture = 1 << 15,
 };
 
 enum class ETextureType {
@@ -390,7 +400,9 @@ struct alignas(16) StandardPushConstants {
   uint32_t skyboxSHOffset;
   uint32_t prefilterMap;
   uint32_t brdfLut;
-  uint32_t paddings[kPushConstantFloatSize - 4];
+
+  uint32_t shadowMask;
+  uint32_t paddings[kPushConstantFloatSize - 5];
 };
 
 struct DeviceCapabilities {

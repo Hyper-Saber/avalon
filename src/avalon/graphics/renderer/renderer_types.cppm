@@ -25,6 +25,8 @@ struct RenderPacket {
 
   uint32_t opaqueInstanceDataBaseOffset;
   uint32_t transparentInstanceDataBaseOffset;
+  uint32_t opaqueInstanceCount;
+  uint32_t transparentInstanceCount;
 
   BufferAllocation indirectCommandBufferAllocation;
 

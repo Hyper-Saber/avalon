@@ -103,7 +103,9 @@ struct StandardPushConstants {
   uint skyboxSHOffset;
   uint prefilterMap;
   uint brdfLut;
-  uint paddings[kPushConstantFloatSize - 4];
+
+  uint shadowMask;
+  uint paddings[kPushConstantFloatSize - 5];
 };
 
 #define CUSTOM_PUSH_TYPE StandardPushConstants
@@ -122,7 +124,7 @@ struct DrawCommand {
 struct InstanceData {
   uint instanceID;
   uint materialID;
-  uint posUVOffset;
+  uint geometryOffset;
   uint attributesOffset;
 
   uint indexOffset;
@@ -139,18 +141,24 @@ struct InstanceData {
   float padding;
 };
 
-struct VertexPosUV {
+static const uint kCube = 0;
+static const uint kPlane = 1;
+static const uint kQuad = 2;
+static const uint kSphere = 3;
+static const uint kMesh = 4;
+
+struct VertexGeometry {
   float3 position;
+  float3 normal;
   float2 uv;
 };
 
 struct VertexAttributes {
-  float3 normal;
   float3 color;
 };
 
-#define kVertexPosUVSize 20
-#define kVertexAttributesSize 24
+#define kVertexGeometrySize 32
+#define kVertexAttributesSize 12
 #define kInstanceDataSize 64
 
 VK_PUSH_CONSTANT CUSTOM_PUSH_TYPE push;
@@ -162,7 +170,7 @@ VK_BINDING(2, 0) STORAGE_BUFFER(ByteAddressBuffer) uStaticSSBO
     : register(REG_SLOT(t1, u0), space0);
 VK_BINDING(3, 0) STORAGE_BUFFER(ByteAddressBuffer) uDynamicSSBO
     : register(REG_SLOT(t2, u1), space0);
-VK_BINDING(4, 0) STORAGE_BUFFER(ByteAddressBuffer) uPosUVSSBO
+VK_BINDING(4, 0) STORAGE_BUFFER(ByteAddressBuffer) uGeometrySSBO
     : register(REG_SLOT(t3, u2), space0);
 VK_BINDING(5, 0) STORAGE_BUFFER(ByteAddressBuffer) uAttributesSSBO
     : register(REG_SLOT(t4, u3), space0);

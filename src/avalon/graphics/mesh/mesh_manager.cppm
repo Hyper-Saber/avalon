@@ -50,11 +50,11 @@ bool IsValid(const MeshData &data, const VertexLayout &layout) noexcept {
 }
 
 void InterleaveVertexData(const MeshData &data, const VertexLayout &layout,
-                          uint8_t *pPosUVMapped, uint8_t *pAttrMapped) {
+                          uint8_t *pGeometryMapped, uint8_t *pAttrMapped) {
   auto vertexCount = data.positions.GetSize();
 
   for (size_t i = 0; i < vertexCount; i++) {
-    uint8_t *pVertexStarts[2] = {pPosUVMapped + (i * layout.strides[0]),
+    uint8_t *pVertexStarts[2] = {pGeometryMapped + (i * layout.strides[0]),
                                  pAttrMapped + (i * layout.strides[1])};
 
     for (const auto &attr : layout.attributes) {
@@ -184,6 +184,11 @@ private:
 
     auto meshHandle = CreateMesh(std::move(data));
     m_defaultMeshes.Insert(type, meshHandle);
+
+    auto pMesh = Resolve(meshHandle);
+    pMesh->SetSDFType(type);
+    pMesh->SetSDFSize(Vec3::One() * 0.5);
+
     return meshHandle;
   }
 

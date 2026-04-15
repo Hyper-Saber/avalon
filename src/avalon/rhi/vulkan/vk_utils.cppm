@@ -108,6 +108,12 @@ constexpr auto ToVkFormat(EFormat format) noexcept -> VkFormat {
     return VK_FORMAT_R8G8B8_UNORM;
   case EFormat::R8G8B8A8_UNORM:
     return VK_FORMAT_R8G8B8A8_UNORM;
+  case EFormat::R16_UNORM:
+    return VK_FORMAT_R16_UNORM;
+  case EFormat::R16G16_UNORM:
+    return VK_FORMAT_R16G16_UNORM;
+  case EFormat::R16G16B16A16_UNORM:
+    return VK_FORMAT_R16G16B16A16_UNORM;
   case EFormat::R8G8B8_SRGB:
     return VK_FORMAT_R8G8B8_SRGB;
   case EFormat::R8G8B8A8_SRGB:

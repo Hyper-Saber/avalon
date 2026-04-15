@@ -36,7 +36,7 @@
 | | 1 | `uMaterials` | `StructuredBuffer<MaterialData>` | **SSBO**: 全局材质属性池 (PBR 参数、颜色等) |
 | | 2 | `uStaticSSBO` | `ByteAddressBuffer` | **SSBO**: 静态几何/场景/通用数据 |
 | | 3 | `uDynamicSSBO` | `ByteAddressBuffer` | **SSBO**: 动态/每帧更新数据 (Model 矩阵等) |
-| | 4 | `uPosUVSSBO` | `ByteAddressBuffer` | **SSBO**: 顶点位置 (Position) 与 UV 数据 |
+| | 4 | `uGeometrySSBO` | `ByteAddressBuffer` | **SSBO**: 顶点几何数据 |
 | | 5 | `uAttributesSSBO` | `ByteAddressBuffer` | **SSBO**: 顶点法线、切线、顶点色等属性 |
 | | 6 | `uIndicesSSBO` | `ByteAddressBuffer` | **SSBO**: 全局索引缓冲区 |
 | | 7 | `uCommandSSBO` | `StructuredBuffer<DrawCommand>` | **SSBO**: 绘制命令数据 (DrawCommand / Indirect Args) |

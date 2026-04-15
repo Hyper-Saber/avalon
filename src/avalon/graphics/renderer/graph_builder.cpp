@@ -41,6 +41,13 @@ RenderGraphBuilder::SpecifyTextureDefaultFormat(rhi::EResourceUsage usage) {
     return EFormat::D32_SFLOAT_S8_UINT;
   case EResourceUsage::Present:
     return m_rhi->GetSwapchainImageFormat();
+  default: {
+    AVALON_ASSERT_MSG(
+        false,
+        String::Format("[RenderGraph] Unsupported auto specify usage: {}",
+                       ToView(usage)));
+    return EFormat::Undefined;
+  }
   }
 
   if (HasFlag(usage, rhi::EResourceUsage::DepthStencilAttachment)) {
@@ -63,12 +70,20 @@ auto RenderGraphBuilder::Write(StringId name, rhi::EResourceUsage usage,
   m_desc.nameHash = name;
   m_desc.usage = usage;
 
+  auto oldDesc = m_graph.m_resourceManager.TryGetTextureDesc(m_desc.nameHash);
+
   if (m_desc.format == rhi::EFormat::Undefined) {
-    m_desc.format = SpecifyTextureDefaultFormat(usage);
+    if (oldDesc)
+      m_desc.format = oldDesc->format;
+    else
+      m_desc.format = SpecifyTextureDefaultFormat(usage);
   }
 
   if (!m_desc.extent.IsValid()) {
-    m_desc.extent = m_rhi->GetSwapchainExtent();
+    if (oldDesc)
+      m_desc.extent = oldDesc->extent;
+    else
+      m_desc.extent = m_rhi->GetSwapchainExtent();
   }
 
   m_currentResource = m_graph.Write(

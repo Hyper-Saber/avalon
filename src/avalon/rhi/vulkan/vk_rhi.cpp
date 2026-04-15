@@ -243,6 +243,10 @@ auto VkRhi::GetOrCreateMipStorageView(TextureHandle handle, uint32_t mipLevel)
   return m_resourcePool->GetOrCreateMipStorageView({handle.id}, mipLevel);
 }
 
+auto VkRhi::GetOrCreateDepthTextureView(TextureHandle handle) -> VkImageView {
+  return m_resourcePool->GetOrCreateDepthTextureView({handle.id});
+}
+
 auto VkRhi::GetDummyComputePipeline() const -> PipelineHandle {
   return m_dummyComputePipeline;
 }

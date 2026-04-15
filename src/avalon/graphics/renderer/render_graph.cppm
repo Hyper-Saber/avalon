@@ -162,7 +162,9 @@ public:
     for (uint32_t nodeIdx : m_executionQueue) {
       auto &node = m_nodes[nodeIdx];
 
-      // Debug("{}", node.nameHash.Resolve());
+      // if (node.nameHash == "Shadow"_id) {
+      //   Debug("{}", node.nameHash.Resolve());
+      // }
 
       HandleResourceTransitions(cmd, node, finalPendingUsages);
 

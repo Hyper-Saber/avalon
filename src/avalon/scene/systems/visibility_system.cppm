@@ -47,7 +47,8 @@ class VisibilitySystem final : public RenderSystemBase<VisibilitySystem> {
       auto &trans = renderView.Get<ecs::TransformComponent>(entity);
       AABB worldBounds = render.localBounds.Transform(trans.worldMatrix);
 
-      if (frustum.IsVisible(worldBounds)) {
+      // if (frustum.IsVisible(worldBounds)) {
+      if (true) {
         outSnapshot.opaqueMeshHandles.PushBack({render.meshHandle.id});
         outSnapshot.opaqueMaterials.PushBack({render.materialHandle.id});
         outSnapshot.opaqueMaterialInstances.PushBack(

@@ -275,6 +275,47 @@ public:
     return subView;
   }
 
+  auto GetOrCreateDepthTextureView(Handle<TextureResource> handle)
+      -> VkImageView {
+    auto *res = m_texturePool.Resolve(handle);
+    AVALON_ASSERT(res != nullptr && "Invalid texture handle");
+
+    TextureSubresourceKey key{
+        .isDepthView = true,
+    };
+
+    if (res->subresourceViews.Contains(key)) {
+      return res->subresourceViews[key];
+    }
+
+    VkImageViewCreateInfo viewInfo{
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .image = res->image,
+        .viewType = VK_IMAGE_VIEW_TYPE_2D,
+        .format = ToVkFormat(res->createInfo.format),
+        .subresourceRange =
+            {
+                .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
+                .baseMipLevel = 0,
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = res->createInfo.layerCount,
+            },
+    };
+
+    VkImageView subView{VK_NULL_HANDLE};
+    VkResult result =
+        vkCreateImageView(res->device, &viewInfo, nullptr, &subView);
+    if (result != VK_SUCCESS) {
+      avalon::Error("[Vulkan]: Failed to create depth view for handle {}",
+                    handle.id);
+      return VK_NULL_HANDLE;
+    }
+
+    res->subresourceViews[key] = subView;
+    return subView;
+  }
+
   auto CreateSampler(const SamplerCreateInfo &info) -> Handle<SamplerResource> {
     auto hash = info.GetHash();
     if (m_samplerCache.Contains(hash)) {

@@ -32,6 +32,9 @@ public:
     m_brdfLudHandle =
         builder.Read("BRDFLut"_id, EResourceUsage::ReadOnly,
                      EResourceUsage::ReadOnly, EShaderStage::Fragment);
+    m_shdowMaskHandle =
+        builder.Read("ShadowMask"_id, EResourceUsage::ReadOnly,
+                     EResourceUsage::ReadOnly, EShaderStage::Fragment);
   }
 
   void OnCompile(rhi::IRhi &rhi) override {}
@@ -50,12 +53,15 @@ public:
     uint32_t brdfLutIndex = bindlessManager.RegisterTexture(
         context.GetPhysicalTexture(m_brdfLudHandle));
     auto shAllocation = context.GetPhysicalBufferAllocation(m_skyboxSHHandle);
+    uint32_t shadowMaskIndex = bindlessManager.RegisterTexture(
+        context.GetPhysicalTexture(m_shdowMaskHandle));
 
     StandardPushConstants passData{
         .instanceBufferOffset = packet.opaqueInstanceDataBaseOffset,
         .skyboxSHOffset = shAllocation.offset,
         .prefilterMap = prefilteredIndex,
         .brdfLut = brdfLutIndex,
+        .shadowMask = shadowMaskIndex,
     };
 
     cmd.BindIndexBuffer(rhi.GetIndexBuffer(), 0, EFormat::R32_Uint);
@@ -88,6 +94,7 @@ private:
   VirtualResourceHandle m_skyboxSHHandle;
   VirtualResourceHandle m_prefilteredHandle;
   VirtualResourceHandle m_brdfLudHandle;
+  VirtualResourceHandle m_shdowMaskHandle;
 
   MaterialInstance *m_materialInstance;
 };

@@ -361,7 +361,9 @@ private:
     auto textureRes = m_resourceProvider.GetTexture(handle);
     VkImageView view = textureRes->imageView;
 
-    if (mipLevel != kNoMiplevels) {
+    if (HasFlag(usage, EResourceUsage::DepthTexture)) {
+      view = m_resourceProvider.GetOrCreateDepthTextureView(handle);
+    } else if (mipLevel != kNoMiplevels) {
       view = m_resourceProvider.GetOrCreateMipStorageView(
           handle, static_cast<uint32_t>(mipLevel));
     }

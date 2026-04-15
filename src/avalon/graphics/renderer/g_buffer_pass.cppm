@@ -1,5 +1,5 @@
 module;
-export module avalon.graphics:depth_pass;
+export module avalon.graphics:g_buffer_pass;
 
 import avalon.core;
 import avalon.rhi;
@@ -12,13 +12,16 @@ import :renderer_types;
 
 namespace avalon::graphics {
 
-export class DepthPass final : public RenderPass<DepthPass> {
+export class GBufferPass final : public RenderPass<GBufferPass> {
 public:
   void Setup(RenderGraphBuilder &builder) override {
     builder.SetClearValue(ClearValue::DepthStencil(0, 0))
         .WriteAttachment(kSceneDepth, EResourceUsage::DepthStencilAttachment);
     builder.SetClearValue(ClearValue::Black())
-        .SetFormat(EFormat::R16_SFLOAT)
+        .SetFormat(EFormat::R16G16B16A16_SFLOAT)
+        .WriteAttachment("Normal"_id, EResourceUsage::ColorAttachment);
+    builder.SetClearValue(ClearValue::Black())
+        .SetFormat(EFormat::R32_Uint)
         .WriteAttachment("InstanceID"_id, EResourceUsage::ColorAttachment);
   }
 
@@ -31,7 +34,7 @@ public:
 
     auto &materialManager = GetMaterialManager();
 
-    auto materialHandle = materialManager.TryGetMaterial("Depth"_id);
+    auto materialHandle = materialManager.TryGetMaterial("GBuffer"_id);
     auto pMat = materialManager.Resolve(materialHandle);
 
     auto pipeline =

@@ -9,7 +9,7 @@ namespace avalon::ecs {
 export struct SolarComponent {
   float latitude = 30.f;
   float declination = 0.0f;
-  float timeOfDay = 8.0f;
+  float timeOfDay = 10.0f;
   float timeMultiplier = 1.0f;
 
   float intensity = 10.0f;

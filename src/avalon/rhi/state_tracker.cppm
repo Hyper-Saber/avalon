@@ -50,13 +50,13 @@ public:
                                  levelCount, nextStage);
 
     state->currentUsage = nextUsage;
-    state->currentLayout = barrier.newLayout;
     state->currentShaderStage = nextStage;
     if (IsWriteUsage(nextUsage)) {
       state->lastWriteStage = barrier.dstStage;
     } else if (barrier.newLayout != state->currentLayout) {
       state->lastWriteStage = EPipelineStage::None;
     }
+    state->currentLayout = barrier.newLayout;
 
     return barrier;
   }

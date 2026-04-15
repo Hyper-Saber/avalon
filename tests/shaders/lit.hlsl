@@ -34,20 +34,24 @@ float3 calculateIndirectLight(PBRSurface surface, float3 viewDir,
 
   float3 F_avg = F0;
 
-  float3 f_ms = (1.0 - E_v) * (1.0 - E_avg) / (1.0 - E_avg);
-  float3 s_ms = F_avg * E_avg / (1.0 - F_avg * (1.0 - E_avg));
+  float3 f_ms = (1.0 - E_v);
+  float3 s_ms = F_avg * E_avg / (1.0 - F_avg * (1.0 - E_avg) + 1e6);
   float3 multiScatteringOrder = s_ms * f_ms;
 
-  float3 specular = prefilteredColor * (f_ss + multiScatteringOrder);
+  float specularOcclusion =
+      saturate(pow(NdotV + surface.ao, 0.5) - 1.0 + surface.ao);
+  specularOcclusion = 1;
+  float3 specular =
+      prefilteredColor * (f_ss + multiScatteringOrder) * specularOcclusion;
 
   float3 kS = f_ss + multiScatteringOrder;
   float3 kD = (1.0 - kS) * (1.0 - surface.metallic);
 
   CubemapSH sh = uDynamicSSBO.Load<CubemapSH>(push.skyboxSHOffset);
   float3 irradiance = evaluateSH(N, sh);
-  float3 diffuse = irradiance * surface.albedo;
+  float3 diffuse = irradiance * surface.albedo * surface.ao;
 
-  return (kD * diffuse + specular) * surface.ao;
+  return (kD * diffuse + specular);
 }
 
 float3 calculateDirectLight(PBRSurface surface, Light mainLight, float3 viewDir,
@@ -78,8 +82,9 @@ float3 calculateDirectLight(PBRSurface surface, Light mainLight, float3 viewDir,
   float E_avg = brdfV.z;
 
   float3 F_avg = F0;
-  float3 s_ms = F_avg * E_avg / (1.0 - F_avg * (1.0 - E_avg));
-  float3 specularMS = s_ms * (1.0 - E_v) * (1.0 - E_l) / (kPi * (1.0 - E_avg));
+  float3 s_ms = F_avg * E_avg / (1.0 - F_avg * (1.0 - E_avg) + 1e6);
+  float3 specularMS =
+      s_ms * (1.0 - E_v) * (1.0 - E_l) / (kPi * (1.0 - E_avg) + 1e6);
 
   float3 kS = (F0 * brdfV.x + brdfV.y) + (s_ms * (1.0 - E_v));
   float3 kd = (1.0 - saturate(kS)) * (1.0 - surface.metallic);
@@ -102,19 +107,19 @@ VSOutput VsMain(uint vertexID : SV_VertexID, uint instanceID : SV_InstanceID) {
   VSOutput output;
 
   InstanceData data = loadInstanceData(instanceID);
-  VertexPosUV posUV = loadVertexPosUV(vertexID, data.posUVOffset);
+  VertexGeometry geometry = loadVertexGeometry(vertexID, data.geometryOffset);
   VertexAttributes attributes =
       loadVertexAttributes(vertexID, data.attributesOffset);
 
-  float4 worldPos = calculateWorldPosition(data.modelOffset, posUV.position);
+  float4 worldPos = calculateWorldPosition(data.modelOffset, geometry.position);
   output.worldPos = worldPos.xyz;
   output.clipPos = calculateClipPosition(worldPos);
 
   output.color = attributes.color;
 
-  output.uv = posUV.uv;
+  output.uv = geometry.uv;
   output.worldNormal =
-      calculateWorldNormal(data.invModelOffset, attributes.normal);
+      calculateWorldNormal(data.invModelOffset, geometry.normal);
   output.materialID = data.materialID;
 
   return output;
@@ -131,6 +136,10 @@ float4 FsMain(VSOutput input) : SV_Target {
   surface.normal = normalize(input.worldNormal);
   surface.ao = mMaterial.ao;
   surface.roughness = max(surface.roughness, 0.05);
+
+  float4 shadow = loadTexture2d(push.shadowMask, uint2(input.clipPos.xy));
+  surface.ao = min(surface.ao, shadow.g);
+
   float3 V = normalize(uCamera.worldPosition.xyz - input.worldPos);
   float3 direct = calculateDirectLight(surface, uMainLight, V, push.brdfLut,
                                        mMaterial.sampler);
@@ -138,5 +147,7 @@ float4 FsMain(VSOutput input) : SV_Target {
   float3 indirect = calculateIndirectLight(surface, V, push.prefilterMap,
                                            push.brdfLut, mMaterial.sampler);
 
-  return float4(direct + indirect, 1.0);
+  float3 finalColor = direct * shadow.x + indirect;
+
+  return float4(finalColor, 1.0);
 }

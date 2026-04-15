@@ -369,16 +369,23 @@ private:
       queueCreateInfos.PushBack(createInfo);
     }
 
-    VkPhysicalDeviceShaderAtomicFloatFeaturesEXT atomicFloatFeature{
+    VkPhysicalDeviceComputeShaderDerivativesFeaturesKHR csDerivativeFeatures{
+        .sType =
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COMPUTE_SHADER_DERIVATIVES_FEATURES_KHR,
+        .pNext = nullptr,
+        .computeDerivativeGroupQuads = VK_TRUE,
+    };
+
+    VkPhysicalDeviceShaderAtomicFloatFeaturesEXT atomicFloatFeatures{
         .sType =
             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_FLOAT_FEATURES_EXT,
-        .pNext = nullptr,
+        .pNext = &csDerivativeFeatures,
         .shaderBufferFloat32AtomicAdd = VK_TRUE,
     };
 
     VkPhysicalDeviceVulkan13Features features13{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
-        .pNext = &atomicFloatFeature,
+        .pNext = &atomicFloatFeatures,
         .synchronization2 = VK_TRUE,
         .dynamicRendering = VK_TRUE,
         .maintenance4 = VK_TRUE,
@@ -419,6 +426,7 @@ private:
 
     m_config.extensions.PushBack("VK_GOOGLE_user_type");
     m_config.extensions.PushBack(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME);
+    m_config.extensions.PushBack("VK_KHR_compute_shader_derivatives");
 
     VkDeviceCreateInfo createInfo{
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,

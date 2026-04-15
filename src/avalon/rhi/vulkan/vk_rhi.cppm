@@ -89,6 +89,7 @@ public:
   auto GetTexture(TextureHandle) -> const TextureResource * override;
   auto GetOrCreateMipStorageView(TextureHandle, uint32_t mipLevel)
       -> VkImageView override;
+  auto GetOrCreateDepthTextureView(TextureHandle) -> VkImageView override;
   auto GetSampler(SamplerHandle) -> const SamplerResource * override;
   auto GetDescriptorSet(DescriptorSetHandle handle)
       -> const DescriptorSetResource * override;

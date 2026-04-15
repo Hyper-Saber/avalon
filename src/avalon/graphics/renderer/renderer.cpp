@@ -78,9 +78,9 @@ public:
         .time = GetContext().globalTime,
         .resolution = m_resolution,
     };
-    UpdateSceneGlobalSet(*cmd, globals);
 
     PrepareMaterialBatches(m_packet, snapshot);
+    UpdateSceneGlobalSet(*cmd, globals);
 
     RenderGraph graph(m_rhi, *m_resourceManager.Get());
 
@@ -120,7 +120,8 @@ private:
 
   void PrepareMaterialBatches(RenderPacket &packet,
                               const SceneSnapshot &snapshot) {
-    uint32_t totalInstances = snapshot.opaqueMeshHandles.GetSize();
+    uint32_t totalInstances =
+        static_cast<uint32_t>(snapshot.opaqueMeshHandles.GetSize());
     AVALON_ASSERT(snapshot.opaqueWorldMatrices.GetSize() == totalInstances);
     AVALON_ASSERT(snapshot.opaqueInvWorldMatrices.GetSize() == totalInstances);
 
@@ -207,15 +208,16 @@ private:
                 indirectAlloc.size);
 
     packet.opaqueInstanceDataBaseOffset = instanceAlloc.offset;
+    packet.opaqueInstanceCount = totalInstances;
     packet.indirectCommandBufferAllocation = indirectAlloc;
     packet.totalCommandCount = indirectCommands.GetSize();
   }
 
-  graphics::InstanceData BuildInstanceData(uint32_t snapshotIdx,
-                                           const SceneSnapshot &snapshot,
-                                           uint32_t modelOffset,
-                                           uint32_t invModelOffset) {
-    graphics::InstanceData data{};
+  InstanceData BuildInstanceData(uint32_t snapshotIdx,
+                                 const SceneSnapshot &snapshot,
+                                 uint32_t modelOffset,
+                                 uint32_t invModelOffset) {
+    InstanceData data{};
 
     auto meshHandle = snapshot.opaqueMeshHandles[snapshotIdx];
     auto instHandle = snapshot.opaqueMaterialInstances[snapshotIdx];
@@ -224,7 +226,7 @@ private:
 
     data.instanceID = snapshotIdx;
     data.materialID = matInst.GetGpuIndex();
-    data.geometryOffset = mesh->GetPosUVOffset();
+    data.geometryOffset = mesh->GetGeometryOffset();
     data.attributeOffset = mesh->GetAttributeOffset();
     data.indexOffset = mesh->GetIndexOffset();
     data.vertexCount = mesh->GetVertexCount();
@@ -257,7 +259,7 @@ private:
   UniquePtr<VirtualResourceManager> m_resourceManager;
 
   RenderPacket m_packet;
-  Resolution m_resolution;
+  Resolution m_resolution{0, 0, kEpsilon, kEpsilon};
 };
 
 auto CreateRenderer(rhi::IRhi &rhi) -> UniquePtr<IRenderer> {

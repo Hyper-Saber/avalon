@@ -31,6 +31,8 @@ public:
 
     auto cube = scene.CreatePrimitive(graphics::ESDFType::Cube);
     auto sphere = scene.CreatePrimitive(graphics::ESDFType::Sphere);
+    auto plane = scene.CreatePrimitive(graphics::ESDFType::Plane);
+
     world.AddComponent<ecs::SphereComponent>(sphere);
     world.AddComponent<ecs::CubeComponent>(cube);
 
@@ -48,7 +50,7 @@ public:
     materialInstanceHandle = materialManager.CreateMaterialInstance(
         materialManager.GetDefaultOpaque());
     materialInstance = materialManager.Resolve(materialInstanceHandle);
-    materialInstance->SetProperty("uMaterials.albedo"_id, Color::Black());
+    materialInstance->SetProperty("uMaterials.albedo"_id, Color::White());
     materialInstance->SetProperty("uMaterials.metallic"_id, 0.7f);
     materialInstance->SetProperty("uMaterials.roughness"_id, 0.3f);
     materialInstance->SetProperty("uMaterials.ao"_id, 1.0f);
@@ -56,10 +58,24 @@ public:
     renderComp = world.GetComponent<ecs::RenderComponent>(sphere);
     renderComp->materialInstanceHandle = materialInstanceHandle;
 
+    materialInstanceHandle = materialManager.CreateMaterialInstance(
+        materialManager.GetDefaultOpaque());
+    materialInstance = materialManager.Resolve(materialInstanceHandle);
+    materialInstance->SetProperty("uMaterials.albedo"_id, Color::White());
+    materialInstance->SetProperty("uMaterials.metallic"_id, 0.0f);
+    materialInstance->SetProperty("uMaterials.roughness"_id, 0.3f);
+    materialInstance->SetProperty("uMaterials.ao"_id, 1.0f);
+
+    renderComp = world.GetComponent<ecs::RenderComponent>(plane);
+    renderComp->materialInstanceHandle = materialInstanceHandle;
+
     auto transComp = world.GetComponent<ecs::TransformComponent>(cube);
-    transComp->SetPosition({0, 0, 1});
+    transComp->SetPosition({1, 0, 1});
     transComp = world.GetComponent<ecs::TransformComponent>(sphere);
-    transComp->SetPosition({0.5, 0, -1});
+    transComp->SetPosition({0, 0, 0});
+    transComp = world.GetComponent<ecs::TransformComponent>(plane);
+    transComp->SetPosition({0, -0.6, 1});
+    transComp->SetScale({10, 10, 10});
 
     auto light = scene.AddLight(scene::ELightType::Directional);
     transComp = world.GetComponent<ecs::TransformComponent>(light);
